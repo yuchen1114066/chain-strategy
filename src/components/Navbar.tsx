@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Menu, X, Leaf, ShoppingCart, Search, User } from "lucide-react";
 
 const navLinks = [
+  { href: "/beauty", label: "✨ 代謝美顏", highlight: true },
   { href: "/recipes", label: "食療食譜" },
   { href: "/quiz", label: "體質測評" },
   { href: "/herb-checker", label: "藥物查詢" },
@@ -36,7 +37,11 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="px-3 py-2 text-sm font-medium text-stone-700 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
+                className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  link.highlight
+                    ? "text-rose-600 bg-rose-50 hover:bg-rose-100 font-semibold"
+                    : "text-stone-700 hover:text-amber-700 hover:bg-amber-50"
+                }`}
               >
                 {link.label}
               </Link>
