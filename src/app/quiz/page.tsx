@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CheckCircle, RefreshCw, Star, Leaf, ChevronRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle, RefreshCw, Star, Leaf, ChevronRight, Save } from "lucide-react";
 import { quizQuestions, constitutions } from "@/lib/data";
+import { saveAssessment, getSessionId } from "@/lib/supabase";
 
 type QuizState = "intro" | "quiz" | "result";
 
@@ -14,6 +15,7 @@ export default function QuizPage() {
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [scores, setScores] = useState<Record<string, number>>({});
   const [resultId, setResultId] = useState<string>("");
+  const [saved, setSaved] = useState(false);
 
   const totalQuestions = quizQuestions.length;
   const progress = ((currentQ) / totalQuestions) * 100;
@@ -45,10 +47,20 @@ export default function QuizPage() {
     setAnswers([...answers, selectedOption]);
 
     if (currentQ + 1 >= totalQuestions) {
-      // Calculate result
       const topConstitution = Object.entries(newScores).sort(([, a], [, b]) => b - a)[0];
-      setResultId(topConstitution ? topConstitution[0] : "ping-he");
+      const topId = topConstitution ? topConstitution[0] : "ping-he";
+      setResultId(topId);
       setState("result");
+      // Save to Supabase (best-effort, non-blocking)
+      saveAssessment({
+        session_id: getSessionId(),
+        primary_constitution: topId,
+        scores: newScores,
+        answers: [...answers, selectedOption],
+      }).catch(() => {});
+      // Cache in localStorage for tracking page
+      localStorage.setItem("ys_last_constitution", topId);
+      setSaved(true);
     } else {
       setCurrentQ(currentQ + 1);
       setSelectedOption(null);
@@ -381,8 +393,23 @@ export default function QuizPage() {
           </div>
         </div>
 
+        {/* Save notice */}
+        {saved && (
+          <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-4 text-sm text-green-700">
+            <Save className="w-4 h-4 flex-shrink-0" />
+            測評結果已儲存，可在七天打卡追蹤你的食療進度
+          </div>
+        )}
+
         {/* CTA */}
         <div className="flex flex-col gap-3">
+          <Link
+            href="/tracking"
+            className="w-full py-4 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all hover:shadow-lg hover:shadow-rose-500/30"
+          >
+            🗓️ 開始七天食療打卡計劃
+            <ChevronRight className="w-5 h-5" />
+          </Link>
           <Link
             href="/recipes"
             className="w-full py-4 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all hover:shadow-lg"
