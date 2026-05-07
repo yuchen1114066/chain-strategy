@@ -13,10 +13,10 @@ export default function Footer() {
             <div className="mb-4">
               <div className="inline-block rounded-xl overflow-hidden bg-black p-2">
                 <Image
-                  src="/chengshu-logo.png"
+                  src="/chengshu-logo.svg"
                   alt="梣數策院"
-                  width={120}
-                  height={60}
+                  width={130}
+                  height={65}
                   className="object-contain"
                 />
               </div>
