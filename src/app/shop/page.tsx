@@ -88,7 +88,7 @@ export default function ShopPage() {
               placeholder="搜尋商品..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm text-stone-700 placeholder-stone-400 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm text-stone-700 placeholder-stone-400 focus:outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition-all"
             />
             {search && (
               <button onClick={() => setSearch("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600">
@@ -99,7 +99,7 @@ export default function ShopPage() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            className="px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm text-stone-700 focus:outline-none focus:border-amber-400 transition-all"
+            className="px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm text-stone-700 focus:outline-none focus:border-rose-300 transition-all"
           >
             <option value="default">預設排序</option>
             <option value="price-asc">價格由低到高</option>
@@ -131,9 +131,10 @@ export default function ShopPage() {
             onClick={() => setSelectedConstitution("全部")}
             className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all whitespace-nowrap ${
               selectedConstitution === "全部"
-                ? "bg-amber-600 border-amber-600 text-white"
-                : "bg-white border-stone-200 text-stone-600 hover:border-amber-300"
+                ? "border-[#c4607a] text-white"
+                : "bg-white border-stone-200 text-stone-600 hover:border-rose-300"
             }`}
+            style={selectedConstitution === "全部" ? {background:"linear-gradient(135deg,#e8a0b4,#c4607a)"} : undefined}
           >
             所有體質
           </button>
@@ -143,9 +144,10 @@ export default function ShopPage() {
               onClick={() => setSelectedConstitution(c.id)}
               className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all whitespace-nowrap ${
                 selectedConstitution === c.id
-                  ? "bg-amber-600 border-amber-600 text-white"
-                  : "bg-white border-stone-200 text-stone-600 hover:border-amber-300"
+                  ? "border-[#c4607a] text-white"
+                  : "bg-white border-stone-200 text-stone-600 hover:border-rose-300"
               }`}
+              style={selectedConstitution === c.id ? {background:"linear-gradient(135deg,#e8a0b4,#c4607a)"} : undefined}
             >
               {c.name}
             </button>
@@ -187,7 +189,7 @@ export default function ShopPage() {
                       </span>
                     )}
                     {product.originalPrice && (
-                      <span className="bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                      <span className="text-white text-xs font-bold px-2 py-0.5 rounded-full" style={{background:"linear-gradient(135deg,#e8a0b4,#c4607a)"}}>
                         特價
                       </span>
                     )}
@@ -232,7 +234,7 @@ export default function ShopPage() {
                     {[1, 2, 3, 4, 5].map((i) => (
                       <Star
                         key={i}
-                        className={`w-3.5 h-3.5 ${i <= Math.round(product.rating) ? "fill-amber-400 text-amber-400" : "text-stone-200"}`}
+                        className={`w-3.5 h-3.5 ${i <= Math.round(product.rating) ? "fill-[#c4607a] text-[#c4607a]" : "text-stone-200"}`}
                       />
                     ))}
                     <span className="text-xs text-stone-500 ml-1">({product.reviews})</span>
@@ -272,7 +274,8 @@ export default function ShopPage() {
             <p className="text-stone-500 mb-6">嘗試更換搜尋條件或篩選選項</p>
             <button
               onClick={() => { setSearch(""); setSelectedCategory("全部"); setSelectedConstitution("全部"); }}
-              className="px-6 py-3 bg-green-700 text-white rounded-xl font-medium hover:bg-green-600 transition-colors"
+              className="px-6 py-3 text-white rounded-full font-medium transition-colors hover:opacity-90"
+              style={{background:"linear-gradient(135deg,#e8a0b4,#c4607a)"}}
             >
               清除所有篩選
             </button>
@@ -297,7 +300,7 @@ export default function ShopPage() {
                 ))}
               </div>
             </div>
-            <button className="flex-shrink-0 px-8 py-4 bg-amber-500 hover:bg-amber-400 text-white font-bold rounded-xl transition-all hover:shadow-lg whitespace-nowrap">
+            <button className="flex-shrink-0 px-8 py-4 text-white font-bold rounded-full transition-all hover:shadow-lg hover:opacity-90 whitespace-nowrap" style={{background:"linear-gradient(135deg,#e8a0b4,#c4607a)"}}>
               立即訂閱
             </button>
           </div>
@@ -315,7 +318,7 @@ export default function ShopPage() {
               <div className="flex items-center gap-2 mt-3">
                 <div className="flex">
                   {[1, 2, 3, 4, 5].map((i) => (
-                    <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
+                    <Star key={i} className="w-4 h-4 fill-[#c4607a] text-[#c4607a]" />
                   ))}
                 </div>
                 <span className="text-sm text-stone-500">4.9分 · 445 則評價</span>

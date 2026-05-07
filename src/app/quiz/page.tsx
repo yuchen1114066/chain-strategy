@@ -103,11 +103,11 @@ export default function QuizPage() {
 
   if (state === "intro") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 to-stone-100">
+      <div className="min-h-screen bg-gradient-to-br from-[#fdf7f2] to-[#fce8ef]">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16">
           {/* Header */}
           <div className="text-center mb-12">
-            <div className="w-20 h-20 bg-gradient-to-br from-amber-500 to-green-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+            <div className="w-20 h-20 bg-gradient-to-br from-rose-400 to-[#5a8a6a] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
               <Leaf className="w-10 h-10 text-white" />
             </div>
             <h1 className="text-4xl font-bold text-stone-800 mb-4">體質測評</h1>
@@ -116,7 +116,7 @@ export default function QuizPage() {
           </div>
 
           {/* Intro Card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-amber-100 p-8 mb-8">
+          <div className="bg-white rounded-2xl shadow-sm border border-rose-100 p-8 mb-8">
             <h2 className="text-xl font-bold text-stone-800 mb-4">關於此測評</h2>
             <p className="text-stone-600 leading-relaxed mb-6">
               中醫體質學說將人的體質分為九種基本類型，每種體質有其獨特的生理特徵、心理特點和對疾病的傾向性。了解自己的體質，可以幫助您選擇最適合的飲食、運動和生活方式。
@@ -131,14 +131,14 @@ export default function QuizPage() {
                 { icon: "🌿", label: "調理方案" },
                 { icon: "💊", label: "宜忌食物清單" },
               ].map((item) => (
-                <div key={item.label} className="flex items-center gap-2 bg-amber-50 rounded-lg px-3 py-2">
+                <div key={item.label} className="flex items-center gap-2 bg-rose-50 rounded-lg px-3 py-2">
                   <span className="text-lg">{item.icon}</span>
                   <span className="text-sm text-stone-600">{item.label}</span>
                 </div>
               ))}
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 text-sm text-[#5c3a4a]">
               <strong>重要提示：</strong>此測評僅供參考，不能替代專業中醫師的診斷。如有健康疑慮，請諮詢合格的中醫師。
             </div>
           </div>
@@ -160,7 +160,8 @@ export default function QuizPage() {
 
           <button
             onClick={startQuiz}
-            className="w-full py-4 bg-amber-600 hover:bg-amber-500 text-white font-bold text-lg rounded-xl transition-all hover:shadow-lg hover:shadow-amber-500/30 flex items-center justify-center gap-2"
+            className="w-full py-4 text-white font-bold text-lg rounded-full transition-all hover:shadow-lg flex items-center justify-center gap-2"
+            style={{background:"linear-gradient(135deg,#e8a0b4,#c4607a)"}}
           >
             <Star className="w-6 h-6" />
             開始測評
@@ -175,7 +176,7 @@ export default function QuizPage() {
     const question = quizQuestions[currentQ];
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 to-stone-100">
+      <div className="min-h-screen bg-gradient-to-br from-[#fdf7f2] to-[#fce8ef]">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
           {/* Progress */}
           <div className="mb-8">
@@ -183,13 +184,13 @@ export default function QuizPage() {
               <span className="text-sm font-medium text-stone-500">
                 第 {currentQ + 1} 題，共 {totalQuestions} 題
               </span>
-              <span className="text-sm font-semibold text-amber-700">
+              <span className="text-sm font-semibold text-[#c4607a]">
                 {Math.round(progress)}% 完成
               </span>
             </div>
             <div className="w-full bg-stone-200 rounded-full h-2.5">
               <div
-                className="bg-gradient-to-r from-amber-500 to-green-500 h-2.5 rounded-full transition-all duration-500"
+                className="bg-gradient-to-r from-[#e8a0b4] to-[#5a8a6a] h-2.5 rounded-full transition-all duration-500"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -199,7 +200,7 @@ export default function QuizPage() {
                 <div
                   key={i}
                   className={`flex-1 h-1 rounded-full transition-colors ${
-                    i < currentQ ? "bg-green-500" : i === currentQ ? "bg-amber-500" : "bg-stone-200"
+                    i < currentQ ? "bg-[#5a8a6a]" : i === currentQ ? "bg-[#e8a0b4]" : "bg-stone-200"
                   }`}
                 />
               ))}
@@ -207,9 +208,9 @@ export default function QuizPage() {
           </div>
 
           {/* Question Card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-amber-100 p-8 mb-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-rose-100 p-8 mb-6">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-amber-700 font-bold text-lg flex-shrink-0">
+              <div className="w-10 h-10 bg-rose-100 rounded-xl flex items-center justify-center text-[#5c3a4a] font-bold text-lg flex-shrink-0">
                 {currentQ + 1}
               </div>
               <h2 className="text-xl font-bold text-stone-800 leading-snug">{question.question}</h2>
@@ -222,15 +223,15 @@ export default function QuizPage() {
                   onClick={() => handleSelect(i)}
                   className={`w-full text-left px-5 py-4 rounded-xl border-2 transition-all ${
                     selectedOption === i
-                      ? "border-amber-500 bg-amber-50 text-amber-800"
-                      : "border-stone-200 bg-stone-50 hover:border-amber-300 hover:bg-amber-50/50 text-stone-700"
+                      ? "border-rose-400 bg-rose-50 text-[#5c3a4a]"
+                      : "border-stone-200 bg-stone-50 hover:border-rose-300 hover:bg-rose-50/50 text-stone-700"
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <div
                       className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
                         selectedOption === i
-                          ? "border-amber-500 bg-amber-500"
+                          ? "border-rose-400 bg-rose-400"
                           : "border-stone-300"
                       }`}
                     >
@@ -249,7 +250,7 @@ export default function QuizPage() {
           <div className="flex gap-3">
             <button
               onClick={handleBack}
-              className="flex items-center gap-2 px-5 py-3 bg-white border border-stone-200 text-stone-600 hover:bg-stone-50 rounded-xl font-medium transition-colors"
+              className="flex items-center gap-2 px-5 py-3 bg-white border border-stone-200 text-stone-600 hover:bg-stone-50 rounded-full font-medium transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
               {currentQ === 0 ? "返回介紹" : "上一題"}
@@ -257,11 +258,12 @@ export default function QuizPage() {
             <button
               onClick={handleNext}
               disabled={selectedOption === null}
-              className={`flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-semibold transition-all ${
+              className={`flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-full font-semibold transition-all ${
                 selectedOption !== null
-                  ? "bg-amber-600 hover:bg-amber-500 text-white hover:shadow-lg hover:shadow-amber-500/30"
+                  ? "text-white hover:shadow-lg"
                   : "bg-stone-200 text-stone-400 cursor-not-allowed"
               }`}
+              style={selectedOption !== null ? {background:"linear-gradient(135deg,#e8a0b4,#c4607a)"} : undefined}
             >
               {currentQ + 1 === totalQuestions ? "查看結果" : "下一題"}
               <ArrowRight className="w-4 h-4" />
@@ -277,7 +279,7 @@ export default function QuizPage() {
   const colors = constitutionColorMap[resultConstitution.color] || constitutionColorMap["yellow"];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-stone-100">
+    <div className="min-h-screen bg-gradient-to-br from-[#fdf7f2] to-[#fce8ef]">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
         {/* Result Header */}
         <div className="text-center mb-8">
@@ -311,7 +313,7 @@ export default function QuizPage() {
               <ul className="space-y-1.5">
                 {resultConstitution.characteristics.map((c) => (
                   <li key={c} className="flex items-center gap-2 text-sm text-stone-600">
-                    <span className={`w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0`} />
+                    <span className={`w-1.5 h-1.5 rounded-full bg-[#c4607a] flex-shrink-0`} />
                     {c}
                   </li>
                 ))}
@@ -381,7 +383,7 @@ export default function QuizPage() {
                     <div className="flex-1 bg-stone-100 rounded-full h-2">
                       <div
                         className={`h-2 rounded-full transition-all ${
-                          id === resultId ? "bg-amber-500" : "bg-stone-300"
+                          id === resultId ? "bg-[#c4607a]" : "bg-stone-300"
                         }`}
                         style={{ width: `${percentage}%` }}
                       />
@@ -405,21 +407,22 @@ export default function QuizPage() {
         <div className="flex flex-col gap-3">
           <Link
             href="/tracking"
-            className="w-full py-4 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all hover:shadow-lg hover:shadow-rose-500/30"
+            className="w-full py-4 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-full flex items-center justify-center gap-2 transition-all hover:shadow-lg hover:shadow-rose-500/30"
           >
             🗓️ 開始七天食療打卡計劃
             <ChevronRight className="w-5 h-5" />
           </Link>
           <Link
             href="/recipes"
-            className="w-full py-4 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all hover:shadow-lg"
+            className="w-full py-4 text-white font-bold rounded-full flex items-center justify-center gap-2 transition-all hover:shadow-lg"
+            style={{background:"linear-gradient(135deg,#e8a0b4,#c4607a)"}}
           >
             查看適合我的食療食譜
             <ChevronRight className="w-5 h-5" />
           </Link>
           <Link
             href="/shop"
-            className="w-full py-4 bg-green-700 hover:bg-green-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all hover:shadow-lg"
+            className="w-full py-4 bg-[#5a8a6a] hover:bg-[#4a7a5a] text-white font-semibold rounded-full flex items-center justify-center gap-2 transition-all hover:shadow-lg"
           >
             購買體質調理產品
             <ChevronRight className="w-5 h-5" />
@@ -432,7 +435,7 @@ export default function QuizPage() {
               setScores({});
               setSelectedOption(null);
             }}
-            className="w-full py-3 bg-white border border-stone-200 text-stone-600 hover:bg-stone-50 font-medium rounded-xl flex items-center justify-center gap-2 transition-colors"
+            className="w-full py-3 bg-white border border-stone-200 text-stone-600 hover:bg-stone-50 font-medium rounded-full flex items-center justify-center gap-2 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             重新測評

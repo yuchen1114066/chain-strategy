@@ -62,16 +62,17 @@ export default function RecipesPage() {
               placeholder="搜尋食譜名稱、食材、效果..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-white border border-stone-200 rounded-xl text-stone-700 placeholder-stone-400 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
+              className="w-full pl-12 pr-4 py-3 bg-white border border-stone-200 rounded-xl text-stone-700 placeholder-stone-400 focus:outline-none focus:border-[#c4607a] focus:ring-2 focus:ring-rose-100 transition-all"
             />
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-3 rounded-xl border font-medium text-sm transition-all ${
+            className={`flex items-center gap-2 px-4 py-3 rounded-full border font-medium text-sm transition-all ${
               showFilters
-                ? "bg-amber-600 border-amber-600 text-white"
-                : "bg-white border-stone-200 text-stone-600 hover:border-amber-300"
+                ? "border-transparent text-white"
+                : "bg-white border-stone-200 text-stone-600 hover:border-rose-300"
             }`}
+            style={showFilters ? {background: "linear-gradient(135deg,#e8a0b4,#c4607a)"} : undefined}
           >
             <Filter className="w-4 h-4" />
             篩選
@@ -92,9 +93,10 @@ export default function RecipesPage() {
                       onClick={() => setSelectedCategory(cat)}
                       className={`px-3 py-1 text-xs rounded-full border transition-all ${
                         selectedCategory === cat
-                          ? "bg-amber-600 border-amber-600 text-white"
-                          : "bg-stone-50 border-stone-200 text-stone-600 hover:border-amber-300"
+                          ? "border-transparent text-white"
+                          : "bg-stone-50 border-stone-200 text-stone-600 hover:border-rose-300"
                       }`}
+                      style={selectedCategory === cat ? {background: "linear-gradient(135deg,#e8a0b4,#c4607a)"} : undefined}
                     >
                       {cat}
                     </button>
@@ -112,9 +114,10 @@ export default function RecipesPage() {
                       onClick={() => setSelectedSeason(s)}
                       className={`px-3 py-1 text-xs rounded-full border transition-all ${
                         selectedSeason === s
-                          ? "bg-amber-600 border-amber-600 text-white"
-                          : "bg-stone-50 border-stone-200 text-stone-600 hover:border-amber-300"
+                          ? "border-transparent text-white"
+                          : "bg-stone-50 border-stone-200 text-stone-600 hover:border-rose-300"
                       }`}
+                      style={selectedSeason === s ? {background: "linear-gradient(135deg,#e8a0b4,#c4607a)"} : undefined}
                     >
                       {s}
                     </button>
@@ -132,9 +135,10 @@ export default function RecipesPage() {
                       onClick={() => setSelectedDifficulty(d)}
                       className={`px-3 py-1 text-xs rounded-full border transition-all ${
                         selectedDifficulty === d
-                          ? "bg-amber-600 border-amber-600 text-white"
-                          : "bg-stone-50 border-stone-200 text-stone-600 hover:border-amber-300"
+                          ? "border-transparent text-white"
+                          : "bg-stone-50 border-stone-200 text-stone-600 hover:border-rose-300"
                       }`}
+                      style={selectedDifficulty === d ? {background: "linear-gradient(135deg,#e8a0b4,#c4607a)"} : undefined}
                     >
                       {d}
                     </button>
@@ -150,9 +154,10 @@ export default function RecipesPage() {
                     onClick={() => setSelectedConstitution("全部")}
                     className={`px-3 py-1 text-xs rounded-full border transition-all ${
                       selectedConstitution === "全部"
-                        ? "bg-amber-600 border-amber-600 text-white"
-                        : "bg-stone-50 border-stone-200 text-stone-600 hover:border-amber-300"
+                        ? "border-transparent text-white"
+                        : "bg-stone-50 border-stone-200 text-stone-600 hover:border-rose-300"
                     }`}
+                    style={selectedConstitution === "全部" ? {background: "linear-gradient(135deg,#e8a0b4,#c4607a)"} : undefined}
                   >
                     全部
                   </button>
@@ -162,9 +167,10 @@ export default function RecipesPage() {
                       onClick={() => setSelectedConstitution(c.id)}
                       className={`px-3 py-1 text-xs rounded-full border transition-all ${
                         selectedConstitution === c.id
-                          ? "bg-amber-600 border-amber-600 text-white"
-                          : "bg-stone-50 border-stone-200 text-stone-600 hover:border-amber-300"
+                          ? "border-transparent text-white"
+                          : "bg-stone-50 border-stone-200 text-stone-600 hover:border-rose-300"
                       }`}
+                      style={selectedConstitution === c.id ? {background: "linear-gradient(135deg,#e8a0b4,#c4607a)"} : undefined}
                     >
                       {c.name}
                     </button>
@@ -183,7 +189,7 @@ export default function RecipesPage() {
                   setSelectedConstitution("全部");
                   setSearch("");
                 }}
-                className="text-xs text-amber-600 hover:text-amber-500 font-medium"
+                className="text-xs text-[#c4607a] hover:text-[#c4607a] font-medium"
               >
                 清除所有篩選
               </button>
@@ -218,7 +224,7 @@ export default function RecipesPage() {
                   <div className="absolute top-3 right-3">
                     <span className={`text-xs font-medium px-2 py-1 rounded-full ${
                       recipe.difficulty === "簡單" ? "bg-green-100 text-green-700" :
-                      recipe.difficulty === "中等" ? "bg-amber-100 text-amber-700" :
+                      recipe.difficulty === "中等" ? "bg-rose-100 text-[#5c3a4a]" :
                       "bg-red-100 text-red-700"
                     }`}>
                       {recipe.difficulty}
@@ -227,7 +233,7 @@ export default function RecipesPage() {
                 </div>
 
                 <div className="p-4">
-                  <h3 className="font-bold text-stone-800 mb-1.5 group-hover:text-amber-700 transition-colors leading-snug">
+                  <h3 className="font-bold text-stone-800 mb-1.5 group-hover:text-[#c4607a] transition-colors leading-snug">
                     {recipe.title}
                   </h3>
                   <p className="text-xs text-stone-500 line-clamp-2 leading-relaxed mb-3">
@@ -237,7 +243,7 @@ export default function RecipesPage() {
                   {/* Tags */}
                   <div className="flex flex-wrap gap-1 mb-3">
                     {recipe.tags.slice(0, 3).map((tag) => (
-                      <span key={tag} className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">
+                      <span key={tag} className="text-xs bg-rose-50 text-[#5c3a4a] px-2 py-0.5 rounded-full">
                         {tag}
                       </span>
                     ))}
@@ -256,8 +262,8 @@ export default function RecipesPage() {
                       </span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                      <span className="font-semibold text-amber-600">{recipe.rating}</span>
+                      <Star className="w-3 h-3 fill-[#e8a0b4] text-[#e8a0b4]" />
+                      <span className="font-semibold text-[#c4607a]">{recipe.rating}</span>
                     </div>
                   </div>
 
@@ -282,7 +288,8 @@ export default function RecipesPage() {
                 setSelectedDifficulty("全部");
                 setSelectedConstitution("全部");
               }}
-              className="px-6 py-3 bg-amber-600 text-white rounded-xl font-medium hover:bg-amber-500 transition-colors"
+              className="px-6 py-3 text-white rounded-full font-medium transition-colors"
+              style={{background: "linear-gradient(135deg,#e8a0b4,#c4607a)"}}
             >
               清除所有篩選
             </button>
