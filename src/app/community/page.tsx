@@ -5,14 +5,16 @@ import { Heart, MessageSquare, Eye, Search, Filter, PenSquare, TrendingUp, Clock
 import { communityPosts, constitutions } from "@/lib/data";
 import Link from "next/link";
 
-const categories = ["全部", "育兒養生", "中老年養生", "體質諮詢", "季節養生", "女性養生", "體重管理", "慢性病管理", "外食族養生", "養生討論"];
+const categories = ["全部", "駐站醫師專欄", "育兒養生", "中老年養生", "體質諮詢", "季節養生", "女性養生", "體重管理", "慢性病管理", "外食族養生", "養生討論"];
 
 export default function CommunityPage() {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("全部");
   const [sortBy, setSortBy] = useState<"latest" | "popular" | "trending">("popular");
 
-  const filtered = communityPosts
+  const featuredPosts = communityPosts.filter((p) => p.featured);
+
+  const filtered = communityPosts.filter((p) => !p.featured)
     .filter((post) => {
       const matchSearch =
         !search ||
@@ -128,6 +130,64 @@ export default function CommunityPage() {
                 </button>
               ))}
             </div>
+
+            {/* Featured Doctor Posts */}
+            {(selectedCategory === "全部" || selectedCategory === "駐站醫師專欄") && !search && (
+              <div className="mb-8">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-lg">🏥</span>
+                  <h2 className="font-bold text-stone-800">駐站中醫師精選文章</h2>
+                  <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">中老年人必看</span>
+                </div>
+                <div className="space-y-4">
+                  {featuredPosts.map((post) => (
+                    <article key={post.id} className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border-2 border-amber-200 shadow-sm p-5">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-amber-600 to-orange-600 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                          {post.avatar}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <div>
+                              <span className="font-bold text-amber-800 text-sm">{post.author}</span>
+                              {post.authorRole && <span className="text-amber-600 text-xs ml-2">{post.authorRole}</span>}
+                            </div>
+                            <div className="flex gap-1.5 flex-shrink-0">
+                              <span className="text-xs bg-amber-600 text-white px-2 py-0.5 rounded-full">駐站醫師</span>
+                              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{post.createdAt}</span>
+                            </div>
+                          </div>
+                          <h3 className="text-base font-bold text-stone-800 mb-2 leading-snug hover:text-amber-700 cursor-pointer transition-colors">
+                            {post.title}
+                          </h3>
+                          <p className="text-sm text-stone-600 line-clamp-3 leading-relaxed mb-3 whitespace-pre-line">
+                            {post.content.slice(0, 200)}…
+                          </p>
+                          <div className="flex flex-wrap gap-1.5 mb-3">
+                            {post.tags.map((tag) => (
+                              <span key={tag} className="text-xs text-amber-700 bg-white px-2 py-0.5 rounded-full border border-amber-200">
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-5 text-xs text-stone-400">
+                            <button className="flex items-center gap-1 hover:text-red-400 transition-colors">
+                              <Heart className="w-4 h-4" /><span className="font-medium">{post.likes.toLocaleString()}</span>
+                            </button>
+                            <span className="flex items-center gap-1"><MessageSquare className="w-4 h-4" />{post.replies} 則留言</span>
+                            <span className="flex items-center gap-1"><Eye className="w-4 h-4" />{post.views.toLocaleString()} 次瀏覽</span>
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <div className="mt-4 border-t border-stone-200 pt-4 flex items-center gap-2">
+                  <span className="text-sm font-semibold text-stone-700">社群討論文章</span>
+                  <div className="flex-1 h-px bg-stone-200" />
+                </div>
+              </div>
+            )}
 
             {/* Posts */}
             <div className="space-y-4">
