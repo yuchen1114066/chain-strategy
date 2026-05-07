@@ -76,7 +76,7 @@ const heroRecipes = [
     badge: "主打食譜",
     badgeColor: "bg-rose-500",
     emoji: "🍲",
-    bgColor: "from-rose-50 to-amber-50",
+    bgColor: "from-[#fdf7f2] to-[#fce8ef]",
     borderColor: "border-rose-200",
     title: "茯苓薏仁山藥排骨湯",
     subtitle: "「平民版燕窩」・三步驟完成",
@@ -106,10 +106,10 @@ const heroRecipes = [
   {
     id: "tea",
     badge: "每日茶飲",
-    badgeColor: "bg-amber-500",
+    badgeColor: "bg-[#c4607a]",
     emoji: "🍵",
-    bgColor: "from-amber-50 to-orange-50",
-    borderColor: "border-amber-200",
+    bgColor: "from-rose-50 to-orange-50",
+    borderColor: "border-rose-200",
     title: "紅豆陳皮消腫茶",
     subtitle: "辦公桌上的「代謝加速器」",
     tagline: "飯後30分鐘一杯，整天擊退浮腫",
@@ -186,14 +186,14 @@ const safetyAlerts = [
   {
     condition: "⚠️ 孕婦",
     risk: "中",
-    riskColor: "bg-amber-100 border-amber-300 text-amber-800",
+    riskColor: "bg-rose-100 border-rose-200 text-[#5c3a4a]",
     detail: "薏仁有促進子宮收縮的作用，孕期（尤其早期）不宜大量食用。玫瑰花活血，也應減量。",
     action: "可飲用山藥湯（去除薏仁），或諮詢婦產科醫師。",
   },
   {
     condition: "⚠️ 陰虛火旺體質（口乾、手心熱、盜汗）",
     risk: "中",
-    riskColor: "bg-amber-100 border-amber-300 text-amber-800",
+    riskColor: "bg-rose-100 border-rose-200 text-[#5c3a4a]",
     detail: "薏仁性微寒，大量使用可能加重陰虛症狀。陳皮性溫燥，陰虛者也不宜過量。",
     action: "薏仁減量至 15g，加入百合 20g 或枸杞 15 粒平衡。",
   },
@@ -246,7 +246,7 @@ export default function BeautyPage() {
           <h2 className="text-2xl font-bold text-stone-800 mb-4">🔍 為什麼你會又水腫又蠟黃？（白話科普）</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <h3 className="font-bold text-amber-700 mb-2">中醫說：脾虛濕重</h3>
+              <h3 className="font-bold text-[#5c3a4a] mb-2">中醫說：脾虛濕重</h3>
               <p className="text-stone-600 text-sm leading-relaxed mb-3">
                 「脾主運化」——脾胃是身體的「代謝引擎」。當引擎動力不足（脾虛），水分和廢物就無法順暢代謝，於是：
               </p>
@@ -268,8 +268,8 @@ export default function BeautyPage() {
               </ul>
             </div>
           </div>
-          <div className="mt-5 bg-amber-50 border border-amber-200 rounded-xl p-4">
-            <p className="text-sm text-amber-800"><strong>💡 三層食療策略：</strong>①利水層（茯苓、薏仁、紅豆）→ 排出廢水｜②補氣層（山藥、大棗）→ 強健代謝引擎｜③疏肝層（玫瑰、陳皮）→ 讓氣血動起來</p>
+          <div className="mt-5 bg-rose-50 border border-rose-100 rounded-xl p-4">
+            <p className="text-sm text-[#5c3a4a]"><strong>💡 三層食療策略：</strong>①利水層（茯苓、薏仁、紅豆）→ 排出廢水｜②補氣層（山藥、大棗）→ 強健代謝引擎｜③疏肝層（玫瑰、陳皮）→ 讓氣血動起來</p>
           </div>
         </div>
       </section>
@@ -345,8 +345,8 @@ export default function BeautyPage() {
                 </div>
 
                 {/* Doctor Note */}
-                <div className="mt-4 bg-white/70 border border-amber-200 rounded-xl p-4">
-                  <p className="text-sm text-amber-800">
+                <div className="mt-4 bg-white/70 border border-rose-200 rounded-xl p-4">
+                  <p className="text-sm text-[#5c3a4a]">
                     <strong>👨‍⚕️ 中醫師小叮嚀：</strong>{recipe.doctorNote}
                   </p>
                 </div>
@@ -396,7 +396,7 @@ export default function BeautyPage() {
                 </div>
 
                 <div className="mb-3 pb-3 border-b border-stone-100">
-                  <p className="text-xs font-bold text-amber-600 mb-1">🏷️ 白話說明</p>
+                  <p className="text-xs font-bold text-[#c4607a] mb-1">🏷️ 白話說明</p>
                   <p className="text-xs text-stone-600 leading-relaxed">{ing.plain}</p>
                 </div>
 
@@ -449,17 +449,17 @@ export default function BeautyPage() {
                   </div>
                 ))}
               </div>
-              <div className="bg-amber-50 rounded-lg p-2">
-                <p className="text-xs text-amber-700">{day.tip}</p>
+              <div className="bg-rose-50 rounded-lg p-2">
+                <p className="text-xs text-[#c4607a]">{day.tip}</p>
               </div>
             </div>
           ))}
           {/* 8th card: after 7 days */}
-          <div className="bg-gradient-to-br from-rose-50 to-amber-50 rounded-2xl border-2 border-rose-200 p-4 flex flex-col justify-center items-center text-center">
+          <div className="bg-gradient-to-br from-[#fdf7f2] to-[#fce8ef] rounded-2xl border-2 border-rose-200 p-4 flex flex-col justify-center items-center text-center">
             <div className="text-4xl mb-2">🌷</div>
             <div className="font-bold text-rose-700 mb-1">7天後</div>
             <p className="text-xs text-stone-600 mb-3">每週 2–3 次維持，效果持續累積</p>
-            <Link href="/quiz" className="text-xs bg-rose-500 hover:bg-rose-400 text-white px-3 py-1.5 rounded-lg transition-colors">
+            <Link href="/quiz" className="text-xs text-white px-3 py-1.5 rounded-full transition-colors" style={{background:"linear-gradient(135deg,#e8a0b4,#c4607a)"}}>
               測我的體質調整方案 →
             </Link>
           </div>
@@ -494,7 +494,7 @@ export default function BeautyPage() {
             <strong className="text-stone-700">⚠️ 完整免責聲明：</strong>
             本頁所有食療食譜、食材百科及計劃內容，<strong className="text-stone-600">僅供一般健康教育與生活參考用途，不構成任何醫療診斷、治療建議或醫療行為</strong>。
             所有內容均不得取代專業醫師、中醫師、藥師之診察與建議。如您有健康疑慮、正在服用任何藥物、懷孕、哺乳或患有慢性疾病，請務必先諮詢合格醫療專業人員，再決定是否採用本頁之建議。
-            <Link href="/herb-checker" className="text-amber-700 underline ml-1">→ 使用中西藥安全查詢工具</Link>
+            <Link href="/herb-checker" className="text-[#5c3a4a] underline ml-1">→ 使用中西藥安全查詢工具</Link>
           </div>
         </div>
       </section>
@@ -510,19 +510,19 @@ export default function BeautyPage() {
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               href="/quiz"
-              className="bg-white text-rose-700 font-bold px-8 py-3 rounded-xl hover:bg-rose-50 transition-colors shadow-sm"
+              className="bg-white text-rose-700 font-bold px-8 py-3 rounded-full hover:bg-rose-50 transition-colors shadow-sm"
             >
               🧬 免費測我的體質
             </Link>
             <Link
               href="/recipes"
-              className="bg-white/20 hover:bg-white/30 text-white font-medium px-8 py-3 rounded-xl border border-white/30 transition-colors"
+              className="bg-white/20 hover:bg-white/30 text-white font-medium px-8 py-3 rounded-full border border-white/30 transition-colors"
             >
               🍲 看更多食療食譜
             </Link>
             <Link
               href="/herb-checker"
-              className="bg-white/20 hover:bg-white/30 text-white font-medium px-8 py-3 rounded-xl border border-white/30 transition-colors"
+              className="bg-white/20 hover:bg-white/30 text-white font-medium px-8 py-3 rounded-full border border-white/30 transition-colors"
             >
               💊 查詢藥物安全
             </Link>
