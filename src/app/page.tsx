@@ -93,44 +93,48 @@ export default function HomePage() {
   return (
     <div className="hero-pattern">
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-amber-900 via-stone-800 to-green-900 text-white">
-        <div className="absolute inset-0 hero-pattern opacity-30" />
-        <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-80 h-80 bg-green-500/10 rounded-full blur-3xl" />
+      <section className="relative overflow-hidden text-white" style={{background:"linear-gradient(135deg,#5c2d42 0%,#3d2030 50%,#2a4035 100%)"}}>
+        <div className="absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl" style={{background:"rgba(232,160,180,0.12)"}} />
+        <div className="absolute bottom-0 left-0 w-80 h-80 rounded-full blur-3xl" style={{background:"rgba(90,138,106,0.12)"}} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-3xl" style={{background:"rgba(232,146,42,0.06)"}} />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
           <div className="max-w-3xl">
             <div className="flex items-center gap-2 mb-6">
-              <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center">
-                <Leaf className="w-4 h-4 text-white" />
+              <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{background:"rgba(232,160,180,0.3)"}}>
+                <Heart className="w-4 h-4 fill-white text-white" />
               </div>
-              <span className="text-amber-300 text-sm font-medium tracking-wider uppercase">Traditional Chinese Medicine</span>
+              <span className="text-sm font-medium tracking-wider" style={{color:"#e8a0b4"}}>WarmCare · 梣數策院</span>
             </div>
 
             <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
-              <span className="text-amber-300">養生</span>
-              <span className="text-white">道</span>
+              <span style={{color:"#f0c8d8"}}>溫暖</span>
+              <span className="text-white">照顧</span>
+              <br/>
+              <span className="text-3xl md:text-4xl font-medium" style={{color:"#a8d4b8"}}>每個家的養生之道</span>
             </h1>
 
-            <p className="text-xl md:text-2xl text-stone-300 mb-4 leading-relaxed">
-              融合千年中醫智慧，開啟現代養生之旅
+            <p className="text-xl md:text-2xl mb-4 leading-relaxed" style={{color:"#e0c8d0"}}>
+              融合千年中醫智慧，用家的溫度守護健康
             </p>
 
-            <p className="text-base text-stone-400 mb-10 max-w-2xl leading-relaxed">
-              為家庭、中老年人、忙碌的現代人提供體質測評、食療食譜、藥膳湯品、中西藥交互查詢等全方位中醫養生服務。
+            <p className="text-base mb-10 max-w-2xl leading-relaxed" style={{color:"#b8a0b0"}}>
+              為家庭、中老年人、忙碌的現代人提供體質測評、食療食譜、七天打卡追蹤、中西藥交互查詢等全方位養生服務。
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4">
               <Link
                 href="/quiz"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-amber-500 hover:bg-amber-400 text-white font-semibold rounded-xl transition-all hover:shadow-lg hover:shadow-amber-500/30 hover:-translate-y-0.5"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 font-semibold rounded-full transition-all hover:-translate-y-0.5 hover:shadow-xl"
+                style={{background:"linear-gradient(135deg,#e8a0b4,#c4607a)",color:"white",boxShadow:"0 4px 20px rgba(232,160,180,0.35)"}}
               >
                 <Star className="w-5 h-5" />
                 開始體質測評
               </Link>
               <Link
                 href="/recipes"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold rounded-xl transition-all hover:shadow-lg backdrop-blur-sm"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 font-semibold rounded-full transition-all hover:-translate-y-0.5"
+                style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",color:"white"}}
               >
                 探索食療食譜
                 <ArrowRight className="w-5 h-5" />
