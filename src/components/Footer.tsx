@@ -9,14 +9,23 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="lg:col-span-1">
-            {/* 梣數策院 Logo */}
-            <div className="mb-4">
-              <div className="inline-block rounded-xl overflow-hidden bg-black p-2">
+            {/* 梣數策院 Logo — 深色版（配 Footer）+ 米色版並排 */}
+            <div className="mb-4 flex gap-2">
+              <div className="inline-block rounded-xl overflow-hidden p-1.5" style={{background:"#2d1f0e"}}>
                 <Image
                   src="/chengshu-logo.svg"
                   alt="梣數策院"
-                  width={130}
-                  height={65}
+                  width={110}
+                  height={55}
+                  className="object-contain"
+                />
+              </div>
+              <div className="inline-block rounded-xl overflow-hidden p-1.5" style={{background:"#fdf3e3"}}>
+                <Image
+                  src="/chengshu-logo-beige.svg"
+                  alt="梣數策院"
+                  width={110}
+                  height={55}
                   className="object-contain"
                 />
               </div>

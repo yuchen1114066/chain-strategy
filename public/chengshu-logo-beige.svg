@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 80" width="160" height="80">
+  <!-- Warm beige/cream background -->
+  <rect width="160" height="80" fill="#fdf3e3" rx="6"/>
+
+  <!-- Subtle inner warm glow -->
+  <ellipse cx="80" cy="35" rx="55" ry="32" fill="#fde8c8" opacity="0.5"/>
+
+  <!-- Tree trunk -->
+  <rect x="77" y="50" width="6" height="15" fill="#7a4f2d" rx="2"/>
+  <!-- Roots -->
+  <path d="M80 65 Q70 71 63 69" stroke="#7a4f2d" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M80 65 Q90 71 97 69" stroke="#7a4f2d" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M80 65 Q76 73 74 75" stroke="#7a4f2d" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M80 65 Q84 73 86 75" stroke="#7a4f2d" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- Main branches -->
+  <path d="M80 50 Q72 42 60 38" stroke="#7a4f2d" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M80 50 Q88 42 100 38" stroke="#7a4f2d" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M80 50 Q78 36 80 22" stroke="#7a4f2d" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M80 38 Q68 32 58 30" stroke="#7a4f2d" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M80 38 Q92 32 102 30" stroke="#7a4f2d" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- Leaf clusters - soft warm palette -->
+  <circle cx="80" cy="18" r="7" fill="#e05c24" opacity="0.88"/>
+  <circle cx="74" cy="22" r="5" fill="#f09a2e" opacity="0.88"/>
+  <circle cx="86" cy="22" r="5" fill="#d44c1a" opacity="0.88"/>
+
+  <circle cx="58" cy="30" r="6" fill="#f09a2e" opacity="0.85"/>
+  <circle cx="52" cy="35" r="5" fill="#f5c150" opacity="0.85"/>
+  <circle cx="60" cy="38" r="5" fill="#e05c24" opacity="0.82"/>
+  <circle cx="55" cy="42" r="4" fill="#cc3d18" opacity="0.78"/>
+
+  <circle cx="102" cy="30" r="6" fill="#d44c1a" opacity="0.85"/>
+  <circle cx="108" cy="35" r="5" fill="#f09a2e" opacity="0.85"/>
+  <circle cx="100" cy="38" r="5" fill="#f5c150" opacity="0.82"/>
+  <circle cx="105" cy="42" r="4" fill="#e05c24" opacity="0.78"/>
+
+  <!-- Arrow accent -->
+  <polygon points="80,8 76,16 84,16" fill="#d44c1a" opacity="0.75"/>
+
+  <!-- Text warm brown -->
+  <text x="80" y="76" text-anchor="middle" font-family="serif" font-size="10" fill="#5c3317" letter-spacing="2" font-weight="bold">梣數策院</text>
+</svg>

@@ -1,43 +1,40 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 80" width="160" height="80">
-  <!-- Black background -->
-  <rect width="160" height="80" fill="#0a0a0a" rx="6"/>
+  <!-- Warm deep amber background (replaces black) -->
+  <rect width="160" height="80" fill="#2d1f0e" rx="6"/>
 
   <!-- Tree trunk -->
-  <rect x="77" y="50" width="6" height="16" fill="#5a3e28" rx="2"/>
+  <rect x="77" y="50" width="6" height="16" fill="#8b6340" rx="2"/>
   <!-- Roots -->
-  <path d="M80 66 Q70 72 62 70" stroke="#5a3e28" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-  <path d="M80 66 Q90 72 98 70" stroke="#5a3e28" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-  <path d="M80 66 Q76 74 74 76" stroke="#5a3e28" stroke-width="2" fill="none" stroke-linecap="round"/>
-  <path d="M80 66 Q84 74 86 76" stroke="#5a3e28" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M80 66 Q70 72 62 70" stroke="#8b6340" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M80 66 Q90 72 98 70" stroke="#8b6340" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M80 66 Q76 74 74 76" stroke="#8b6340" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M80 66 Q84 74 86 76" stroke="#8b6340" stroke-width="2" fill="none" stroke-linecap="round"/>
 
   <!-- Main branches -->
-  <path d="M80 50 Q72 42 60 38" stroke="#5a3e28" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-  <path d="M80 50 Q88 42 100 38" stroke="#5a3e28" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-  <path d="M80 50 Q78 36 80 22" stroke="#5a3e28" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-  <path d="M80 38 Q68 32 58 30" stroke="#5a3e28" stroke-width="2" fill="none" stroke-linecap="round"/>
-  <path d="M80 38 Q92 32 102 30" stroke="#5a3e28" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M80 50 Q72 42 60 38" stroke="#8b6340" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M80 50 Q88 42 100 38" stroke="#8b6340" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M80 50 Q78 36 80 22" stroke="#8b6340" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M80 38 Q68 32 58 30" stroke="#8b6340" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M80 38 Q92 32 102 30" stroke="#8b6340" stroke-width="2" fill="none" stroke-linecap="round"/>
 
-  <!-- Leaf clusters - autumn colors -->
-  <!-- Top center -->
-  <circle cx="80" cy="18" r="7" fill="#c0392b" opacity="0.9"/>
-  <circle cx="74" cy="22" r="5" fill="#e67e22" opacity="0.9"/>
-  <circle cx="86" cy="22" r="5" fill="#d35400" opacity="0.9"/>
+  <!-- Leaf clusters - warm autumn glow -->
+  <circle cx="80" cy="18" r="7" fill="#e85d26" opacity="0.95"/>
+  <circle cx="74" cy="22" r="5" fill="#f4a134" opacity="0.95"/>
+  <circle cx="86" cy="22" r="5" fill="#d94f1e" opacity="0.95"/>
 
-  <!-- Left side -->
-  <circle cx="58" cy="30" r="6" fill="#e67e22" opacity="0.9"/>
-  <circle cx="52" cy="35" r="5" fill="#f39c12" opacity="0.9"/>
-  <circle cx="60" cy="38" r="5" fill="#c0392b" opacity="0.85"/>
-  <circle cx="55" cy="42" r="4" fill="#e74c3c" opacity="0.8"/>
+  <circle cx="58" cy="30" r="6" fill="#f4a134" opacity="0.95"/>
+  <circle cx="52" cy="35" r="5" fill="#f7c45e" opacity="0.9"/>
+  <circle cx="60" cy="38" r="5" fill="#e85d26" opacity="0.9"/>
+  <circle cx="55" cy="42" r="4" fill="#e03e1a" opacity="0.85"/>
 
-  <!-- Right side -->
-  <circle cx="102" cy="30" r="6" fill="#c0392b" opacity="0.9"/>
-  <circle cx="108" cy="35" r="5" fill="#e67e22" opacity="0.9"/>
-  <circle cx="100" cy="38" r="5" fill="#f39c12" opacity="0.85"/>
-  <circle cx="105" cy="42" r="4" fill="#d35400" opacity="0.8"/>
+  <circle cx="102" cy="30" r="6" fill="#d94f1e" opacity="0.95"/>
+  <circle cx="108" cy="35" r="5" fill="#f4a134" opacity="0.9"/>
+  <circle cx="100" cy="38" r="5" fill="#f7c45e" opacity="0.9"/>
+  <circle cx="105" cy="42" r="4" fill="#e85d26" opacity="0.85"/>
 
-  <!-- Arrow / upward growth accent -->
-  <polygon points="80,8 76,16 84,16" fill="#c0392b" opacity="0.7"/>
+  <!-- Arrow accent -->
+  <polygon points="80,8 76,16 84,16" fill="#f4a134" opacity="0.8"/>
 
-  <!-- Text: 梣數策院 -->
-  <text x="80" y="76" text-anchor="middle" font-family="serif" font-size="10" fill="#c8a96e" letter-spacing="2" font-weight="bold">梣數策院</text>
+  <!-- Text warm gold -->
+  <text x="80" y="76" text-anchor="middle" font-family="serif" font-size="10" fill="#f0d090" letter-spacing="2" font-weight="bold">梣數策院</text>
 </svg>
