@@ -17,11 +17,11 @@ const levelConfig = {
     label: "嚴重交互",
   },
   "中度": {
-    color: "bg-amber-50 border-amber-200",
-    badge: "bg-amber-100 text-amber-700 border-amber-200",
+    color: "bg-rose-50 border-rose-200",
+    badge: "bg-rose-100 text-[#c4607a] border-rose-200",
     icon: AlertCircle,
-    iconColor: "text-amber-500",
-    dot: "bg-amber-500",
+    iconColor: "text-[#c4607a]",
+    dot: "bg-[#c4607a]",
     label: "中度交互",
   },
   "輕微": {
@@ -130,7 +130,7 @@ export default function HerbCheckerPage() {
               placeholder="輸入中藥材名稱（如：當歸、黃芪）或西藥名稱（如：華法林、阿斯匹靈）..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-12 pr-10 py-3 border border-stone-200 rounded-xl text-stone-700 placeholder-stone-400 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
+              className="w-full pl-12 pr-10 py-3 border border-stone-200 rounded-xl text-stone-700 placeholder-stone-400 focus:outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition-all"
             />
             {search && (
               <button
@@ -150,7 +150,7 @@ export default function HerbCheckerPage() {
                 <button
                   key={s}
                   onClick={() => setSearch(s)}
-                  className="text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 px-2 py-1 rounded-full border border-amber-200 transition-colors"
+                  className="text-xs bg-rose-50 hover:bg-rose-100 text-[#c4607a] px-2 py-1 rounded-full border border-rose-200 transition-colors"
                 >
                   {s}
                 </button>
@@ -278,7 +278,8 @@ export default function HerbCheckerPage() {
             </p>
             <button
               onClick={() => { setSearch(""); setLevelFilter("全部"); }}
-              className="mt-6 px-6 py-3 bg-amber-600 text-white rounded-xl hover:bg-amber-500 transition-colors font-medium"
+              className="mt-6 px-6 py-3 text-white rounded-full transition-colors font-medium hover:opacity-90"
+              style={{background:"linear-gradient(135deg,#e8a0b4,#c4607a)"}}
             >
               清除搜尋
             </button>

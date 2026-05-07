@@ -45,7 +45,7 @@ export default function CommunityPage() {
       {/* Header */}
       <div className="bg-gradient-to-br from-amber-800 to-stone-900 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2 mb-3 text-amber-300 text-sm">
+          <div className="flex items-center gap-2 mb-3 text-rose-300 text-sm">
             <Link href="/" className="hover:text-white transition-colors">首頁</Link>
             <span>/</span>
             <span>養生社群</span>
@@ -63,13 +63,13 @@ export default function CommunityPage() {
                   { value: "98%", label: "滿意度" },
                 ].map((s) => (
                   <div key={s.label}>
-                    <div className="text-xl font-bold text-amber-300">{s.value}</div>
+                    <div className="text-xl font-bold text-rose-300">{s.value}</div>
                     <div className="text-xs text-stone-400">{s.label}</div>
                   </div>
                 ))}
               </div>
             </div>
-            <button className="flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-400 text-white font-semibold rounded-xl transition-all hover:shadow-lg whitespace-nowrap">
+            <button className="flex items-center gap-2 px-6 py-3 text-white font-semibold rounded-full transition-all hover:shadow-lg whitespace-nowrap" style={{background:"linear-gradient(135deg,#e8a0b4,#c4607a)"}}>
               <PenSquare className="w-5 h-5" />
               發表新文章
             </button>
@@ -90,7 +90,7 @@ export default function CommunityPage() {
                   placeholder="搜尋文章..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm text-stone-700 placeholder-stone-400 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm text-stone-700 placeholder-stone-400 focus:outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition-all"
                 />
               </div>
               <div className="flex gap-2">
@@ -104,8 +104,8 @@ export default function CommunityPage() {
                     onClick={() => setSortBy(key as typeof sortBy)}
                     className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
                       sortBy === key
-                        ? "bg-amber-600 border-amber-600 text-white"
-                        : "bg-white border-stone-200 text-stone-600 hover:border-amber-300"
+                        ? "bg-[#c4607a] border-[#c4607a] text-white"
+                        : "bg-white border-stone-200 text-stone-600 hover:border-rose-300"
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5" />
@@ -123,8 +123,8 @@ export default function CommunityPage() {
                   onClick={() => setSelectedCategory(cat)}
                   className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${
                     selectedCategory === cat
-                      ? "bg-amber-600 border-amber-600 text-white"
-                      : "bg-white border-stone-200 text-stone-600 hover:border-amber-300"
+                      ? "bg-[#c4607a] border-[#c4607a] text-white"
+                      : "bg-white border-stone-200 text-stone-600 hover:border-rose-300"
                   }`}
                 >
                   {cat}
@@ -138,27 +138,27 @@ export default function CommunityPage() {
                 <div className="flex items-center gap-2 mb-4">
                   <span className="text-lg">🏥</span>
                   <h2 className="font-bold text-stone-800">駐站中醫師精選文章</h2>
-                  <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">中老年人必看</span>
+                  <span className="ml-2 text-xs bg-rose-100 text-[#c4607a] px-2 py-0.5 rounded-full">中老年人必看</span>
                 </div>
                 <div className="space-y-4">
                   {featuredPosts.map((post) => (
-                    <article key={post.id} className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border-2 border-amber-200 shadow-sm p-5">
+                    <article key={post.id} className="bg-gradient-to-r from-rose-50 to-orange-50 rounded-xl border-2 border-rose-200 shadow-sm p-5">
                       <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-amber-600 to-orange-600 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0" style={{background:"linear-gradient(135deg,#e8a0b4,#c4607a)"}}>
                           {post.avatar}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2 mb-1">
                             <div>
-                              <span className="font-bold text-amber-800 text-sm">{post.author}</span>
-                              {post.authorRole && <span className="text-amber-600 text-xs ml-2">{post.authorRole}</span>}
+                              <span className="font-bold text-[#5c3a4a] text-sm">{post.author}</span>
+                              {post.authorRole && <span className="text-[#c4607a] text-xs ml-2">{post.authorRole}</span>}
                             </div>
                             <div className="flex gap-1.5 flex-shrink-0">
-                              <span className="text-xs bg-amber-600 text-white px-2 py-0.5 rounded-full">駐站醫師</span>
-                              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{post.createdAt}</span>
+                              <span className="text-xs text-white px-2 py-0.5 rounded-full" style={{background:"linear-gradient(135deg,#e8a0b4,#c4607a)"}}>駐站醫師</span>
+                              <span className="text-xs bg-rose-100 text-[#c4607a] px-2 py-0.5 rounded-full">{post.createdAt}</span>
                             </div>
                           </div>
-                          <h3 className="text-base font-bold text-stone-800 mb-2 leading-snug hover:text-amber-700 cursor-pointer transition-colors">
+                          <h3 className="text-base font-bold text-stone-800 mb-2 leading-snug hover:text-[#c4607a] cursor-pointer transition-colors">
                             {post.title}
                           </h3>
                           <p className="text-sm text-stone-600 line-clamp-3 leading-relaxed mb-3">
@@ -166,7 +166,7 @@ export default function CommunityPage() {
                           </p>
                           <div className="flex flex-wrap gap-1.5 mb-3">
                             {post.tags.map((tag) => (
-                              <span key={tag} className="text-xs text-amber-700 bg-white px-2 py-0.5 rounded-full border border-amber-200">
+                              <span key={tag} className="text-xs text-[#c4607a] bg-white px-2 py-0.5 rounded-full border border-rose-200">
                                 #{tag}
                               </span>
                             ))}
@@ -204,7 +204,7 @@ export default function CommunityPage() {
                   >
                     <div className="flex items-start gap-4">
                       {/* Avatar */}
-                      <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0" style={{background:"linear-gradient(135deg,#e8a0b4,#c4607a)"}}>
                         {post.avatar}
                       </div>
 
@@ -215,7 +215,7 @@ export default function CommunityPage() {
                             <span className="text-stone-400 text-xs ml-2">{post.createdAt}</span>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                            <span className="text-xs bg-rose-100 text-[#c4607a] px-2 py-0.5 rounded-full">
                               {post.category}
                             </span>
                             {constitution && (
@@ -226,7 +226,7 @@ export default function CommunityPage() {
                           </div>
                         </div>
 
-                        <h3 className="text-base font-bold text-stone-800 mb-2 hover:text-amber-700 cursor-pointer transition-colors leading-snug">
+                        <h3 className="text-base font-bold text-stone-800 mb-2 hover:text-[#c4607a] cursor-pointer transition-colors leading-snug">
                           {post.title}
                         </h3>
 
@@ -239,7 +239,7 @@ export default function CommunityPage() {
                           {post.tags.map((tag) => (
                             <span
                               key={tag}
-                              className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full hover:bg-amber-100 cursor-pointer transition-colors"
+                              className="text-xs text-[#c4607a] bg-rose-50 px-2 py-0.5 rounded-full hover:bg-rose-100 cursor-pointer transition-colors"
                             >
                               #{tag}
                             </span>
@@ -279,7 +279,7 @@ export default function CommunityPage() {
             {/* Load More */}
             {filtered.length > 0 && (
               <div className="text-center mt-8">
-                <button className="px-8 py-3 bg-white border-2 border-amber-200 text-amber-700 font-semibold rounded-xl hover:bg-amber-50 hover:border-amber-300 transition-all">
+                <button className="px-8 py-3 bg-white border-2 border-rose-200 text-[#c4607a] font-semibold rounded-full hover:bg-rose-50 hover:border-rose-300 transition-all">
                   載入更多文章
                 </button>
               </div>
@@ -306,7 +306,7 @@ export default function CommunityPage() {
                       {i + 1}
                     </span>
                     <div>
-                      <p className="text-sm text-stone-700 font-medium leading-snug hover:text-amber-700 cursor-pointer transition-colors line-clamp-2">
+                      <p className="text-sm text-stone-700 font-medium leading-snug hover:text-[#c4607a] cursor-pointer transition-colors line-clamp-2">
                         {post.title}
                       </p>
                       <div className="flex items-center gap-2 mt-1 text-xs text-stone-400">
@@ -322,20 +322,20 @@ export default function CommunityPage() {
             {/* Active Users */}
             <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-5">
               <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2">
-                <Users className="w-4 h-4 text-amber-500" />
+                <Users className="w-4 h-4 text-[#c4607a]" />
                 活躍用戶
               </h3>
               <div className="space-y-3">
                 {activeUsers.map((user) => (
                   <div key={user.name} className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0" style={{background:"linear-gradient(135deg,#e8a0b4,#c4607a)"}}>
                       {user.avatar}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-stone-800 truncate">{user.name}</div>
                       <div className="text-xs text-stone-400">{user.posts} 篇文章</div>
                     </div>
-                    <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                    <span className="text-xs bg-rose-100 text-[#c4607a] px-1.5 py-0.5 rounded-full flex-shrink-0">
                       {user.badge}
                     </span>
                   </div>
@@ -344,7 +344,7 @@ export default function CommunityPage() {
             </div>
 
             {/* Constitution Quiz CTA */}
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-5">
               <div className="text-2xl mb-2">🌿</div>
               <h3 className="font-bold text-stone-800 mb-2">了解您的體質</h3>
               <p className="text-xs text-stone-500 leading-relaxed mb-4">
@@ -352,7 +352,8 @@ export default function CommunityPage() {
               </p>
               <Link
                 href="/quiz"
-                className="block w-full text-center py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                className="block w-full text-center py-2.5 text-white text-sm font-semibold rounded-full transition-colors hover:opacity-90"
+                style={{background:"linear-gradient(135deg,#e8a0b4,#c4607a)"}}
               >
                 立即測評
               </Link>
@@ -366,7 +367,7 @@ export default function CommunityPage() {
                   <button
                     key={tag}
                     onClick={() => setSearch(tag)}
-                    className="text-xs bg-stone-100 hover:bg-amber-100 text-stone-600 hover:text-amber-700 px-2.5 py-1 rounded-full transition-colors"
+                    className="text-xs bg-stone-100 hover:bg-rose-50 text-stone-600 hover:text-[#c4607a] px-2.5 py-1 rounded-full transition-colors"
                   >
                     #{tag}
                   </button>

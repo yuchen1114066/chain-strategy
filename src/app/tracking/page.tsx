@@ -26,7 +26,7 @@ const METRICS = [
 
 const colorMap = {
   blue: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700", fill: "bg-blue-500", light: "bg-blue-100" },
-  amber: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700", fill: "bg-amber-500", light: "bg-amber-100" },
+  amber: { bg: "bg-rose-50", border: "border-rose-200", text: "text-[#c4607a]", fill: "bg-[#c4607a]", light: "bg-rose-100" },
   green: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", fill: "bg-green-500", light: "bg-green-100" },
 };
 
@@ -87,12 +87,12 @@ export default function TrackingPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-rose-50 to-amber-50">
+    <div className="min-h-screen bg-gradient-to-br from-[#fdf7f2] to-[#fce8ef]">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
-          <Link href="/quiz" className="p-2 bg-white rounded-lg border border-stone-200 text-stone-500 hover:text-amber-700 transition-colors">
+          <Link href="/quiz" className="p-2 bg-white rounded-lg border border-stone-200 text-stone-500 hover:text-[#c4607a] transition-colors">
             <ChevronLeft className="w-5 h-5" />
           </Link>
           <div className="flex-1">
@@ -104,11 +104,11 @@ export default function TrackingPage() {
           <div className="flex gap-1 bg-white rounded-lg border border-stone-200 p-1">
             <button
               onClick={() => setView("log")}
-              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${view === "log" ? "bg-amber-100 text-amber-700" : "text-stone-500"}`}
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${view === "log" ? "bg-rose-100 text-[#c4607a]" : "text-stone-500"}`}
             >打卡</button>
             <button
               onClick={() => setView("chart")}
-              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-1 ${view === "chart" ? "bg-amber-100 text-amber-700" : "text-stone-500"}`}
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-1 ${view === "chart" ? "bg-rose-100 text-[#c4607a]" : "text-stone-500"}`}
             ><BarChart2 className="w-3.5 h-3.5" />趨勢</button>
           </div>
         </div>
@@ -123,7 +123,7 @@ export default function TrackingPage() {
                 key={day}
                 onClick={() => { setActiveDay(day); setSubmitted(false); }}
                 className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border-2 transition-all ${
-                  active ? "border-rose-400 bg-rose-50" : done ? "border-green-300 bg-green-50" : "border-stone-200 bg-white hover:border-amber-300"
+                  active ? "border-rose-400 bg-rose-50" : done ? "border-green-300 bg-green-50" : "border-stone-200 bg-white hover:border-rose-300"
                 }`}
               >
                 <span className="text-base">{icon}</span>
@@ -139,7 +139,7 @@ export default function TrackingPage() {
         {view === "log" && (
           <>
             {/* Day info */}
-            <div className="bg-white rounded-2xl border border-amber-100 p-5 mb-5 shadow-sm">
+            <div className="bg-white rounded-2xl border border-rose-100 p-5 mb-5 shadow-sm">
               <div className="flex items-center gap-3 mb-2">
                 <span className="text-2xl">{DAY_LABELS[activeDay - 1].icon}</span>
                 <div>
@@ -218,7 +218,7 @@ export default function TrackingPage() {
                       onChange={(e) => setForm({ ...form, notes: e.target.value })}
                       placeholder="例如：早上臉比昨天消了一點，喝了兩杯紅豆茶…"
                       rows={3}
-                      className="w-full rounded-xl border border-stone-200 px-4 py-3 text-sm text-stone-700 placeholder:text-stone-300 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 resize-none"
+                      className="w-full rounded-xl border border-stone-200 px-4 py-3 text-sm text-stone-700 placeholder:text-stone-300 focus:outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100 resize-none"
                     />
                   </div>
                 </div>
@@ -232,7 +232,8 @@ export default function TrackingPage() {
                   <button
                     onClick={handleSubmit}
                     disabled={submitting}
-                    className="mt-5 w-full py-4 bg-rose-600 hover:bg-rose-500 disabled:bg-stone-300 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all hover:shadow-lg"
+                    className="mt-5 w-full py-4 disabled:bg-stone-300 text-white font-bold rounded-full flex items-center justify-center gap-2 transition-all hover:shadow-lg hover:opacity-90"
+                    style={{background:"linear-gradient(135deg,#e8a0b4,#c4607a)"}}
                   >
                     <Save className="w-5 h-5" />
                     {submitting ? "儲存中…" : `Day ${activeDay} 打卡完成`}
@@ -246,7 +247,7 @@ export default function TrackingPage() {
         {view === "chart" && (
           <div className="bg-white rounded-2xl border border-stone-100 p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-6">
-              <TrendingUp className="w-5 h-5 text-amber-600" />
+              <TrendingUp className="w-5 h-5 text-[#c4607a]" />
               <h3 className="font-bold text-stone-800">七天變化趨勢</h3>
               <span className="ml-auto text-xs text-stone-400">{completedDays.size}/7 天完成</span>
             </div>
@@ -311,9 +312,9 @@ export default function TrackingPage() {
                   const energyDiff = (last.energy_level ?? 0) - (first.energy_level ?? 0);
                   const avg = (swDiff + skinDiff + energyDiff) / 3;
                   return (
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-2">
-                      <p className="text-sm font-semibold text-amber-800 mb-2">📈 整體進步摘要</p>
-                      <p className="text-sm text-amber-700">
+                    <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 mt-2">
+                      <p className="text-sm font-semibold text-[#5c3a4a] mb-2">📈 整體進步摘要</p>
+                      <p className="text-sm text-[#c4607a]">
                         從 Day {first.plan_day} 到 Day {last.plan_day}，
                         消腫 {swDiff >= 0 ? "+" : ""}{swDiff}，
                         膚色 {skinDiff >= 0 ? "+" : ""}{skinDiff}，
