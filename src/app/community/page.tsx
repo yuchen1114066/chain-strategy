@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Heart, MessageSquare, Eye, Search, Filter, PenSquare, TrendingUp, Clock, Users, Star } from "lucide-react";
+import { Heart, MessageSquare, Eye, Search, PenSquare, TrendingUp, Clock, Users } from "lucide-react";
 import { communityPosts, constitutions } from "@/lib/data";
 import Link from "next/link";
 
@@ -14,7 +14,8 @@ export default function CommunityPage() {
 
   const featuredPosts = communityPosts.filter((p) => p.featured);
 
-  const filtered = communityPosts.filter((p) => !p.featured)
+  const filtered = communityPosts
+    .filter((p) => !p.featured)
     .filter((post) => {
       const matchSearch =
         !search ||
@@ -30,7 +31,7 @@ export default function CommunityPage() {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
-  const topPosts = communityPosts.sort((a, b) => b.likes - a.likes).slice(0, 5);
+  const topPosts = [...communityPosts].sort((a, b) => b.likes - a.likes).slice(0, 5);
   const activeUsers = [
     { avatar: "陳", name: "藥膳達人陳醫師", posts: 42, badge: "中醫師" },
     { avatar: "王", name: "退休教師王伯伯", posts: 38, badge: "養生達人" },
@@ -160,7 +161,7 @@ export default function CommunityPage() {
                           <h3 className="text-base font-bold text-stone-800 mb-2 leading-snug hover:text-amber-700 cursor-pointer transition-colors">
                             {post.title}
                           </h3>
-                          <p className="text-sm text-stone-600 line-clamp-3 leading-relaxed mb-3 whitespace-pre-line">
+                          <p className="text-sm text-stone-600 line-clamp-3 leading-relaxed mb-3">
                             {post.content.slice(0, 200)}…
                           </p>
                           <div className="flex flex-wrap gap-1.5 mb-3">
