@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Leaf, Heart, AlertCircle } from "lucide-react";
 
 export default function Footer() {
@@ -8,6 +9,18 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="lg:col-span-1">
+            {/* 梣數策院 Logo */}
+            <div className="mb-4">
+              <div className="inline-block rounded-xl overflow-hidden bg-black p-2">
+                <Image
+                  src="/chengshu-logo.png"
+                  alt="梣數策院"
+                  width={120}
+                  height={60}
+                  className="object-contain"
+                />
+              </div>
+            </div>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-9 h-9 bg-gradient-to-br from-amber-500 to-green-600 rounded-lg flex items-center justify-center">
                 <Leaf className="w-5 h-5 text-white" />
@@ -60,11 +73,29 @@ export default function Footer() {
 
           {/* Contact */}
           <div>
-            <h4 className="text-white font-semibold mb-4 text-sm">服務資訊</h4>
-            <ul className="space-y-2 text-sm text-stone-400">
-              <li>📧 hello@yangshengdao.tw</li>
-              <li>📞 02-2345-6789（週一至週五 9-18時）</li>
-              <li>🏠 台北市中正區，養生道健康中心</li>
+            <h4 className="text-white font-semibold mb-4 text-sm">聯絡我們</h4>
+            <ul className="space-y-3 text-sm text-stone-400">
+              <li className="flex items-center gap-2">
+                <span className="text-green-400 text-base">💬</span>
+                <span>LINE 官方帳號</span>
+                <a href="https://line.me/R/ti/p/@178jiwdm" target="_blank" rel="noopener noreferrer"
+                  className="text-green-400 hover:text-green-300 font-mono transition-colors">
+                  @178jiwdm
+                </a>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-base">📧</span>
+                <a href="mailto:chain.stratgy@gmail.com"
+                  className="text-stone-400 hover:text-amber-400 transition-colors break-all">
+                  chain.stratgy@gmail.com
+                </a>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-base">📞</span>
+                <a href="tel:0975520919" className="text-stone-400 hover:text-amber-400 transition-colors">
+                  0975-520919
+                </a>
+              </li>
             </ul>
           </div>
         </div>
@@ -82,7 +113,7 @@ export default function Footer() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-stone-500">
-            <p>© 2026 養生道 YangSheng Dao. 版權所有。</p>
+            <p>© 2026 梣數策院 · WarmCare 養生道. 版權所有。</p>
             <div className="flex gap-4">
               <span className="hover:text-stone-300 cursor-pointer">隱私政策</span>
               <span className="hover:text-stone-300 cursor-pointer">服務條款</span>

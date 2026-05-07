@@ -27,8 +27,8 @@ export default function Navbar() {
               <Leaf className="w-5 h-5 text-white" />
             </div>
             <div className="flex flex-col leading-tight">
-              <span className="text-lg font-bold text-amber-800 tracking-wide">養生道</span>
-              <span className="text-xs text-amber-600 hidden sm:block">YangSheng Dao</span>
+              <span className="text-lg font-bold text-amber-800 tracking-wide">WarmCare</span>
+              <span className="text-xs text-amber-600 hidden sm:block">養生道</span>
             </div>
           </Link>
 
