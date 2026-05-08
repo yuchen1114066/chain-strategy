@@ -306,33 +306,6 @@ export default function ShopPage() {
           </div>
         </div>
 
-        {/* Consultation Banner */}
-        <div className="mt-6 bg-purple-50 border border-purple-200 rounded-2xl p-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div>
-              <div className="text-3xl mb-2">👨‍⚕️</div>
-              <h3 className="text-2xl font-bold text-stone-800 mb-2">線上中醫師諮詢</h3>
-              <p className="text-stone-500 text-sm max-w-md leading-relaxed">
-                資深中醫師一對一線上視訊諮詢，30分鐘個人化體質分析，提供量身訂製的養生建議和藥膳食療方案。
-              </p>
-              <div className="flex items-center gap-2 mt-3">
-                <div className="flex">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star key={i} className="w-4 h-4 fill-[#c4607a] text-[#c4607a]" />
-                  ))}
-                </div>
-                <span className="text-sm text-stone-500">4.9分 · 445 則評價</span>
-              </div>
-            </div>
-            <div className="flex-shrink-0 text-center">
-              <div className="text-2xl font-bold text-purple-800 mb-1">NT$800</div>
-              <div className="text-sm text-stone-500 mb-4">30分鐘 · 含書面報告</div>
-              <button className="px-8 py-3 bg-purple-700 hover:bg-purple-600 text-white font-bold rounded-xl transition-all hover:shadow-lg whitespace-nowrap">
-                預約諮詢
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

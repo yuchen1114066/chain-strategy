@@ -67,7 +67,7 @@ const dimensionCards = [
     icon: ShoppingBag,
     title: "商業維度",
     subtitle: "Commerce",
-    description: "精選藥材商城、藥膳包訂閱、線上中醫師諮詢",
+    description: "精選藥材商城、溯源認證藥膳包訂閱",
     iconColor: "#8a6a3a",
     href: "/shop",
   },
