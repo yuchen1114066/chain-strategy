@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import MobileBottomNav from "@/components/MobileBottomNav";
 
 export const metadata: Metadata = {
   title: "養生道 YangSheng Dao | 傳統中醫養生平台",
@@ -17,8 +18,9 @@ export default function RootLayout({
     <html lang="zh-TW" className="h-full">
       <body className="min-h-full flex flex-col bg-[#fdfaf5] text-[#2c1810]">
         <Navbar />
-        <main className="flex-1">{children}</main>
-        <Footer />
+        <main className="flex-1 pb-16 md:pb-0">{children}</main>
+        <div className="hidden md:block"><Footer /></div>
+        <MobileBottomNav />
       </body>
     </html>
   );
