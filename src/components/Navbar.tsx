@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu, X, ShoppingCart, Search, User, Heart } from "lucide-react";
 
 const navLinks = [
@@ -16,6 +17,8 @@ const navLinks = [
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
+  if (pathname?.startsWith("/erp")) return null;
 
   return (
     <header className="sticky top-0 z-50 bg-[#fdf7f2]/95 backdrop-blur-sm border-b border-rose-100 shadow-sm">

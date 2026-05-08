@@ -1,8 +1,13 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { Heart, AlertCircle } from "lucide-react";
 
 export default function Footer() {
+  const pathname = usePathname();
+  if (pathname?.startsWith("/erp")) return null;
   return (
     <footer className="mt-16" style={{background:"#3d2030", color:"#f0dde5"}}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
