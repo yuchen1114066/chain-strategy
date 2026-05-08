@@ -6,6 +6,7 @@ import { Menu, X, ShoppingCart, Search, User, Leaf } from "lucide-react";
 
 const navLinks = [
   { href: "/today", label: "🌿 今日養生", highlight: true },
+  { href: "/beauty", label: "✨ 代謝美顏" },
   { href: "/quiz", label: "體質測評" },
   { href: "/recipes", label: "食療食譜" },
   { href: "/tracking", label: "打卡追蹤" },
