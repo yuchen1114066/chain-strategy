@@ -9,7 +9,7 @@ const navLinks = [
   { href: "/recipes", label: "食療食譜" },
   { href: "/quiz", label: "體質測評" },
   { href: "/tracking", label: "打卡追蹤" },
-  { href: "/herb-checker", label: "藥物查詢" },
+  { href: "/herb-checker", label: "本草查詢" },
   { href: "/community", label: "養生社群" },
   { href: "/shop", label: "養生商城" },
 ];

@@ -43,7 +43,7 @@ export default function Footer() {
                 { href: "/quiz", label: "🌿 體質測評" },
                 { href: "/recipes", label: "🍵 食療食譜庫" },
                 { href: "/tracking", label: "🗓️ 七天打卡追蹤" },
-                { href: "/herb-checker", label: "💊 中西藥安全查詢" },
+                { href: "/herb-checker", label: "🌿 本草查詢" },
                 { href: "/community", label: "💬 養生社群" },
                 { href: "/shop", label: "🛒 溯源認證商城" },
               ].map((link) => (
