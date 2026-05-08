@@ -10,11 +10,8 @@ export default function Footer() {
 
           {/* Brand */}
           <div className="lg:col-span-1">
-            <div className="mb-5 flex gap-3 items-center">
-              <div className="rounded-2xl overflow-hidden p-1.5" style={{ background: "#1a2a18" }}>
-                <Image src="/chengshu-logo.svg" alt="梣數策院" width={100} height={50} className="object-contain" />
-              </div>
-              <div className="rounded-2xl overflow-hidden p-1.5" style={{ background: "#fdf3e3" }}>
+            <div className="mb-5">
+              <div className="rounded-2xl overflow-hidden p-1.5 inline-block" style={{ background: "#fdf3e3" }}>
                 <Image src="/chengshu-logo-beige.svg" alt="梣數策院" width={100} height={50} className="object-contain" />
               </div>
             </div>
