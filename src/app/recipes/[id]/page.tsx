@@ -275,10 +275,14 @@ export default async function RecipeDetailPage({
                   href={`/recipes/${r.id}`}
                   className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 border border-stone-100 group"
                 >
-                  <div className={`h-36 bg-gradient-to-br ${r.imageColor} flex items-center justify-center`}>
-                    <span className="text-5xl">
-                      {r.category === "湯品" ? "🍲" : r.category === "粥品" ? "🥣" : r.category === "茶飲" ? "🍵" : "🍮"}
-                    </span>
+                  <div className={`h-36 bg-gradient-to-br ${r.imageColor} flex items-center justify-center relative overflow-hidden`}>
+                    {r.image ? (
+                      <Image src={r.image} alt={r.title} fill className="object-cover" />
+                    ) : (
+                      <span className="text-5xl">
+                        {r.category === "湯品" ? "🍲" : r.category === "粥品" ? "🥣" : r.category === "茶飲" ? "🍵" : "🍮"}
+                      </span>
+                    )}
                   </div>
                   <div className="p-4">
                     <h3 className="font-bold text-stone-800 group-hover:text-amber-700 transition-colors text-sm">{r.title}</h3>
