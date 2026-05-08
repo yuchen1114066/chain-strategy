@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Clock, Users, Star, ChefHat, Leaf, Heart, Share2, ShoppingCart } from "lucide-react";
 import { recipes, constitutions } from "@/lib/data";
@@ -41,11 +42,15 @@ export default async function RecipeDetailPage({
           </Link>
 
           <div className="flex flex-col lg:flex-row gap-8 items-start">
-            {/* Recipe Image Placeholder */}
-            <div className="w-full lg:w-80 h-64 bg-white/40 backdrop-blur-sm rounded-2xl flex items-center justify-center flex-shrink-0 shadow-md">
-              <span className="text-9xl filter drop-shadow-lg">
-                {recipe.category === "湯品" ? "🍲" : recipe.category === "粥品" ? "🥣" : recipe.category === "茶飲" ? "🍵" : "🍮"}
-              </span>
+            {/* Recipe Image */}
+            <div className="w-full lg:w-80 h-64 bg-white/40 backdrop-blur-sm rounded-2xl flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden relative">
+              {recipe.image ? (
+                <Image src={recipe.image} alt={recipe.title} fill className="object-cover rounded-2xl" />
+              ) : (
+                <span className="text-9xl filter drop-shadow-lg">
+                  {recipe.category === "湯品" ? "🍲" : recipe.category === "粥品" ? "🥣" : recipe.category === "茶飲" ? "🍵" : "🍮"}
+                </span>
+              )}
             </div>
 
             <div className="flex-1">
