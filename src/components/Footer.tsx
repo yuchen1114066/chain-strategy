@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import { Leaf, AlertCircle } from "lucide-react";
 
 export default function Footer() {
@@ -10,12 +9,6 @@ export default function Footer() {
 
           {/* Brand */}
           <div className="lg:col-span-1">
-            <div className="mb-5">
-              <div className="rounded-2xl overflow-hidden p-1.5 inline-block" style={{ background: "#2d1f0e" }}>
-                <Image src="/chengshu-logo.svg" alt="梣數策院" width={100} height={50} className="object-contain" />
-              </div>
-            </div>
-
             <div className="flex items-center gap-2 mb-3">
               <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "#3d5c3a" }}>
                 <Leaf className="w-4 h-4 text-white" />
