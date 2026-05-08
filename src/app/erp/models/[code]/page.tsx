@@ -27,9 +27,19 @@ export default async function ModelDetailPage({
       <Link href="/erp/models" className="text-xs text-cyan-700 hover:underline">← 返回型號列表</Link>
 
       <header className="bg-white rounded-xl border border-slate-200 p-6">
-        <div className="font-mono text-xs text-slate-500">{model.code}</div>
-        <h1 className="text-2xl font-bold">{model.name}</h1>
-        <p className="text-sm text-slate-600 mt-1">{model.description}</p>
+        <div className="flex items-start justify-between flex-wrap gap-3">
+          <div>
+            <div className="text-xs text-slate-500">成品品號</div>
+            <div className="font-mono text-2xl font-bold text-cyan-700">{model.code}</div>
+            <div className="text-xs text-slate-500 mt-2">機種</div>
+            <div className="text-base font-semibold">{model.machineFamily}</div>
+          </div>
+          <div className="text-right">
+            <div className="text-xs text-slate-500">商品說明</div>
+            <div className="font-medium">{model.name}</div>
+            <p className="text-sm text-slate-600 mt-1 max-w-md">{model.description}</p>
+          </div>
+        </div>
         <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
           <Stat label="BOM 零件數" value={String(lines.length)} />
           <Stat label="標準成本" value={`$${totalCost.toLocaleString()}`} />
@@ -37,6 +47,20 @@ export default async function ModelDetailPage({
           <Stat label="關鍵交期" value={`${longestLead} 天`} hint="最長備料日" />
         </div>
       </header>
+
+      {/* BOM bridge banner */}
+      <section className="rounded-xl border border-cyan-200 bg-cyan-50/60 p-4 text-sm">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="font-mono text-xs px-2 py-1 rounded bg-white border">{model.code}</span>
+          <span className="text-cyan-700 font-bold">→ 透過 BOM 自動展開 →</span>
+          <span className="font-mono text-xs px-2 py-1 rounded bg-white border">{lines.length} 個零件</span>
+          <span className="text-cyan-700 font-bold">→ 即時對到 →</span>
+          <span className="font-mono text-xs px-2 py-1 rounded bg-white border">
+            {new Set(lines.map((l) => parts.find((p) => p.id === l.partId)?.supplierId).filter(Boolean)).size} 家供應商
+          </span>
+          <span className="font-mono text-xs px-2 py-1 rounded bg-white border">在庫 vs 需求</span>
+        </div>
+      </section>
 
       {/* BOM */}
       <section className="bg-white rounded-xl border border-slate-200">

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { workOrders, models, parts, suppliers, bom, today } from "@/lib/erp/seed";
+import { workOrders, models, parts, suppliers, bom, today, currentStageLabel } from "@/lib/erp/seed";
 import { computeAlerts } from "@/lib/erp/alerts";
 import StageBar from "@/components/erp/StageBar";
 import AlertList from "@/components/erp/AlertList";
@@ -10,6 +10,14 @@ function daysUntil(iso: string): number {
   const ms = new Date(iso + "T00:00:00Z").getTime() - new Date(today + "T00:00:00Z").getTime();
   return Math.round(ms / 86_400_000);
 }
+
+const statusTone: Record<string, string> = {
+  "已簽收": "bg-emerald-100 text-emerald-700",
+  "生產中": "bg-cyan-100 text-cyan-700",
+  "待料":   "bg-amber-100 text-amber-800",
+  "規劃中": "bg-slate-100 text-slate-600",
+  "待開工": "bg-slate-100 text-slate-600",
+};
 
 export default async function WorkOrderDetailPage({
   params,
@@ -24,7 +32,6 @@ export default async function WorkOrderDetailPage({
   const lines = bom.filter((b) => b.modelId === wo.modelId && b.isActive);
   const allAlerts = computeAlerts().filter((a) => a.woId === wo.id);
 
-  // BOM × WO qty 缺料列
   const bomNeeds = lines.map((l) => {
     const p = parts.find((p) => p.id === l.partId)!;
     const sup = suppliers.find((s) => s.id === p.supplierId);
@@ -37,31 +44,52 @@ export default async function WorkOrderDetailPage({
 
   const dleft = daysUntil(wo.shipDate);
   const stageDoneCount = wo.stages.filter((s) => s.status === "done").length;
+  const sl = wo.statusLabel ?? wo.status;
 
   return (
     <div className="p-6 space-y-6">
       <Link href="/erp/work-orders" className="text-xs text-cyan-700 hover:underline">← 返回工單列表</Link>
 
-      {/* Header */}
+      {/* Header — fields aligned with iGP screen */}
       <header className="bg-white rounded-xl border border-slate-200 p-6">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <div className="font-mono text-sm text-slate-500">{wo.woNo}</div>
-            <h1 className="text-2xl font-bold mt-1">
-              {model.name} × {wo.qty}
+        <div className="flex items-start justify-between flex-wrap gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 font-mono">訂單號</span>
+              <span className="font-mono text-base font-bold">{wo.woNo}</span>
+              <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                來源 ● {wo.source}
+              </span>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${statusTone[sl] ?? "bg-slate-100 text-slate-600"}`}>
+                ● {sl}
+              </span>
+            </div>
+            <h1 className="text-2xl font-bold mt-2">
+              {model.machineFamily}
             </h1>
-            <p className="text-sm text-slate-600 mt-0.5">
-              {wo.customer}　→　{wo.destination}
-            </p>
+            <div className="text-sm text-slate-700">
+              <span className="font-mono text-cyan-700">{model.code}</span>　·　{model.name}
+            </div>
+            <div className="text-sm text-slate-600 mt-1">
+              客戶 <b className="text-slate-900">{wo.customer}</b>
+              　·　數量 <b className="tabular-nums">{wo.qty}</b>
+              　·　下單 {wo.orderDate}
+              　·　目的地 {wo.destination}
+            </div>
+            {wo.notes && (
+              <div className="text-xs text-amber-700 mt-1">📝 備註：{wo.notes}</div>
+            )}
           </div>
           <div className="text-right">
             <div className="text-xs text-slate-500">客戶要求船期</div>
-            <div className={`text-2xl font-bold tabular-nums ${dleft < 7 ? "text-rose-600" : dleft < 21 ? "text-amber-600" : "text-slate-900"}`}>
+            <div className={`text-2xl font-bold tabular-nums ${dleft < 0 ? "text-slate-400" : dleft < 7 ? "text-rose-600" : dleft < 21 ? "text-amber-600" : "text-slate-900"}`}>
               {wo.shipDate}
             </div>
             <div className="text-xs text-slate-500">
-              {dleft >= 0 ? `距離出貨 ${dleft} 天` : `已逾期 ${-dleft} 天`}
+              {dleft > 0 ? `距離出貨 ${dleft} 天` : dleft === 0 ? "今日出貨" : `已逾 ${-dleft} 天`}
             </div>
+            <div className="mt-2 text-xs text-slate-500">目前站別</div>
+            <div className="text-base font-semibold text-cyan-700">{currentStageLabel(wo)}</div>
           </div>
         </div>
 
@@ -73,7 +101,7 @@ export default async function WorkOrderDetailPage({
         </div>
       </header>
 
-      {/* Stage bar (large) */}
+      {/* Stage bar */}
       <section className="bg-white rounded-xl border border-slate-200 p-5">
         <h2 className="font-bold mb-3">八階段反向排程</h2>
         <StageBar stages={wo.stages} today={today} />
@@ -117,11 +145,13 @@ export default async function WorkOrderDetailPage({
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* BOM × Qty */}
+        {/* BOM × Qty — the BOM bridge made visible */}
         <section className="lg:col-span-2 bg-white rounded-xl border border-slate-200">
           <div className="px-5 py-4 border-b border-slate-200">
-            <h2 className="font-bold">BOM 展開（× {wo.qty} 台）</h2>
-            <p className="text-xs text-slate-500 mt-0.5">缺料即時偵測 — 紅底為庫存不足</p>
+            <h2 className="font-bold">🔗 BOM 連結展開（{model.code} × {wo.qty}）</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              成品品號 → 透過 BOM → 自動展開所需零件 / 即時偵測缺料
+            </p>
           </div>
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-600 text-xs">
@@ -159,7 +189,7 @@ export default async function WorkOrderDetailPage({
 
         {/* Alerts for this WO */}
         <section className="bg-white rounded-xl border border-slate-200 p-5">
-          <h2 className="font-bold mb-3">本單異常</h2>
+          <h2 className="font-bold mb-3">本單異常 + 動作建議</h2>
           <AlertList alerts={allAlerts} />
         </section>
       </div>

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const links = [
   { href: "/erp", label: "戰情室", icon: "🎯" },
+  { href: "/erp/simulator", label: "缺料模擬器", icon: "🔮", highlight: true },
   { href: "/erp/work-orders", label: "工單追蹤", icon: "📋" },
   { href: "/erp/models", label: "型號 + BOM", icon: "🏗️" },
   { href: "/erp/parts", label: "零件主檔", icon: "🔩" },
@@ -37,11 +38,14 @@ export default function Sidebar() {
               className={`flex items-center gap-2 px-5 py-2.5 text-sm transition-colors border-l-2 ${
                 active
                   ? "bg-slate-800/60 border-cyan-400 text-white"
+                  : l.highlight
+                  ? "border-transparent text-cyan-300 hover:bg-slate-800/40"
                   : "border-transparent text-slate-300 hover:bg-slate-800/40 hover:text-white"
               }`}
             >
               <span className="text-base">{l.icon}</span>
               <span>{l.label}</span>
+              {l.highlight && !active && <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-cyan-500 text-white font-bold">NEW</span>}
             </Link>
           );
         })}
