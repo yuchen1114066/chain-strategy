@@ -212,7 +212,7 @@ export default function BeautyPage() {
       {/* Hero Header */}
       <div className="bg-gradient-to-br from-rose-900 via-amber-800 to-rose-800 text-white relative overflow-hidden">
         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(circle at 20% 50%, #fff 1px, transparent 1px), radial-gradient(circle at 80% 20%, #fff 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
-        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
+        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
           <div className="flex items-center gap-2 mb-4 text-rose-300 text-sm">
             <Link href="/" className="hover:text-white transition-colors">首頁</Link>
             <span>/</span>
