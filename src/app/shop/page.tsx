@@ -1,11 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { ShoppingCart, Star, Search, Filter, Tag, Truck, Shield, RefreshCw, Heart, X } from "lucide-react";
+import { ShoppingCart, Search, Star, X, Check, Truck, Shield, RefreshCw } from "lucide-react";
 import { products, constitutions } from "@/lib/data";
 import Link from "next/link";
 
-const categories = ["全部", "補氣養生", "女性養生", "美容養顏", "祛濕保健", "抗炎保健", "活血保健", "滋補食材", "情緒養生", "季節禮盒", "訂閱服務", "專業服務"];
+const categories = ["全部", "補氣養生", "女性養生", "美容養顏", "祛濕保健", "抗炎保健", "活血保健", "滋補食材", "情緒養生", "季節禮盒", "訂閱服務"];
+
+const categoryEmoji: Record<string, string> = {
+  "補氣養生": "🌿", "女性養生": "🌸", "美容養顏": "💎", "祛濕保健": "💧",
+  "抗炎保健": "🔶", "活血保健": "❤️", "滋補食材": "🫐", "情緒養生": "🌹",
+  "季節禮盒": "🎁", "訂閱服務": "📦",
+};
 
 export default function ShopPage() {
   const [search, setSearch] = useState("");
@@ -17,7 +23,7 @@ export default function ShopPage() {
 
   const filtered = products
     .filter((p) => {
-      const matchSearch = !search || p.name.includes(search) || p.description.includes(search) || p.category.includes(search);
+      const matchSearch = !search || p.name.includes(search) || p.description.includes(search);
       const matchCat = selectedCategory === "全部" || p.category === selectedCategory;
       const matchConstitution = selectedConstitution === "全部" || p.constitution?.includes(selectedConstitution);
       return matchSearch && matchCat && matchConstitution;
@@ -36,276 +42,279 @@ export default function ShopPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#fdfaf5]">
-      {/* Header */}
-      <div className="bg-gradient-to-br from-green-900 to-stone-900 text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2 mb-3 text-green-300 text-sm">
-            <Link href="/" className="hover:text-white transition-colors">首頁</Link>
-            <span>/</span>
-            <span>養生商城</span>
-          </div>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-            <div>
-              <h1 className="text-4xl font-bold mb-3">養生商城</h1>
-              <p className="text-stone-300 text-base max-w-xl">
-                嚴選台灣在地有機藥材、傳統藥膳食材包、養生茶飲，讓您在家輕鬆實踐中醫養生。
-              </p>
-            </div>
-            <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-3 rounded-xl">
-              <ShoppingCart className="w-5 h-5 text-amber-300" />
-              <div>
-                <div className="text-white font-bold">{cartCount} 件商品</div>
-                <div className="text-xs text-stone-400">購物車</div>
-              </div>
-            </div>
-          </div>
+    <div className="min-h-screen bg-white text-[#1a1a1a]">
 
-          {/* Trust Badges */}
-          <div className="mt-8 flex flex-wrap gap-4">
-            {[
-              { icon: Truck, text: "滿 $1500 免運費" },
-              { icon: Shield, text: "SGS品質認證" },
-              { icon: RefreshCw, text: "7天退換貨保障" },
-              { icon: Tag, text: "正品保證溯源" },
-            ].map(({ icon: Icon, text }) => (
-              <div key={text} className="flex items-center gap-2 text-sm text-stone-300">
-                <Icon className="w-4 h-4 text-green-400" />
-                {text}
-              </div>
-            ))}
+      {/* Top info bar */}
+      <div className="border-b border-[#e8e8e8] bg-[#fafafa]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex flex-wrap gap-4 justify-center text-xs text-[#666]">
+          <span className="flex items-center gap-1"><Truck className="w-3 h-3" />滿 NT$1,500 免運費</span>
+          <span className="flex items-center gap-1"><Shield className="w-3 h-3" />SGS 品質認證</span>
+          <span className="flex items-center gap-1"><RefreshCw className="w-3 h-3" />7 天退換貨保障</span>
+        </div>
+      </div>
+
+      {/* Page Header */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-4">
+        <div className="text-xs text-[#999] mb-4">
+          <Link href="/" className="hover:text-[#c0392b] transition-colors">首頁</Link>
+          <span className="mx-2">/</span>
+          <span>養生商城</span>
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#e0e0e0] pb-5">
+          <div>
+            <h1 className="text-2xl font-light tracking-widest text-[#1a1a1a] mb-1">養生商城</h1>
+            <p className="text-sm text-[#888]">嚴選台灣在地有機藥材・傳統藥膳食材・四季養生茶飲</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#aaa]" />
+              <input
+                type="text"
+                placeholder="搜尋商品..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 pr-8 py-2 border border-[#ddd] text-sm text-[#333] placeholder-[#bbb] focus:outline-none focus:border-[#999] transition-colors w-48"
+              />
+              {search && (
+                <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#aaa] hover:text-[#666]">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            {/* Sort */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="py-2 px-3 border border-[#ddd] text-sm text-[#333] focus:outline-none focus:border-[#999] transition-colors"
+            >
+              <option value="default">預設排序</option>
+              <option value="price-asc">價格低→高</option>
+              <option value="price-desc">價格高→低</option>
+              <option value="rating">評分最高</option>
+            </select>
+            {/* Cart */}
+            <div className="flex items-center gap-1.5 border border-[#ddd] px-3 py-2 text-sm text-[#333]">
+              <ShoppingCart className="w-4 h-4" />
+              <span>{cartCount}</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search & Sort */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <div className="flex-1 relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-            <input
-              type="text"
-              placeholder="搜尋商品..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm text-stone-700 placeholder-stone-400 focus:outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition-all"
-            />
-            {search && (
-              <button onClick={() => setSearch("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600">
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            className="px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm text-stone-700 focus:outline-none focus:border-rose-300 transition-all"
-          >
-            <option value="default">預設排序</option>
-            <option value="price-asc">價格由低到高</option>
-            <option value="price-desc">價格由高到低</option>
-            <option value="rating">評分最高</option>
-          </select>
-        </div>
+      {/* Main Layout: sidebar + grid */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+        <div className="flex gap-10">
 
-        {/* Category Filter */}
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all whitespace-nowrap ${
-                selectedCategory === cat
-                  ? "bg-green-700 border-green-700 text-white"
-                  : "bg-white border-stone-200 text-stone-600 hover:border-green-400"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-
-        {/* Constitution Filter */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-          <button
-            onClick={() => setSelectedConstitution("全部")}
-            className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all whitespace-nowrap ${
-              selectedConstitution === "全部"
-                ? "border-[#c4607a] text-white"
-                : "bg-white border-stone-200 text-stone-600 hover:border-rose-300"
-            }`}
-            style={selectedConstitution === "全部" ? {background:"linear-gradient(135deg,#e8a0b4,#c4607a)"} : undefined}
-          >
-            所有體質
-          </button>
-          {constitutions.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setSelectedConstitution(c.id)}
-              className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all whitespace-nowrap ${
-                selectedConstitution === c.id
-                  ? "border-[#c4607a] text-white"
-                  : "bg-white border-stone-200 text-stone-600 hover:border-rose-300"
-              }`}
-              style={selectedConstitution === c.id ? {background:"linear-gradient(135deg,#e8a0b4,#c4607a)"} : undefined}
-            >
-              {c.name}
-            </button>
-          ))}
-        </div>
-
-        {/* Results Count */}
-        <p className="text-sm text-stone-500 mb-5">
-          共 <strong className="text-stone-700">{filtered.length}</strong> 件商品
-        </p>
-
-        {/* Product Grid */}
-        {filtered.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {filtered.map((product) => (
-              <div
-                key={product.id}
-                className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 border border-stone-100 group flex flex-col"
-              >
-                {/* Product Image */}
-                <div className={`h-44 bg-gradient-to-br ${product.imageColor} relative flex items-center justify-center`}>
-                  <span className="text-6xl filter drop-shadow-sm">
-                    {product.category === "補氣養生" ? "🌿" :
-                     product.category === "女性養生" ? "🌸" :
-                     product.category === "美容養顏" ? "💎" :
-                     product.category === "祛濕保健" ? "💧" :
-                     product.category === "抗炎保健" ? "🔶" :
-                     product.category === "活血保健" ? "❤️" :
-                     product.category === "滋補食材" ? "🫐" :
-                     product.category === "情緒養生" ? "🌹" :
-                     product.category === "季節禮盒" ? "🎁" :
-                     product.category === "訂閱服務" ? "📦" :
-                     product.category === "專業服務" ? "👨‍⚕️" : "🌿"}
-                  </span>
-                  <div className="absolute top-3 left-3 flex flex-col gap-1.5">
-                    {product.badge && (
-                      <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                        {product.badge}
-                      </span>
-                    )}
-                    {product.originalPrice && (
-                      <span className="text-white text-xs font-bold px-2 py-0.5 rounded-full" style={{background:"linear-gradient(135deg,#e8a0b4,#c4607a)"}}>
-                        特價
-                      </span>
-                    )}
-                  </div>
-                  <button className="absolute top-3 right-3 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100">
-                    <Heart className="w-4 h-4 text-stone-400 hover:text-red-400 transition-colors" />
-                  </button>
-                </div>
-
-                <div className="p-4 flex flex-col flex-1">
-                  {/* Category Badge */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs bg-stone-100 text-stone-600 px-2 py-0.5 rounded-full">
-                      {product.category}
-                    </span>
-                    {!product.inStock && (
-                      <span className="text-xs bg-stone-200 text-stone-500 px-2 py-0.5 rounded-full">
-                        暫時缺貨
-                      </span>
-                    )}
-                  </div>
-
-                  <h3 className="font-bold text-stone-800 mb-1.5 group-hover:text-green-700 transition-colors leading-snug">
-                    {product.name}
-                  </h3>
-
-                  <p className="text-xs text-stone-500 line-clamp-2 leading-relaxed mb-3 flex-1">
-                    {product.description}
-                  </p>
-
-                  {/* Features */}
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {product.features.slice(0, 3).map((f) => (
-                      <span key={f} className="text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full">
-                        {f}
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* Rating */}
-                  <div className="flex items-center gap-1 mb-3">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <Star
-                        key={i}
-                        className={`w-3.5 h-3.5 ${i <= Math.round(product.rating) ? "fill-[#c4607a] text-[#c4607a]" : "text-stone-200"}`}
-                      />
-                    ))}
-                    <span className="text-xs text-stone-500 ml-1">({product.reviews})</span>
-                  </div>
-
-                  {/* Price & CTA */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xl font-bold text-green-800">NT${product.price}</span>
-                      {product.originalPrice && (
-                        <span className="text-sm text-stone-400 line-through ml-2">NT${product.originalPrice}</span>
-                      )}
-                    </div>
+          {/* Left Sidebar — desktop */}
+          <aside className="hidden md:block w-44 flex-shrink-0 pt-4">
+            {/* Categories */}
+            <div className="mb-8">
+              <p className="text-xs font-semibold text-[#999] tracking-widest uppercase mb-3">商品分類</p>
+              <ul className="space-y-0.5">
+                {categories.map((cat) => (
+                  <li key={cat}>
                     <button
-                      onClick={() => handleAddToCart(product.id)}
-                      disabled={!product.inStock}
-                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
-                        addedId === product.id
-                          ? "bg-green-600 text-white"
-                          : product.inStock
-                          ? "bg-green-700 hover:bg-green-600 text-white hover:shadow-md"
-                          : "bg-stone-200 text-stone-400 cursor-not-allowed"
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`w-full text-left text-sm py-1.5 px-2 transition-colors ${
+                        selectedCategory === cat
+                          ? "text-[#c0392b] font-medium"
+                          : "text-[#555] hover:text-[#c0392b]"
                       }`}
                     >
-                      <ShoppingCart className="w-4 h-4" />
-                      {addedId === product.id ? "已加入！" : product.inStock ? "加入購物車" : "缺貨"}
+                      {cat === "全部" ? "すべての商品" : cat}
                     </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-20">
-            <div className="text-6xl mb-4">🛒</div>
-            <h3 className="text-xl font-bold text-stone-700 mb-2">找不到相關商品</h3>
-            <p className="text-stone-500 mb-6">嘗試更換搜尋條件或篩選選項</p>
-            <button
-              onClick={() => { setSearch(""); setSelectedCategory("全部"); setSelectedConstitution("全部"); }}
-              className="px-6 py-3 text-white rounded-full font-medium transition-colors hover:opacity-90"
-              style={{background:"linear-gradient(135deg,#e8a0b4,#c4607a)"}}
-            >
-              清除所有篩選
-            </button>
-          </div>
-        )}
+                  </li>
+                ))}
+              </ul>
+            </div>
 
-        {/* Subscription Banner */}
-        <div className="mt-16 bg-gradient-to-br from-green-800 to-stone-800 rounded-2xl p-8 text-white">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            {/* Constitution filter */}
             <div>
-              <div className="text-3xl mb-2">📦</div>
-              <h3 className="text-2xl font-bold mb-2">節氣養生月訂盒</h3>
-              <p className="text-stone-300 text-sm max-w-md leading-relaxed">
-                依據二十四節氣設計，每月配送當季最適合的養生食材和茶飲，附當月養生建議書。
-                NT$1,200/月，隨時可取消。
+              <p className="text-xs font-semibold text-[#999] tracking-widest uppercase mb-3">適合體質</p>
+              <ul className="space-y-0.5">
+                <li>
+                  <button
+                    onClick={() => setSelectedConstitution("全部")}
+                    className={`w-full text-left text-sm py-1.5 px-2 transition-colors ${
+                      selectedConstitution === "全部" ? "text-[#c0392b] font-medium" : "text-[#555] hover:text-[#c0392b]"
+                    }`}
+                  >
+                    所有體質
+                  </button>
+                </li>
+                {constitutions.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      onClick={() => setSelectedConstitution(c.id)}
+                      className={`w-full text-left text-sm py-1.5 px-2 transition-colors ${
+                        selectedConstitution === c.id ? "text-[#c0392b] font-medium" : "text-[#555] hover:text-[#c0392b]"
+                      }`}
+                    >
+                      {c.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </aside>
+
+          {/* Mobile category tabs */}
+          <div className="md:hidden w-full pt-4">
+            <div className="flex gap-2 overflow-x-auto pb-3 mb-1 scrollbar-hide">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`text-xs px-3 py-1.5 border whitespace-nowrap transition-colors flex-shrink-0 ${
+                    selectedCategory === cat
+                      ? "bg-[#1a1a1a] text-white border-[#1a1a1a]"
+                      : "border-[#ddd] text-[#555] hover:border-[#999]"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Product Grid */}
+          <main className="flex-1 pt-4 min-w-0">
+            {/* Section title */}
+            <div className="flex items-center justify-between mb-5">
+              <p className="text-sm text-[#888]">
+                {selectedCategory !== "全部" && (
+                  <span className="text-[#1a1a1a] font-medium mr-2">{selectedCategory}</span>
+                )}
+                共 <span className="text-[#1a1a1a] font-medium">{filtered.length}</span> 件商品
               </p>
-              <div className="flex flex-wrap gap-3 mt-4">
-                {["每月配送", "節氣主題", "個人化建議", "可隨時取消"].map((f) => (
-                  <span key={f} className="text-xs bg-white/10 border border-white/20 px-2.5 py-1 rounded-full">
-                    {f}
-                  </span>
+            </div>
+
+            {filtered.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-10">
+                {filtered.map((product) => (
+                  <div key={product.id} className="group">
+                    {/* Product Image Area */}
+                    <div className={`relative w-full aspect-[4/3] bg-gradient-to-br ${product.imageColor} flex items-center justify-center overflow-hidden mb-4`}>
+                      <span className="text-7xl filter drop-shadow-sm">
+                        {categoryEmoji[product.category] ?? "🌿"}
+                      </span>
+                      {/* Badges */}
+                      <div className="absolute top-3 left-3 flex flex-col gap-1">
+                        {product.badge && (
+                          <span className="bg-[#c0392b] text-white text-xs px-2 py-0.5 tracking-wide">
+                            {product.badge}
+                          </span>
+                        )}
+                        {product.originalPrice && (
+                          <span className="bg-[#1a1a1a] text-white text-xs px-2 py-0.5 tracking-wide">
+                            特價
+                          </span>
+                        )}
+                        {!product.inStock && (
+                          <span className="bg-[#999] text-white text-xs px-2 py-0.5 tracking-wide">
+                            缺貨
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Product Info */}
+                    <div>
+                      <p className="text-xs text-[#999] mb-1">{product.category}</p>
+                      <h3 className="text-sm font-medium text-[#1a1a1a] mb-1.5 leading-snug group-hover:text-[#c0392b] transition-colors">
+                        {product.name}
+                      </h3>
+                      <p className="text-xs text-[#777] leading-relaxed mb-3 line-clamp-2">
+                        {product.description}
+                      </p>
+
+                      {/* Stars */}
+                      <div className="flex items-center gap-1 mb-3">
+                        {[1,2,3,4,5].map((i) => (
+                          <Star key={i} className={`w-3 h-3 ${i <= Math.round(product.rating) ? "fill-[#c0392b] text-[#c0392b]" : "text-[#e0e0e0]"}`} />
+                        ))}
+                        <span className="text-xs text-[#999] ml-1">({product.reviews})</span>
+                      </div>
+
+                      {/* Price + Button */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-base font-medium text-[#1a1a1a]">NT${product.price.toLocaleString()}</span>
+                          {product.originalPrice && (
+                            <span className="text-xs text-[#bbb] line-through">NT${product.originalPrice.toLocaleString()}</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleAddToCart(product.id)}
+                          disabled={!product.inStock}
+                          className={`flex items-center gap-1.5 text-xs px-4 py-2 border transition-colors ${
+                            addedId === product.id
+                              ? "bg-[#1a1a1a] text-white border-[#1a1a1a]"
+                              : product.inStock
+                              ? "border-[#1a1a1a] text-[#1a1a1a] hover:bg-[#1a1a1a] hover:text-white"
+                              : "border-[#ddd] text-[#bbb] cursor-not-allowed"
+                          }`}
+                        >
+                          {addedId === product.id ? (
+                            <><Check className="w-3 h-3" />已加入</>
+                          ) : product.inStock ? (
+                            <>加入購物車</>
+                          ) : (
+                            <>暫時缺貨</>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
-            </div>
-            <button className="flex-shrink-0 px-8 py-4 text-white font-bold rounded-full transition-all hover:shadow-lg hover:opacity-90 whitespace-nowrap" style={{background:"linear-gradient(135deg,#e8a0b4,#c4607a)"}}>
-              立即訂閱
-            </button>
-          </div>
+            ) : (
+              <div className="text-center py-24 border border-[#eee]">
+                <p className="text-[#999] text-sm mb-4">找不到相關商品</p>
+                <button
+                  onClick={() => { setSearch(""); setSelectedCategory("全部"); setSelectedConstitution("全部"); }}
+                  className="text-xs border border-[#1a1a1a] text-[#1a1a1a] px-5 py-2 hover:bg-[#1a1a1a] hover:text-white transition-colors"
+                >
+                  清除篩選
+                </button>
+              </div>
+            )}
+          </main>
         </div>
 
+        {/* Bottom Banner — 3 tiles like kobai.jp */}
+        <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-px bg-[#e0e0e0]">
+          {[
+            {
+              emoji: "📦",
+              bg: "from-stone-700 to-stone-900",
+              label: "節氣養生月訂盒",
+              desc: "依二十四節氣設計，每月配送當季養生食材與茶飲，附養生建議書。NT$1,200/月",
+            },
+            {
+              emoji: "🌿",
+              bg: "from-green-700 to-green-900",
+              label: "本草原料溯源認證",
+              desc: "所有食材均通過 SGS 檢驗，產地直送，讓您安心食用每一口養生好物。",
+            },
+            {
+              emoji: "🏪",
+              bg: "from-amber-700 to-amber-900",
+              label: "養生道實體門市",
+              desc: "台北・台中・高雄均設有實體體驗館，歡迎預約免費體質諮詢服務。",
+            },
+          ].map((tile) => (
+            <div
+              key={tile.label}
+              className={`bg-gradient-to-br ${tile.bg} text-white p-8 flex flex-col justify-end min-h-[200px] cursor-pointer group`}
+            >
+              <div className="text-4xl mb-4 group-hover:scale-110 transition-transform">{tile.emoji}</div>
+              <p className="text-sm font-semibold mb-1 tracking-wide">{tile.label}</p>
+              <p className="text-xs text-white/70 leading-relaxed">{tile.desc}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
