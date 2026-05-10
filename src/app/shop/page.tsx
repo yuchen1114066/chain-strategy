@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ShoppingCart, Search, Star, X, Check, Truck, Shield, RefreshCw } from "lucide-react";
-import { products, constitutions } from "@/lib/data";
+import { products } from "@/lib/data";
 import Link from "next/link";
 
 const categories = ["全部", "補氣養生", "女性養生", "美容養顏", "祛濕保健", "抗炎保健", "活血保健", "滋補食材", "情緒養生", "季節禮盒", "訂閱服務"];
@@ -16,7 +16,6 @@ const categoryEmoji: Record<string, string> = {
 export default function ShopPage() {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("全部");
-  const [selectedConstitution, setSelectedConstitution] = useState("全部");
   const [sortBy, setSortBy] = useState<"default" | "price-asc" | "price-desc" | "rating">("default");
   const [cartCount, setCartCount] = useState(0);
   const [addedId, setAddedId] = useState<string | null>(null);
@@ -25,8 +24,7 @@ export default function ShopPage() {
     .filter((p) => {
       const matchSearch = !search || p.name.includes(search) || p.description.includes(search);
       const matchCat = selectedCategory === "全部" || p.category === selectedCategory;
-      const matchConstitution = selectedConstitution === "全部" || p.constitution?.includes(selectedConstitution);
-      return matchSearch && matchCat && matchConstitution;
+      return matchSearch && matchCat;
     })
     .sort((a, b) => {
       if (sortBy === "price-asc") return a.price - b.price;
@@ -108,8 +106,7 @@ export default function ShopPage() {
 
           {/* Left Sidebar — desktop */}
           <aside className="hidden md:block w-44 flex-shrink-0 pt-4">
-            {/* Categories */}
-            <div className="mb-8">
+            <div>
               <p className="text-xs font-semibold text-[#999] tracking-widest uppercase mb-3">商品分類</p>
               <ul className="space-y-0.5">
                 {categories.map((cat) => (
@@ -122,36 +119,7 @@ export default function ShopPage() {
                           : "text-[#555] hover:text-[#c0392b]"
                       }`}
                     >
-                      {cat === "全部" ? "すべての商品" : cat}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Constitution filter */}
-            <div>
-              <p className="text-xs font-semibold text-[#999] tracking-widest uppercase mb-3">適合體質</p>
-              <ul className="space-y-0.5">
-                <li>
-                  <button
-                    onClick={() => setSelectedConstitution("全部")}
-                    className={`w-full text-left text-sm py-1.5 px-2 transition-colors ${
-                      selectedConstitution === "全部" ? "text-[#c0392b] font-medium" : "text-[#555] hover:text-[#c0392b]"
-                    }`}
-                  >
-                    所有體質
-                  </button>
-                </li>
-                {constitutions.map((c) => (
-                  <li key={c.id}>
-                    <button
-                      onClick={() => setSelectedConstitution(c.id)}
-                      className={`w-full text-left text-sm py-1.5 px-2 transition-colors ${
-                        selectedConstitution === c.id ? "text-[#c0392b] font-medium" : "text-[#555] hover:text-[#c0392b]"
-                      }`}
-                    >
-                      {c.name}
+                      {cat === "全部" ? "全部商品" : cat}
                     </button>
                   </li>
                 ))}
@@ -172,7 +140,7 @@ export default function ShopPage() {
                       : "border-[#ddd] text-[#555] hover:border-[#999]"
                   }`}
                 >
-                  {cat}
+                  {cat === "全部" ? "全部商品" : cat}
                 </button>
               ))}
             </div>
@@ -273,7 +241,7 @@ export default function ShopPage() {
               <div className="text-center py-24 border border-[#eee]">
                 <p className="text-[#999] text-sm mb-4">找不到相關商品</p>
                 <button
-                  onClick={() => { setSearch(""); setSelectedCategory("全部"); setSelectedConstitution("全部"); }}
+                  onClick={() => { setSearch(""); setSelectedCategory("全部"); }}
                   className="text-xs border border-[#1a1a1a] text-[#1a1a1a] px-5 py-2 hover:bg-[#1a1a1a] hover:text-white transition-colors"
                 >
                   清除篩選
