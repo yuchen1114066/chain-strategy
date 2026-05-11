@@ -12,6 +12,7 @@ const links = [
   { href: "/erp/suppliers", label: "供應商", icon: "🏭" },
   { href: "/erp/alerts", label: "異常警訊", icon: "🚨" },
   { href: "/erp/import", label: "Excel 匯入", icon: "📥" },
+  { href: "/erp/mobile", label: "行動倉儲", icon: "📱", highlight: true },
 ];
 
 export default function Sidebar() {
