@@ -14,6 +14,7 @@ const links = [
   { href: "/erp/models", label: "型號 + BOM", icon: "🏗️" },
   { href: "/erp/parts", label: "零件主檔", icon: "🔩" },
   { href: "/erp/suppliers", label: "供應商", icon: "🏭" },
+  { href: "/erp/po-generator", label: "採購單生成", icon: "🛒", highlight: true },
   { href: "/erp/alerts", label: "異常警訊", icon: "🚨" },
   { href: "/erp/import", label: "BOM 匯入", icon: "📥" },
   { href: "/erp/mobile", label: "QR 查碼", icon: "📱" },
