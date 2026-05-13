@@ -12,32 +12,45 @@ import type {
 } from "./types";
 
 export const suppliers: Supplier[] = [
-  { id: "s1", code: "SUP-CN-001", name: "東莞睿達金屬", country: "中國", city: "東莞", transitDays: 9, contact: "Mr. Liu" },
-  { id: "s2", code: "SUP-TW-001", name: "台中精誠馬達", country: "台灣", city: "台中", transitDays: 2, contact: "陳經理" },
-  { id: "s3", code: "SUP-TW-002", name: "桃園控制板廠", country: "台灣", city: "桃園", transitDays: 1, contact: "林副總" },
-  { id: "s4", code: "SUP-CN-002", name: "寧波橡膠帶業", country: "中國", city: "寧波", transitDays: 11, contact: "Ms. Wang" },
-  { id: "s5", code: "SUP-VN-001", name: "胡志明電源廠", country: "越南", city: "胡志明", transitDays: 14, contact: "Mr. Tran" },
+  // 祺驊 BOM 中實際出現的廠商（FB11G003 BOM 截圖確認）
+  // 交貨天數一律 45 天（依使用者提供）
+  { id: "s1",  code: "SUP-JC",  name: "競丞",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s2",  code: "SUP-SC",  name: "雙成",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s3",  code: "SUP-CY",  name: "重邑",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s4",  code: "SUP-ZHY", name: "莊宏億",       country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s5",  code: "SUP-YN",  name: "應拿",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s6",  code: "SUP-CHV", name: "祺驊（越南）", country: "越南", city: "—", transitDays: 45, contact: "內部廠" },
+  { id: "s7",  code: "SUP-JH",  name: "吉輝",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s8",  code: "SUP-TT",  name: "鈦泰",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s9",  code: "SUP-HY",  name: "寒亞",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s10", code: "SUP-ZS",  name: "這勝",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s11", code: "SUP-HC",  name: "海騁",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s12", code: "SUP-YZ",  name: "右在",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s13", code: "SUP-DTC", name: "東台祺電",     country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s14", code: "SUP-HB",  name: "海碧",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s15", code: "SUP-JL",  name: "金倫",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
 ];
 
 export const parts: Part[] = [
-  // FB64 直立車主要零件
-  { id: "p1", code: "FB64-FRM", name: "FB64 主車架", category: "鋼架", unit: "PCS", unitCost: 1450, supplierId: "s1", leadDays: 30, stockOnHand: 60, safetyStock: 30 },
-  { id: "p2", code: "FB64-FLY18", name: "18kg 飛輪組", category: "飛輪", unit: "PCS", unitCost: 950, supplierId: "s1", leadDays: 30, stockOnHand: 35, safetyStock: 20 },
-  { id: "p3", code: "FB64-RES", name: "磁控阻力組（8段）", category: "阻力", unit: "PCS", unitCost: 780, supplierId: "s2", leadDays: 21, stockOnHand: 12, safetyStock: 25 }, // 缺
-  { id: "p4", code: "FB64-CON", name: "FB64 控制儀錶", category: "控制板", unit: "PCS", unitCost: 1280, supplierId: "s3", leadDays: 14, stockOnHand: 45, safetyStock: 20 },
-  { id: "p5", code: "FB64-LCD5", name: "5吋 LCD 顯示器", category: "顯示器", unit: "PCS", unitCost: 540, supplierId: "s3", leadDays: 14, stockOnHand: 90, safetyStock: 40 },
-  { id: "p6", code: "FB64-SDL", name: "競速座墊", category: "座墊", unit: "PCS", unitCost: 230, supplierId: "s2", leadDays: 10, stockOnHand: 75, safetyStock: 30 },
-  { id: "p7", code: "FB64-PED", name: "鋁合金腳踏板（對）", category: "踏板", unit: "PR", unitCost: 180, supplierId: "s2", leadDays: 12, stockOnHand: 120, safetyStock: 60 },
-  { id: "p8", code: "FB64-BLT", name: "3V 傳動皮帶", category: "皮帶", unit: "PCS", unitCost: 95, supplierId: "s4", leadDays: 21, stockOnHand: 180, safetyStock: 80 },
-  { id: "p9", code: "FB64-PSU", name: "12V 電源供應", category: "電源", unit: "PCS", unitCost: 320, supplierId: "s5", leadDays: 30, stockOnHand: 8, safetyStock: 40 }, // 嚴重缺
-  { id: "p10", code: "FB64-BOX", name: "FB64 外箱套", category: "包材", unit: "SET", unitCost: 240, supplierId: "s2", leadDays: 7, stockOnHand: 200, safetyStock: 80 },
+  // FB64 直立車主要零件（demo 用 — 廠商已對應到祺驊真實供應商）
+  // 全部交期統一 45 天（依使用者提供）
+  { id: "p1",  code: "FB64-FRM",   name: "FB64 主車架",       category: "鋼架",   unit: "PCS", unitCost: 1450, supplierId: "s4",  leadDays: 45, stockOnHand: 60,  safetyStock: 30 }, // 莊宏億
+  { id: "p2",  code: "FB64-FLY18", name: "18kg 飛輪組",       category: "飛輪",   unit: "PCS", unitCost: 950,  supplierId: "s6",  leadDays: 45, stockOnHand: 35,  safetyStock: 20 }, // 祺驊越南
+  { id: "p3",  code: "FB64-RES",   name: "磁控阻力組（8段）", category: "阻力",   unit: "PCS", unitCost: 780,  supplierId: "s8",  leadDays: 45, stockOnHand: 12,  safetyStock: 25 }, // 缺 — 鈦泰
+  { id: "p4",  code: "FB64-CON",   name: "FB64 控制儀錶",     category: "控制板", unit: "PCS", unitCost: 1280, supplierId: "s13", leadDays: 45, stockOnHand: 45,  safetyStock: 20 }, // 東台祺電
+  { id: "p5",  code: "FB64-LCD5",  name: "5吋 LCD 顯示器",    category: "顯示器", unit: "PCS", unitCost: 540,  supplierId: "s13", leadDays: 45, stockOnHand: 90,  safetyStock: 40 }, // 東台祺電
+  { id: "p6",  code: "FB64-SDL",   name: "競速座墊",          category: "座墊",   unit: "PCS", unitCost: 230,  supplierId: "s7",  leadDays: 45, stockOnHand: 75,  safetyStock: 30 }, // 吉輝
+  { id: "p7",  code: "FB64-PED",   name: "鋁合金腳踏板（對）",category: "踏板",   unit: "PR",  unitCost: 180,  supplierId: "s2",  leadDays: 45, stockOnHand: 120, safetyStock: 60 }, // 雙成
+  { id: "p8",  code: "FB64-BLT",   name: "3V 傳動皮帶",       category: "皮帶",   unit: "PCS", unitCost: 95,   supplierId: "s11", leadDays: 45, stockOnHand: 180, safetyStock: 80 }, // 海騁
+  { id: "p9",  code: "FB64-PSU",   name: "12V 電源供應",      category: "電源",   unit: "PCS", unitCost: 320,  supplierId: "s13", leadDays: 45, stockOnHand: 8,   safetyStock: 40 }, // 嚴重缺 — 東台祺電
+  { id: "p10", code: "FB64-BOX",   name: "FB64 外箱套",       category: "包材",   unit: "SET", unitCost: 240,  supplierId: "s14", leadDays: 45, stockOnHand: 200, safetyStock: 80 }, // 海碧
   // 跑步機共用零件
-  { id: "p11", code: "T220-FRM", name: "跑步機鋼架（折疊）", category: "鋼架", unit: "PCS", unitCost: 1850, supplierId: "s1", leadDays: 35, stockOnHand: 20, safetyStock: 10 },
-  { id: "p12", code: "T220-MOT", name: "DC 3HP 馬達", category: "馬達", unit: "PCS", unitCost: 4200, supplierId: "s2", leadDays: 21, stockOnHand: 8, safetyStock: 15 }, // 缺
-  { id: "p13", code: "T220-RUN", name: "跑步帶（橡膠）", category: "皮帶", unit: "PCS", unitCost: 680, supplierId: "s4", leadDays: 28, stockOnHand: 30, safetyStock: 20 },
+  { id: "p11", code: "T220-FRM",   name: "跑步機鋼架（折疊）",category: "鋼架",   unit: "PCS", unitCost: 1850, supplierId: "s4",  leadDays: 45, stockOnHand: 20,  safetyStock: 10 }, // 莊宏億
+  { id: "p12", code: "T220-MOT",   name: "DC 3HP 馬達",       category: "馬達",   unit: "PCS", unitCost: 4200, supplierId: "s13", leadDays: 45, stockOnHand: 8,   safetyStock: 15 }, // 缺 — 東台祺電
+  { id: "p13", code: "T220-RUN",   name: "跑步帶（橡膠）",    category: "皮帶",   unit: "PCS", unitCost: 680,  supplierId: "s11", leadDays: 45, stockOnHand: 30,  safetyStock: 20 }, // 海騁
   // 划船機共用零件
-  { id: "p14", code: "R100-RAIL", name: "划船機軌道", category: "鋼架", unit: "PCS", unitCost: 2100, supplierId: "s1", leadDays: 35, stockOnHand: 10, safetyStock: 8 },
-  { id: "p15", code: "R100-ROPE", name: "划船拉繩組", category: "皮帶", unit: "PCS", unitCost: 220, supplierId: "s4", leadDays: 25, stockOnHand: 40, safetyStock: 20 },
+  { id: "p14", code: "R100-RAIL",  name: "划船機軌道",        category: "鋼架",   unit: "PCS", unitCost: 2100, supplierId: "s4",  leadDays: 45, stockOnHand: 10,  safetyStock: 8 },  // 莊宏億
+  { id: "p15", code: "R100-ROPE",  name: "划船拉繩組",        category: "皮帶",   unit: "PCS", unitCost: 220,  supplierId: "s11", leadDays: 45, stockOnHand: 40,  safetyStock: 20 }, // 海騁
 ];
 
 // 機種 FB64・直立車 之下有多個成品品號（H021-A2 商規 / H020-A1 家規）
