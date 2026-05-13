@@ -5,14 +5,15 @@ import { usePathname } from "next/navigation";
 
 const links = [
   { href: "/erp", label: "戰情室", icon: "🎯" },
-  { href: "/erp/flow", label: "流程綜觀", icon: "🌊", highlight: true },
+  { href: "/erp/flow", label: "流程綜觀", icon: "🌊" },
+  { href: "/erp/analytics", label: "零件分析", icon: "📊", highlight: true },
   { href: "/erp/simulator", label: "缺料模擬器", icon: "🔮" },
   { href: "/erp/work-orders", label: "工單追蹤", icon: "📋" },
   { href: "/erp/models", label: "型號 + BOM", icon: "🏗️" },
   { href: "/erp/parts", label: "零件主檔", icon: "🔩" },
   { href: "/erp/suppliers", label: "供應商", icon: "🏭" },
   { href: "/erp/alerts", label: "異常警訊", icon: "🚨" },
-  { href: "/erp/import", label: "Excel 匯入", icon: "📥" },
+  { href: "/erp/import", label: "BOM 匯入", icon: "📥" },
   { href: "/erp/mobile", label: "QR 查碼", icon: "📱" },
 ];
 
