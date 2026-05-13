@@ -1,311 +1,179 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
+import Link from "next/link";
 import {
   initialSlips,
-  SP_FOR_TASK,
-  TASK_META,
   classifyBarcode,
+  TASK_META,
   type Slip,
-  type SlipItem,
-  type SlipType,
-  type ScanEvent,
-  type SyncMode,
+  type ScanKind,
 } from "@/lib/erp/warehouse";
+import { parts, suppliers, models, bom, workOrders } from "@/lib/erp/seed";
 
-type View = "tasks" | "detail" | "scan";
+// 預設可掃的 QR 列表（demo 模擬：實際手機開相機）
+const DEMO_QR_PRESETS = [
+  { label: "料件：線圈固定架", code: "P04AA10" },
+  { label: "料件：SKF 軸承", code: "P13AA06" },
+  { label: "料件：FB64 主車架", code: "FB64-FRM" },
+  { label: "領料單", code: "5410-260507001" },
+  { label: "收料單", code: "5210-260507002" },
+  { label: "製令", code: "5110-260128006" },
+  { label: "採購單", code: "PO-2026-1021" },
+  { label: "倉位", code: "A100-B2-04" },
+];
 
-export default function MobileWarehousePage() {
-  const [slips, setSlips] = useState<Slip[]>(initialSlips);
-  const [tab, setTab] = useState<SlipType>("picking");
-  const [view, setView] = useState<View>("tasks");
-  const [activeSlipNo, setActiveSlipNo] = useState<string | null>(null);
-  const [scanItem, setScanItem] = useState<SlipItem | null>(null);
-  const [qtyInput, setQtyInput] = useState<string>("");
-  const [events, setEvents] = useState<ScanEvent[]>([]);
-  const [syncMode, setSyncMode] = useState<SyncMode>("batch");
-  const [operator] = useState("林倉管");
-  const [flash, setFlash] = useState<string | null>(null);
+export default function MobileLookupPage() {
+  const [code, setCode] = useState<string>("P04AA10");
+  const [scanning, setScanning] = useState(false);
 
-  const activeSlip = slips.find((s) => s.no === activeSlipNo);
-  const slipsOfTab = slips.filter((s) => s.type === tab);
-  const pendingSyncCount = events.filter((e) => e.syncStatus === "pending").length;
+  const kind = classifyBarcode(code);
 
-  // ── 動作 ──────────────────────────────────────────
-  function openSlip(no: string) {
-    setActiveSlipNo(no);
-    setView("detail");
-    // 開單即視為 in_progress
-    setSlips((prev) =>
-      prev.map((s) => (s.no === no && s.status === "pending" ? { ...s, status: "in_progress" } : s))
-    );
+  function simulateScan(c: string) {
+    setScanning(true);
+    setTimeout(() => {
+      setCode(c);
+      setScanning(false);
+    }, 600);
   }
 
-  function startScan(item: SlipItem) {
-    setScanItem(item);
-    setQtyInput(String(item.qtyPlanned - item.qtyScanned));
-    setView("scan");
-  }
-
-  function confirmScan() {
-    if (!scanItem || !activeSlip) return;
-    const qty = parseInt(qtyInput) || 0;
-    if (qty <= 0) {
-      setFlash("⚠️ 數量必須 > 0");
-      setTimeout(() => setFlash(null), 1500);
-      return;
-    }
-    // 更新單據
-    setSlips((prev) =>
-      prev.map((s) => {
-        if (s.no !== activeSlip.no) return s;
-        return {
-          ...s,
-          items: s.items.map((it) =>
-            it.partCode === scanItem.partCode
-              ? { ...it, qtyScanned: Math.min(it.qtyPlanned, it.qtyScanned + qty) }
-              : it
-          ),
-        };
-      })
-    );
-    // 寫入事件佇列
-    const ev: ScanEvent = {
-      id: `EV-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      ts: new Date().toISOString(),
-      slipNo: activeSlip.no,
-      partCode: scanItem.partCode,
-      partName: scanItem.partName,
-      qty,
-      location: scanItem.location,
-      operator,
-      taskType: activeSlip.type,
-      syncStatus: syncMode === "realtime" ? "synced" : "pending",
-      spName: SP_FOR_TASK[activeSlip.type],
-    };
-    setEvents((prev) => [ev, ...prev]);
-    setFlash(`✅ ${scanItem.partCode} × ${qty} 已記錄`);
-    setTimeout(() => setFlash(null), 1200);
-    setView("detail");
-    setScanItem(null);
-  }
-
-  function completeSlip() {
-    if (!activeSlip) return;
-    setSlips((prev) =>
-      prev.map((s) => (s.no === activeSlip.no ? { ...s, status: "done" } : s))
-    );
-    setView("tasks");
-    setActiveSlipNo(null);
-    setFlash(`✓ ${activeSlip.no} 已完成，${syncMode === "batch" ? "待批次回寫" : "已即時回寫"}鼎新`);
-    setTimeout(() => setFlash(null), 2000);
-  }
-
-  function batchSync() {
-    setEvents((prev) => prev.map((e) => (e.syncStatus === "pending" ? { ...e, syncStatus: "synced" } : e)));
-    setSlips((prev) => prev.map((s) => (s.status === "done" ? { ...s, status: "synced" } : s)));
-    setFlash(`⇄ ${pendingSyncCount} 筆異動已回寫鼎新 INVMC`);
-    setTimeout(() => setFlash(null), 2000);
-  }
-
-  // ── 介面 ──────────────────────────────────────────
   return (
     <div className="p-6 space-y-5">
       <header className="flex items-end justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">📱 行動倉儲</h1>
+          <h1 className="text-2xl font-bold">📱 QR 查碼工具</h1>
           <p className="text-sm text-slate-500 mt-1">
-            PDA / 手機掃碼作業 — 4 種任務、QR 自動辨識、3 段同步模式、強制走鼎新 SP
+            掃 QR → 立刻顯示品名 / 廠商 / 庫存 / 倉位等資訊。<b className="text-amber-700">不做扣帳，同仁回 iGP ERP 操作</b>。
           </p>
-        </div>
-        <div className="text-xs text-slate-500">
-          作業人員：<b className="text-slate-900">{operator}</b>
         </div>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        {/* ============ 左：手機螢幕模擬器 ============ */}
+        {/* ============ 左：手機 ============ */}
         <div className="flex justify-center">
           <PhoneShell>
-            {/* 頂部狀態列（裝飾） */}
             <div className="bg-slate-900 text-white text-[10px] px-4 py-1 flex justify-between">
               <span>9:41</span>
-              <span className="flex gap-1.5">📶 LTE 🔋 87%</span>
+              <span>📶 LTE 🔋 87%</span>
+            </div>
+            <div className="bg-cyan-600 text-white px-4 py-3">
+              <div className="text-[10px] opacity-80">ChainOps</div>
+              <div className="text-sm font-bold">📷 QR 查碼</div>
             </div>
 
-            {/* App header */}
-            <div className="bg-cyan-600 text-white px-4 py-3 flex items-center justify-between">
-              <div>
-                <div className="text-[10px] opacity-80">ChainOps 行動倉儲</div>
-                <div className="text-sm font-bold">
-                  {view === "tasks" && `${TASK_META[tab].icon} ${TASK_META[tab].label}作業`}
-                  {view === "detail" && activeSlip && `📋 ${activeSlip.no}`}
-                  {view === "scan" && "📷 掃描中"}
+            <div className="flex-1 overflow-y-auto bg-slate-50 p-3 space-y-3">
+              {/* 模擬鏡頭 */}
+              <div className="aspect-square bg-slate-900 rounded-lg flex items-center justify-center relative overflow-hidden">
+                {scanning ? (
+                  <>
+                    <div className="absolute inset-6 border-2 border-cyan-400 rounded-lg animate-pulse" />
+                    <div className="absolute top-1/2 left-6 right-6 h-0.5 bg-cyan-400 animate-pulse" />
+                    <div className="text-cyan-400 text-xs font-mono z-10">辨識中...</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="absolute inset-6 border-2 border-emerald-400 rounded-lg" />
+                    <div className="text-emerald-400 text-xs font-mono z-10">✓ 已辨識：{code}</div>
+                  </>
+                )}
+                <div className="absolute bottom-2 left-2 right-2 text-center text-[10px] text-slate-500">
+                  正式版接 html5-qrcode / ZXing.js
                 </div>
               </div>
-              {view !== "tasks" && (
-                <button
-                  onClick={() => (view === "scan" ? setView("detail") : setView("tasks"))}
-                  className="text-[10px] bg-white/20 px-2 py-1 rounded"
-                >
-                  ← 返回
-                </button>
-              )}
-            </div>
 
-            {/* Body — 依 view 切換 */}
-            <div className="flex-1 overflow-y-auto bg-slate-50 relative">
-              {flash && (
-                <div className="absolute top-2 inset-x-2 z-10 bg-slate-900 text-white text-xs px-3 py-2 rounded shadow-lg text-center">
-                  {flash}
+              {/* 辨識結果 */}
+              {!scanning && (
+                <div className="bg-white rounded-lg border border-cyan-300 p-3 space-y-2">
+                  <KindBadge kind={kind} />
+                  <ScanResult kind={kind} />
                 </div>
               )}
 
-              {view === "tasks" && (
-                <TasksView
-                  tab={tab}
-                  slipsOfTab={slipsOfTab}
-                  onOpen={openSlip}
-                  events={events}
-                  onBatchSync={batchSync}
-                  pendingSyncCount={pendingSyncCount}
-                />
-              )}
-
-              {view === "detail" && activeSlip && (
-                <DetailView slip={activeSlip} onScan={startScan} onComplete={completeSlip} />
-              )}
-
-              {view === "scan" && scanItem && (
-                <ScanView item={scanItem} qty={qtyInput} setQty={setQtyInput} onConfirm={confirmScan} />
-              )}
-            </div>
-
-            {/* 底部 Tab Bar */}
-            {view === "tasks" && (
-              <div className="bg-white border-t border-slate-200 grid grid-cols-4">
-                {(["receiving", "picking", "count", "production"] as SlipType[]).map((t) => {
-                  const meta = TASK_META[t];
-                  const active = tab === t;
-                  const count = slips.filter((s) => s.type === t && (s.status === "pending" || s.status === "in_progress")).length;
-                  return (
+              {/* Demo：選個 QR 模擬掃描 */}
+              <div className="bg-white rounded-lg border border-slate-200 p-3">
+                <div className="text-[10px] text-slate-500 mb-2">📋 Demo：點任一個 QR 模擬掃描</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {DEMO_QR_PRESETS.map((q) => (
                     <button
-                      key={t}
-                      onClick={() => setTab(t)}
-                      className={`py-2 text-center transition-colors ${active ? "text-cyan-600" : "text-slate-500"}`}
+                      key={q.code}
+                      onClick={() => simulateScan(q.code)}
+                      className={`text-[10px] px-2 py-1.5 rounded border text-left ${
+                        code === q.code
+                          ? "border-cyan-500 bg-cyan-50 text-cyan-700"
+                          : "border-slate-200 hover:border-cyan-400"
+                      }`}
                     >
-                      <div className="text-lg leading-none">{meta.arrow}</div>
-                      <div className="text-[10px] font-semibold mt-0.5">{meta.label}</div>
-                      {count > 0 && (
-                        <div className="text-[9px] mt-0.5">
-                          <span className="px-1 py-0.5 rounded-full bg-rose-500 text-white">{count}</span>
-                        </div>
-                      )}
+                      <div className="font-mono">{q.code}</div>
+                      <div className="text-slate-500 truncate">{q.label}</div>
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            )}
+            </div>
+
+            <div className="bg-amber-50 border-t border-amber-200 px-3 py-2 text-[10px] text-amber-900 text-center">
+              ⚠ 本機僅查詢，扣帳 / 入庫請至 iGP ERP
+            </div>
           </PhoneShell>
         </div>
 
-        {/* ============ 右：管理者後台 ============ */}
+        {/* ============ 右：QR 規範 + 使用情境 ============ */}
         <div className="space-y-4">
-          {/* 同步模式 */}
           <section className="bg-white rounded-xl border border-slate-200 p-4">
-            <h3 className="font-bold mb-2">⇄ 同步模式</h3>
-            <div className="grid grid-cols-3 gap-2">
-              {(["realtime", "batch", "offline"] as SyncMode[]).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setSyncMode(m)}
-                  className={`text-xs px-2 py-2 rounded border transition-colors ${
-                    syncMode === m
-                      ? "bg-cyan-600 text-white border-cyan-600"
-                      : "bg-white text-slate-700 border-slate-300 hover:border-cyan-400"
-                  }`}
-                >
-                  <div className="font-bold">
-                    {m === "realtime" ? "即時" : m === "batch" ? "批次" : "離線"}
-                  </div>
-                  <div className="text-[10px] mt-0.5 opacity-90">
-                    {m === "realtime" ? "30s 內寫" : m === "batch" ? "暫存待核可" : "IndexedDB"}
-                  </div>
-                </button>
-              ))}
-            </div>
-            <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-              所有 INVMC 異動<b>強制</b>走 <code className="font-mono bg-slate-100 px-1 rounded">{SP_FOR_TASK.receiving}</code>
-              {" "}/{" "}<code className="font-mono bg-slate-100 px-1 rounded">{SP_FOR_TASK.picking}</code>
-              {" "}/{" "}<code className="font-mono bg-slate-100 px-1 rounded">{SP_FOR_TASK.count}</code>，
-              繞過 SP 直接 INSERT 會把鼎新庫存連動弄壞。
-            </p>
-          </section>
-
-          {/* 待同步佇列 */}
-          <section className="bg-white rounded-xl border border-slate-200 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-bold">📋 待同步佇列</h3>
-              <button
-                onClick={batchSync}
-                disabled={pendingSyncCount === 0}
-                className="text-xs px-3 py-1.5 rounded bg-cyan-600 text-white hover:bg-cyan-700 disabled:bg-slate-300 disabled:cursor-not-allowed"
-              >
-                ⇄ 批次回寫鼎新（{pendingSyncCount}）
-              </button>
-            </div>
-            {events.length === 0 ? (
-              <p className="text-xs text-slate-500 py-4 text-center">尚無掃描紀錄 — 到左邊手機操作試試</p>
-            ) : (
-              <ul className="text-xs space-y-1 max-h-72 overflow-y-auto">
-                {events.map((e) => (
-                  <li
-                    key={e.id}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded border border-slate-100 hover:bg-slate-50"
-                  >
-                    <span
-                      className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${
-                        e.syncStatus === "synced" ? "bg-emerald-500" : e.syncStatus === "failed" ? "bg-rose-500" : "bg-amber-500"
-                      }`}
-                    />
-                    <span className="font-mono text-[10px] text-slate-400 shrink-0">{e.ts.slice(11, 19)}</span>
-                    <span className="font-mono text-cyan-700 shrink-0">{e.slipNo}</span>
-                    <span className="font-mono shrink-0">{e.partCode}</span>
-                    <span className="tabular-nums font-semibold shrink-0">×{e.qty}</span>
-                    <span className="text-slate-500 truncate">{e.partName}</span>
-                    <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded shrink-0 ${
-                      e.syncStatus === "synced" ? "bg-emerald-100 text-emerald-700" :
-                      e.syncStatus === "failed" ? "bg-rose-100 text-rose-700" :
-                      "bg-amber-100 text-amber-700"
-                    }`}>
-                      {e.syncStatus === "synced" ? "已同步" : e.syncStatus === "failed" ? "失敗" : "待同步"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          {/* QR Code 規範速查 */}
-          <section className="bg-white rounded-xl border border-slate-200 p-4">
-            <h3 className="font-bold mb-2">🔖 QR Code 編碼規範</h3>
-            <ul className="text-xs space-y-1 text-slate-700">
-              <li>· 領料單 <code className="font-mono bg-slate-100 px-1 rounded">5410-260507001</code></li>
-              <li>· 收料單 <code className="font-mono bg-slate-100 px-1 rounded">5210-260507002</code></li>
-              <li>· 製令 <code className="font-mono bg-slate-100 px-1 rounded">5110-260128006</code></li>
-              <li>· 採購單 <code className="font-mono bg-slate-100 px-1 rounded">PO-2026-1021</code></li>
-              <li>· 料件 <code className="font-mono bg-slate-100 px-1 rounded">P04AA10</code></li>
-              <li>· 倉位 <code className="font-mono bg-slate-100 px-1 rounded">A100-B2-04</code></li>
+            <h3 className="font-bold mb-2">🎯 設計原則</h3>
+            <ul className="text-sm space-y-2 text-slate-700">
+              <li className="flex gap-2">
+                <span className="text-emerald-600">✓</span>
+                <span><b>查詢即用</b>：掃描 → 0.3 秒看到品名 / 廠商 / 庫存，省去翻 Excel</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="text-emerald-600">✓</span>
+                <span><b>對帳工具</b>：手機看到的數量 = iGP ERP 上的數量，倉管實盤對照</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="text-emerald-600">✓</span>
+                <span><b>不做扣帳</b>：避免兩套系統不同步，扣帳一律回 iGP 操作</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="text-rose-600">✗</span>
+                <span><b>不連線 ERP 寫入</b>：手機端純讀，免去 SP 權限 / 雙向同步爭議</span>
+              </li>
             </ul>
-            <p className="text-[11px] text-slate-500 mt-2">
-              掃碼後依前綴自動跳對應作業頁。Demo 用模擬掃碼，正式版接 html5-qrcode / ZXing.js。
+          </section>
+
+          <section className="bg-white rounded-xl border border-slate-200 p-4">
+            <h3 className="font-bold mb-2">🔖 支援辨識的 QR 類型</h3>
+            <table className="w-full text-xs">
+              <thead className="text-slate-500">
+                <tr>
+                  <th className="text-left py-1">類型</th>
+                  <th className="text-left py-1">前綴</th>
+                  <th className="text-left py-1">範例</th>
+                  <th className="text-left py-1">顯示內容</th>
+                </tr>
+              </thead>
+              <tbody className="text-slate-700">
+                <tr className="border-t border-slate-100"><td className="py-1">料件</td><td><code>P*</code></td><td className="font-mono">P04AA10</td><td>名稱/廠商/庫存/被哪些成品用</td></tr>
+                <tr className="border-t border-slate-100"><td className="py-1">領料單</td><td><code>5410-</code></td><td className="font-mono">5410-260507001</td><td>關聯工單/料件清單/倉位</td></tr>
+                <tr className="border-t border-slate-100"><td className="py-1">收料單</td><td><code>5210-</code></td><td className="font-mono">5210-260507002</td><td>關聯 PO / 預期到貨</td></tr>
+                <tr className="border-t border-slate-100"><td className="py-1">製令</td><td><code>5110-</code></td><td className="font-mono">5110-260128006</td><td>關聯工單/領料清單</td></tr>
+                <tr className="border-t border-slate-100"><td className="py-1">採購單</td><td><code>PO-</code></td><td className="font-mono">PO-2026-1021</td><td>供應商/料件/預計到貨</td></tr>
+                <tr className="border-t border-slate-100"><td className="py-1">倉位</td><td><code>A*</code></td><td className="font-mono">A100-B2-04</td><td>此倉位存放料件清單</td></tr>
+              </tbody>
+            </table>
+            <p className="text-[11px] text-slate-500 mt-3">
+              依前綴自動辨識類型 → 跳對應顯示畫面。
             </p>
           </section>
 
-          {/* 提示 */}
-          <section className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900">
-            <b>試試流程：</b> 點手機底部 ↑「領料」分頁 → 點 <code className="font-mono">5410-260507001</code> →
-            點任一料件「📷 掃描料件條碼」→ 確認數量 → 兩項都掃完後點「✓ 全部完成 · 回寫鼎新」。
+          <section className="bg-cyan-50 border border-cyan-200 rounded-xl p-4 text-sm">
+            <b className="text-cyan-900">使用情境</b>
+            <ol className="list-decimal list-inside mt-2 space-y-1 text-cyan-900 text-xs">
+              <li>倉管走到 A100-B2-04 → 掃倉位 QR → 看到「P04AA10 線圈固定架 在庫 85」</li>
+              <li>實盤後數一數箱子實際 80 個 → 跟 iGP 數字不符 → 通知 PM 對帳</li>
+              <li>採購收貨時掃 PO QR → 看到該收 P04AA10 × 100 → 對外箱對得上</li>
+              <li>產線領料前掃 5410-260507001 → 看到要領哪兩項 → 去倉位拿 → 回 iGP 點扣帳</li>
+            </ol>
           </section>
         </div>
       </div>
@@ -313,7 +181,6 @@ export default function MobileWarehousePage() {
   );
 }
 
-// =================== 手機外殼 ===================
 function PhoneShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative w-[320px] h-[640px] bg-slate-900 rounded-[36px] p-2 shadow-2xl">
@@ -325,238 +192,160 @@ function PhoneShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-// =================== Tab：任務列表 ===================
-function TasksView({
-  tab,
-  slipsOfTab,
-  onOpen,
-  events,
-  onBatchSync,
-  pendingSyncCount,
-}: {
-  tab: SlipType;
-  slipsOfTab: Slip[];
-  onOpen: (no: string) => void;
-  events: ScanEvent[];
-  onBatchSync: () => void;
-  pendingSyncCount: number;
-}) {
-  // 同步 tab：直接顯示批次回寫
-  if (tab === "production") {
-    // production = 製令也算 picking 性質；此處先顯示製令清單
+function KindBadge({ kind }: { kind: ScanKind }) {
+  const label =
+    kind.kind === "part" ? "🔩 料件" :
+    kind.kind === "slip_picking" ? "📤 領料單" :
+    kind.kind === "slip_receiving" ? "📦 收料單" :
+    kind.kind === "production_order" ? "🏭 製令" :
+    kind.kind === "po" ? "🛒 採購單" :
+    kind.kind === "location" ? "📍 倉位" :
+    "❓ 未知";
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-700 font-semibold">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function ScanResult({ kind }: { kind: ScanKind }) {
+  if (kind.kind === "part") return <PartResult code={kind.code} />;
+  if (kind.kind === "slip_picking" || kind.kind === "slip_receiving" || kind.kind === "production_order") {
+    return <SlipResult no={kind.no} />;
   }
+  if (kind.kind === "po") return <PoResult no={kind.no} />;
+  if (kind.kind === "location") return <LocationResult code={kind.code} />;
+  return <div className="text-xs text-slate-500">無法辨識：{kind.kind === "unknown" ? kind.raw : ""}</div>;
+}
 
+function PartResult({ code }: { code: string }) {
+  const p = parts.find((x) => x.code === code);
+  if (!p) return <Empty msg={`找不到料件 ${code}`} />;
+  const sup = suppliers.find((s) => s.id === p.supplierId);
+  const usedBy = bom
+    .filter((b) => b.partId === p.id && b.isActive)
+    .map((b) => models.find((m) => m.id === b.modelId))
+    .filter(Boolean);
+  const low = p.stockOnHand < p.safetyStock;
   return (
-    <div className="p-3 space-y-2">
-      <div className="flex items-center justify-between text-[10px] text-slate-500 px-1">
-        <span>共 {slipsOfTab.length} 張</span>
-        {pendingSyncCount > 0 && (
-          <button
-            onClick={onBatchSync}
-            className="text-cyan-600 font-semibold"
-          >
-            ⇄ 待同步 {pendingSyncCount}
-          </button>
-        )}
+    <div className="text-xs space-y-1.5">
+      <div className="font-mono text-sm font-bold">{p.code}</div>
+      <div className="text-sm">{p.name}</div>
+      <div className="grid grid-cols-2 gap-1.5 pt-1 text-[11px]">
+        <Field label="iGP 庫存" value={<span className={low ? "text-rose-600 font-bold" : ""}>{p.stockOnHand} {p.unit}{low && " ⚠"}</span>} />
+        <Field label="安全庫存" value={`${p.safetyStock} ${p.unit}`} />
+        <Field label="單價" value={`$${p.unitCost.toLocaleString()}`} />
+        <Field label="分類" value={p.category} />
       </div>
-      {slipsOfTab.length === 0 ? (
-        <div className="py-8 text-center text-xs text-slate-400">此分頁無待辦單據</div>
-      ) : (
-        slipsOfTab.map((s) => {
-          const total = s.items.reduce((a, b) => a + b.qtyPlanned, 0);
-          const done = s.items.reduce((a, b) => a + b.qtyScanned, 0);
-          const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-          return (
-            <button
-              key={s.no}
-              onClick={() => onOpen(s.no)}
-              className="w-full text-left bg-white rounded-lg border border-slate-200 p-3 hover:border-cyan-400 active:bg-slate-50"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="font-mono text-xs text-cyan-700 font-semibold">{s.no}</div>
-                  <div className="text-[11px] text-slate-600 mt-0.5">
-                    {s.items.length} 項　·　{s.workOrderRef ?? s.createdAt}
-                  </div>
-                  {s.note && <div className="text-[10px] text-slate-500 mt-1 truncate">{s.note}</div>}
-                </div>
-                <span className={`text-[9px] px-1.5 py-0.5 rounded shrink-0 ${
-                  s.status === "synced" ? "bg-emerald-100 text-emerald-700" :
-                  s.status === "done" ? "bg-cyan-100 text-cyan-700" :
-                  s.status === "in_progress" ? "bg-amber-100 text-amber-700" :
-                  "bg-slate-100 text-slate-600"
-                }`}>
-                  {s.status === "synced" ? "已同步" : s.status === "done" ? "完成" : s.status === "in_progress" ? "進行中" : "待辦"}
-                </span>
-              </div>
-              <div className="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                <div className="h-full bg-cyan-500 transition-all" style={{ width: `${pct}%` }} />
-              </div>
-              <div className="mt-1 text-[10px] text-slate-500 tabular-nums">{done}/{total}（{pct}%）</div>
-            </button>
-          );
-        })
-      )}
-
-      {events.length > 0 && (
-        <div className="mt-4 pt-3 border-t border-slate-200">
-          <div className="text-[10px] text-slate-500 mb-1 px-1">今日掃描 {events.length} 筆</div>
+      <div className="pt-2 border-t border-slate-100">
+        <div className="text-[10px] text-slate-500">供應商</div>
+        <div className="text-[11px] font-semibold">{sup?.name}</div>
+        <div className="text-[10px] text-slate-500">{sup?.country} · {sup?.city} · 交期 {p.leadDays}d</div>
+      </div>
+      {usedBy.length > 0 && (
+        <div className="pt-2 border-t border-slate-100">
+          <div className="text-[10px] text-slate-500">被以下成品使用</div>
+          <ul className="text-[11px] mt-0.5">
+            {usedBy.slice(0, 4).map((m) => m && (
+              <li key={m.id} className="font-mono">{m.code} <span className="text-slate-500">{m.machineFamily}</span></li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
   );
 }
 
-// =================== 單據明細 ===================
-function DetailView({
-  slip,
-  onScan,
-  onComplete,
-}: {
-  slip: Slip;
-  onScan: (item: SlipItem) => void;
-  onComplete: () => void;
-}) {
-  const allDone = slip.items.every((it) => it.qtyScanned >= it.qtyPlanned);
+function SlipResult({ no }: { no: string }) {
+  const slip: Slip | undefined = initialSlips.find((s) => s.no === no);
+  if (!slip) return <Empty msg={`找不到單據 ${no}`} />;
+  const meta = TASK_META[slip.type];
+  const total = slip.items.reduce((a, b) => a + b.qtyPlanned, 0);
   return (
-    <div className="p-3 space-y-2">
-      <div className="bg-white rounded-lg border border-slate-200 p-3 text-xs">
-        <div className="flex items-center justify-between">
-          <span className="font-mono text-cyan-700 font-bold text-sm">{slip.no}</span>
-          <span className="text-slate-500">{TASK_META[slip.type].label}</span>
-        </div>
-        {slip.workOrderRef && (
-          <div className="text-[11px] text-slate-600 mt-1">關聯工單 {slip.workOrderRef}</div>
-        )}
-        {slip.note && <div className="text-[11px] text-slate-500 mt-1">{slip.note}</div>}
-      </div>
-
-      {slip.items.map((it) => {
-        const remain = it.qtyPlanned - it.qtyScanned;
-        const done = remain <= 0;
-        return (
-          <div key={it.partCode} className="bg-white rounded-lg border border-slate-200 p-3">
-            <div className="flex items-start justify-between">
+    <div className="text-xs space-y-1.5">
+      <div className="font-mono text-sm font-bold">{slip.no}</div>
+      <div className="text-[11px]">{meta.icon} {meta.label}　·　{slip.createdAt}</div>
+      {slip.note && <div className="text-[10px] text-slate-500">📝 {slip.note}</div>}
+      {slip.workOrderRef && (
+        <div className="text-[11px]">關聯工單 <span className="font-mono text-cyan-700">{slip.workOrderRef}</span></div>
+      )}
+      <div className="pt-2 border-t border-slate-100">
+        <div className="text-[10px] text-slate-500 mb-1">料件清單（{slip.items.length} 項 / 共 {total}）</div>
+        <ul className="space-y-1">
+          {slip.items.map((it) => (
+            <li key={it.partCode} className="flex justify-between gap-2">
               <div className="min-w-0">
-                <div className="font-mono text-xs text-slate-500">{it.partCode}</div>
-                <div className="text-sm font-semibold">{it.partName}</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">📍 {it.location}</div>
+                <div className="font-mono">{it.partCode}</div>
+                <div className="text-slate-500 truncate">{it.partName}</div>
+                <div className="text-[10px] text-slate-400">📍 {it.location}</div>
               </div>
-              <div className="text-right shrink-0">
-                <div className="text-[10px] text-slate-500">已掃 / 應掃</div>
-                <div className={`text-sm font-bold tabular-nums ${done ? "text-emerald-600" : "text-slate-900"}`}>
-                  {it.qtyScanned} / {it.qtyPlanned}
-                </div>
+              <div className="text-right shrink-0 tabular-nums font-semibold">
+                {it.qtyPlanned} {it.unit ?? ""}
               </div>
-            </div>
-            {!done && (
-              <button
-                onClick={() => onScan(it)}
-                className="mt-2 w-full py-2 rounded-md bg-cyan-600 text-white text-xs font-bold active:bg-cyan-700"
-              >
-                📷 掃描料件條碼（剩 {remain}）
-              </button>
-            )}
-            {done && (
-              <div className="mt-2 text-center text-[11px] text-emerald-700 font-semibold">✓ 此項完成</div>
-            )}
-          </div>
-        );
-      })}
-
-      <button
-        onClick={onComplete}
-        disabled={!allDone}
-        className={`w-full py-3 rounded-md text-sm font-bold mt-3 ${
-          allDone
-            ? "bg-emerald-600 text-white active:bg-emerald-700"
-            : "bg-slate-200 text-slate-500"
-        }`}
-      >
-        {allDone ? "✓ 全部完成 · 回寫鼎新" : `尚有 ${slip.items.filter((it) => it.qtyScanned < it.qtyPlanned).length} 項未掃完`}
-      </button>
-    </div>
-  );
-}
-
-// =================== 掃描 / 數量輸入 ===================
-function ScanView({
-  item,
-  qty,
-  setQty,
-  onConfirm,
-}: {
-  item: SlipItem;
-  qty: string;
-  setQty: (v: string) => void;
-  onConfirm: () => void;
-}) {
-  const remain = item.qtyPlanned - item.qtyScanned;
-  const inputQty = parseInt(qty) || 0;
-  const tooMany = inputQty > remain;
-  // 模擬辨識 barcode（顯示分類結果）
-  const classified = useMemo(() => classifyBarcode(item.partCode), [item.partCode]);
-
-  return (
-    <div className="p-3 space-y-3">
-      {/* 模擬相機畫面 */}
-      <div className="aspect-square bg-slate-900 rounded-lg flex items-center justify-center relative overflow-hidden">
-        <div className="absolute inset-6 border-2 border-cyan-400 rounded-lg" />
-        <div className="absolute top-1/2 left-6 right-6 h-0.5 bg-cyan-400/60 animate-pulse" />
-        <div className="text-cyan-400 text-xs font-mono z-10">📷 模擬掃描中...</div>
-        <div className="absolute bottom-2 left-2 right-2 text-center text-[10px] text-slate-400">
-          正式版接 html5-qrcode / ZXing.js
-        </div>
-      </div>
-
-      {/* 辨識結果 */}
-      <div className="bg-white rounded-lg border border-cyan-300 p-3 text-xs space-y-1">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-700 font-semibold">
-            {classified.kind === "part" ? "料件" : classified.kind}
-          </span>
-          <span className="font-mono text-sm font-bold">{item.partCode}</span>
-        </div>
-        <div className="text-sm">{item.partName}</div>
-        <div className="text-[11px] text-slate-500">📍 {item.location}　·　剩 {remain}</div>
-      </div>
-
-      {/* 數量輸入 */}
-      <div className="bg-white rounded-lg border border-slate-200 p-3">
-        <label className="block text-xs text-slate-600 mb-1">本次掃入數量</label>
-        <input
-          type="number"
-          value={qty}
-          onChange={(e) => setQty(e.target.value)}
-          className="w-full text-2xl font-bold tabular-nums text-center border-2 border-cyan-300 rounded-md py-2 focus:outline-none focus:border-cyan-500"
-        />
-        {tooMany && (
-          <p className="text-[10px] text-rose-600 mt-1">超過剩餘 {remain}，已自動截斷</p>
-        )}
-        <div className="grid grid-cols-4 gap-1 mt-2">
-          {[1, 5, 10, remain].filter((v, i, a) => v > 0 && a.indexOf(v) === i).map((v) => (
-            <button
-              key={v}
-              onClick={() => setQty(String(v))}
-              className="text-xs py-1.5 rounded bg-slate-100 hover:bg-slate-200"
-            >
-              {v === remain ? `全收${v}` : v}
-            </button>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
-
-      <button
-        onClick={onConfirm}
-        disabled={inputQty <= 0}
-        className={`w-full py-3 rounded-md text-sm font-bold ${
-          inputQty > 0
-            ? "bg-cyan-600 text-white active:bg-cyan-700"
-            : "bg-slate-200 text-slate-500"
-        }`}
-      >
-        ✓ 確認並記錄
-      </button>
+      <div className="pt-2 text-[10px] text-amber-700 bg-amber-50 px-2 py-1.5 rounded">
+        ⚠ 領料 / 入庫請至 iGP 系統執行扣帳
+      </div>
     </div>
   );
 }
+
+function PoResult({ no }: { no: string }) {
+  // Demo：示意性顯示
+  return (
+    <div className="text-xs space-y-1.5">
+      <div className="font-mono text-sm font-bold">{no}</div>
+      <div>採購單 — 預期到貨</div>
+      <Field label="供應商" value="東莞睿達金屬" />
+      <Field label="料件" value="P04AA10 線圈固定架 × 100" />
+      <Field label="預計到貨" value="2026-05-15" />
+      <div className="pt-2 text-[10px] text-amber-700 bg-amber-50 px-2 py-1.5 rounded">
+        ⚠ 收貨後請至 iGP 5210 收料單系統執行入庫
+      </div>
+    </div>
+  );
+}
+
+function LocationResult({ code }: { code: string }) {
+  // 模擬：列出此倉位有哪些料件（demo 用 hardcoded）
+  return (
+    <div className="text-xs space-y-1.5">
+      <div className="font-mono text-sm font-bold">{code}</div>
+      <div>倉位</div>
+      <div className="pt-2 border-t border-slate-100">
+        <div className="text-[10px] text-slate-500 mb-1">此倉位料件</div>
+        <ul className="space-y-1">
+          <li className="flex justify-between">
+            <span className="font-mono">P04AA10</span>
+            <span className="tabular-nums">85 PCS</span>
+          </li>
+        </ul>
+      </div>
+      <div className="pt-2 text-[10px] text-cyan-700 bg-cyan-50 px-2 py-1.5 rounded">
+        💡 實盤對照：拿出箱子數一數，看是否等於 iGP 上的 85
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[10px] text-slate-500">{label}</div>
+      <div className="font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function Empty({ msg }: { msg: string }) {
+  return <div className="text-xs text-rose-600">{msg}</div>;
+}
+
+// (eliminate unused-import warnings)
+void Link;
+void workOrders;

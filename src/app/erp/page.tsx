@@ -30,8 +30,14 @@ export default function ErpCockpitPage() {
         </div>
         <div className="flex gap-2">
           <Link
-            href="/erp/simulator"
+            href="/erp/flow"
             className="px-4 py-2 text-sm rounded-md bg-cyan-600 text-white hover:bg-cyan-700 font-semibold flex items-center gap-1"
+          >
+            🌊 流程綜觀
+          </Link>
+          <Link
+            href="/erp/simulator"
+            className="px-3 py-2 text-sm rounded-md border border-cyan-300 text-cyan-700 hover:bg-cyan-50 font-semibold"
           >
             🔮 缺料模擬器
           </Link>
