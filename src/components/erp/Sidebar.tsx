@@ -13,6 +13,7 @@ const links = [
   { href: "/erp/calendar", label: "排程日曆", icon: "📅" },
   { href: "/erp/customers", label: "客戶分析", icon: "👥" },
   { href: "/erp/models", label: "型號 + BOM", icon: "🏗️" },
+  { href: "/erp/bom-compare", label: "BOM 對照", icon: "🔍" },
   { href: "/erp/parts", label: "零件主檔", icon: "🔩" },
   { href: "/erp/suppliers", label: "供應商", icon: "🏭" },
   { href: "/erp/po-generator", label: "採購單生成", icon: "🛒", highlight: true },
