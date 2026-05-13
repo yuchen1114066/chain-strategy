@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 const links = [
   { href: "/erp", label: "戰情室", icon: "🎯" },
   { href: "/erp/flow", label: "流程綜觀", icon: "🌊" },
-  { href: "/erp/analytics", label: "零件分析", icon: "📊", highlight: true },
+  { href: "/erp/viz", label: "可視化儀表板", icon: "📈", highlight: true },
+  { href: "/erp/analytics", label: "零件分析", icon: "📊" },
   { href: "/erp/simulator", label: "缺料模擬器", icon: "🔮" },
   { href: "/erp/work-orders", label: "工單追蹤", icon: "📋" },
   { href: "/erp/models", label: "型號 + BOM", icon: "🏗️" },
