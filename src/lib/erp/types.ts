@@ -10,17 +10,34 @@ export type Supplier = {
   contact: string;
 };
 
+export type PartKind = "purchase" | "self" | "dummy" | "feature" | "outsource";
+// 採購件 / 自製件 / 虛設品號 / Feature件 / 託外加工件
+
 export type Part = {
   id: string;
   code: string;
   name: string;
+  spec?: string;              // 規格 e.g. "NBK 6001 2RS" / "ψ12機用"
   category: string;
-  unit: string;
+  unit: string;               // PCS / F / g / SET / PR
   unitCost: number;
-  supplierId: string;
+  supplierId?: string;        // 自製件可為空
   leadDays: number;
   stockOnHand: number;
   safetyStock: number;
+  kind?: PartKind;            // 預設 "purchase"
+};
+
+export type BomLine = {
+  modelId: string;
+  partId: string;
+  parentPartCode?: string;    // 階層父節點 part code（null = 直接掛在 model 下）
+  level?: number;             // 0 = 主件本身, 1 = 直接子件, 2+ = 孫件…（預設 1）
+  qtyPerUnit: number;
+  batchQty?: number;          // 標準批量（多數為 1）
+  version: number;
+  isActive: boolean;
+  notes?: string;
 };
 
 export type Model = {
@@ -32,15 +49,6 @@ export type Model = {
   category: "treadmill" | "bike" | "rower" | "elliptical" | "strength";
   description: string;
   stdPrice: number;
-};
-
-export type BomLine = {
-  modelId: string;
-  partId: string;
-  qtyPerUnit: number;
-  version: number;
-  isActive: boolean;
-  notes?: string;
 };
 
 export const STAGES = [
