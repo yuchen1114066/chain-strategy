@@ -22,11 +22,18 @@ export default function Sidebar() {
     <aside className="w-60 shrink-0 border-r border-slate-800 bg-slate-950 text-slate-100 min-h-screen">
       <div className="px-5 py-5 border-b border-slate-800">
         <Link href="/erp" className="block">
-          <div className="text-base font-bold text-white tracking-wide">
-            ChainOps ERP
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">
-            業務 / 採購 協調追蹤
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-rose-500 to-rose-700 flex items-center justify-center text-white font-bold text-lg shadow-inner">
+              C
+            </div>
+            <div>
+              <div className="text-base font-bold text-white tracking-wide leading-tight">
+                祺驊 CHI HUA
+              </div>
+              <div className="text-[10px] text-slate-400 leading-tight">
+                業務 / 採購協調追蹤
+              </div>
+            </div>
           </div>
         </Link>
       </div>
