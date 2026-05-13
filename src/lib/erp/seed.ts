@@ -112,6 +112,20 @@ export const parts: Part[] = [
   { id: "p124", code: "P11B01",     name: "滑套",        category: "套件",   spec: "ψ7×ψ3×10.5L",                    unit: "PCS", unitCost: 0.37,   supplierId: "s2",  leadDays: 45, stockOnHand: 400,  safetyStock: 150, kind: "purchase" }, // 雙成
   { id: "p125", code: "P11D02",     name: "滑塊",        category: "套件",   spec: "橘色",                          unit: "PCS", unitCost: 1.35,   supplierId: "s14", leadDays: 45, stockOnHand: 200,  safetyStock: 80,  kind: "purchase" }, // 海碧
   { id: "p126", code: "P15A001",    name: "復位彈簧",    category: "彈簧",   spec: "ψ1.0×10.5×37L",                  unit: "PCS", unitCost: 0.63,   supplierId: "s15", leadDays: 45, stockOnHand: 400,  safetyStock: 150, kind: "purchase" }, // 金倫
+
+  // ==================================================================
+  // 祺驊真實 BOM — S43A001 煞車線圈半成品（4 階深 + 託外加工結構）
+  // ==================================================================
+  { id: "p150", code: "S42J001",    name: "煞車線繞半成品", category: "半成品", spec: "0.55×1000t/100L",     unit: "PCS", unitCost: 0,      leadDays: 45, stockOnHand: 50,    safetyStock: 20,  kind: "self" },
+  { id: "p151", code: "S42R006",    name: "煞車線繞半成品", category: "半成品", spec: "0.55X1000t",          unit: "PCS", unitCost: 0,      leadDays: 45, stockOnHand: 50,    safetyStock: 20,  kind: "self" },
+  { id: "p152", code: "M03A020",    name: "絕緣紙",        category: "絕緣材", spec: "0.13*33*350",        unit: "PCS", unitCost: 0.50,   supplierId: "s24", leadDays: 45, stockOnHand: 2000,  safetyStock: 800, kind: "purchase" }, // 弦成
+  { id: "p153", code: "M15F008",    name: "玻璃纖維矽套管",category: "絕緣材", spec: "ψ3×32mm",            unit: "PCS", unitCost: 0.101,  supplierId: "s25", leadDays: 45, stockOnHand: 4000,  safetyStock: 1500,kind: "purchase" }, // 成富
+  { id: "p154", code: "P20CB02-A1", name: "煞車引出線",    category: "電線",   spec: "P2-D60309/130L",     unit: "PCS", unitCost: 6.50,   supplierId: "s26", leadDays: 45, stockOnHand: 600,   safetyStock: 200, kind: "purchase" }, // 永峻
+  { id: "p155", code: "P04HA05",    name: "繞線架",        category: "塑件",   spec: "56L×58W×36.5H×6410G5(開孔)", unit: "PCS", unitCost: 1.60, supplierId: "s27", leadDays: 45, stockOnHand: 800,   safetyStock: 300, kind: "outsource" }, // 新宏 託外加工
+  { id: "p156", code: "P48AB02",    name: "工程塑膠粒",    category: "原料",   spec: "6410G5 AWT",         unit: "g",   unitCost: 0.308,  supplierId: "s28", leadDays: 45, stockOnHand: 80000, safetyStock: 30000, kind: "purchase" }, // 協祐
+  { id: "p157", code: "P21D055",    name: "漆包線",        category: "電線",   spec: "2EIW-ψ0.55",         unit: "g",   unitCost: 0.369,  supplierId: "s35", leadDays: 45, stockOnHand: 100000,safetyStock: 40000, kind: "purchase" }, // 台一
+  { id: "p158", code: "M06BB04",    name: "稀薄劑",        category: "化工",   spec: "RTH-031A",           unit: "g",   unitCost: 0.082,  supplierId: "s30", leadDays: 45, stockOnHand: 50000, safetyStock: 15000, kind: "purchase" }, // 大同精化
+  { id: "p159", code: "M06BA05",    name: "凡立水",        category: "化工",   spec: "TCV-225",            unit: "g",   unitCost: 0.147,  supplierId: "s30", leadDays: 45, stockOnHand: 30000, safetyStock: 10000, kind: "purchase" }, // 大同精化
 ];
 
 // 機種 FB64・直立車 之下有多個成品品號（H021-A2 商規 / H020-A1 家規）
@@ -122,6 +136,8 @@ export const models: Model[] = [
   { id: "m4", code: "R-MAG-100", machineFamily: "R-MAG・划船機", name: "磁控划船機 R-100", category: "rower", description: "雙軌磁控，滑順靜音", stdPrice: 28000 },
   // 祺驊真實成品 — 內磁式磁控模組
   { id: "m100", code: "FB13G009", machineFamily: "FB13・內磁式磁控", name: "FB13G009 雙向內磁式磁控", category: "strength", description: "ψ250*132*6片開-M10*P1.5，搭配 ψ250 飛輪、6 片磁極，標準成本 $450", stdPrice: 1500 },
+  // 半成品（有自己的 BOM）— 將會作為其他成品的零件
+  { id: "m101", code: "S43A001", machineFamily: "S43・煞車線圈", name: "S43A001 煞車線圈半成品", category: "strength", description: "1000t/100L(含浸)，含繞線+塑膠繞線架託外加工+漆包線+含浸劑，標準成本 $136.07", stdPrice: 200 },
 ];
 
 // FB13G009 多階 BOM（依使用者提供的真實 BOM 截圖建檔）
@@ -164,6 +180,27 @@ const FB13G009_BOM: BomLine[] = [
   { modelId: "m100", partId: "p126", parentPartCode: "S40A206", qtyPerUnit: 2,   level: 2, version: 1, isActive: true }, // P15A001 復位彈簧
 ];
 
+// S43A001 煞車線圈 4 階 BOM（依使用者提供截圖）
+const S43A001_BOM: BomLine[] = [
+  // ── Level 1：S43A001 直接子件（線繞半成品 + 含浸劑）─────
+  { modelId: "m101", partId: "p150", qtyPerUnit: 1, level: 1, version: 1, isActive: true }, // S42J001 煞車線繞半成品
+  { modelId: "m101", partId: "p158", qtyPerUnit: 9, level: 1, version: 1, isActive: true }, // M06BB04 稀薄劑 9g
+  { modelId: "m101", partId: "p159", qtyPerUnit: 3, level: 1, version: 1, isActive: true }, // M06BA05 凡立水 3g
+
+  // ── Level 2：S42J001 下展開 ─────────────────────────────
+  { modelId: "m101", partId: "p152", parentPartCode: "S42J001", qtyPerUnit: 1, level: 2, version: 1, isActive: true }, // M03A020 絕緣紙
+  { modelId: "m101", partId: "p153", parentPartCode: "S42J001", qtyPerUnit: 2, level: 2, version: 1, isActive: true }, // M15F008 玻璃纖維矽套管
+  { modelId: "m101", partId: "p154", parentPartCode: "S42J001", qtyPerUnit: 1, level: 2, version: 1, isActive: true }, // P20CB02-A1 煞車引出線
+  { modelId: "m101", partId: "p151", parentPartCode: "S42J001", qtyPerUnit: 1, level: 2, version: 1, isActive: true }, // S42R006 煞車線繞半成品
+
+  // ── Level 3：S42R006 下展開（託外加工繞線架）────────────
+  { modelId: "m101", partId: "p155", parentPartCode: "S42R006", qtyPerUnit: 1, level: 3, version: 1, isActive: true }, // P04HA05 繞線架（託外加工）
+
+  // ── Level 4：P04HA05 託外加工的料 ──────────────────────
+  { modelId: "m101", partId: "p156", parentPartCode: "P04HA05", qtyPerUnit: 26,  level: 4, version: 1, isActive: true }, // P48AB02 工程塑膠粒 26g
+  { modelId: "m101", partId: "p157", parentPartCode: "P04HA05", qtyPerUnit: 320, level: 4, version: 1, isActive: true }, // P21D055 漆包線 320g
+];
+
 export const bom: BomLine[] = [
   // FB64H021-A2（商規，飛輪 + 完整儀表）
   { modelId: "m1", partId: "p1", qtyPerUnit: 1, version: 1, isActive: true },
@@ -201,6 +238,8 @@ export const bom: BomLine[] = [
   { modelId: "m4", partId: "p9", qtyPerUnit: 1, version: 1, isActive: true },
   // FB13G009 完整多階 BOM（祺驊真實資料）
   ...FB13G009_BOM,
+  // S43A001 煞車線圈半成品 4 階 BOM
+  ...S43A001_BOM,
 ];
 
 const TODAY = "2026-05-08";
