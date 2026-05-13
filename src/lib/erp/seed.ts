@@ -51,6 +51,10 @@ export const suppliers: Supplier[] = [
   { id: "s34", code: "SUP-YH",   name: "永潓",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
   { id: "s35", code: "SUP-TY",   name: "台一",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
   { id: "s36", code: "SUP-QY",   name: "企縣",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  // 從 FB13G009 BOM 新增的廠商
+  { id: "s37", code: "SUP-YS",   name: "允升",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s38", code: "SUP-WC",   name: "五傳",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s39", code: "SUP-LX",   name: "龍星",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
 ];
 
 export const parts: Part[] = [
@@ -73,6 +77,41 @@ export const parts: Part[] = [
   // 划船機共用零件
   { id: "p14", code: "R100-RAIL",  name: "划船機軌道",        category: "鋼架",   unit: "PCS", unitCost: 2100, supplierId: "s4",  leadDays: 45, stockOnHand: 10,  safetyStock: 8 },  // 莊宏億
   { id: "p15", code: "R100-ROPE",  name: "划船拉繩組",        category: "皮帶",   unit: "PCS", unitCost: 220,  supplierId: "s11", leadDays: 45, stockOnHand: 40,  safetyStock: 20 }, // 海騁
+
+  // ==================================================================
+  // 祺驊真實 BOM — FB13G009 雙向內磁式磁控 ψ250*132*6片開-M10*P1.5
+  // 共 28 個料件（含半成品 + 包裝多階）
+  // ==================================================================
+  // 包裝相關（Feature 件 + 虛設品號 + 採購件三層）
+  { id: "p100", code: "FB13G009-P", name: "包裝",        category: "包裝",   unit: "PCS", unitCost: 0,      leadDays: 45, stockOnHand: 0,    safetyStock: 0,   kind: "feature" },
+  { id: "p101", code: "SPMD002",    name: "包裝組合",    category: "包裝",   spec: "樓板/4入 (250)",        unit: "PCS", unitCost: 0,      leadDays: 45, stockOnHand: 0,    safetyStock: 0,   kind: "dummy" },
+  { id: "p102", code: "M05A012",    name: "紙箱",        category: "包材",   spec: "540L*310W*320H(250 4入)",       unit: "PCS", unitCost: 50.40,  supplierId: "s37", leadDays: 45, stockOnHand: 500,  safetyStock: 200, kind: "purchase" }, // 允升
+  { id: "p103", code: "M05J008",    name: "棧板",        category: "包材",   spec: "1320L*950W*144H(mm)",           unit: "PCS", unitCost: 546.00, supplierId: "s38", leadDays: 45, stockOnHand: 80,   safetyStock: 30,  kind: "purchase" }, // 五傳
+  { id: "p104", code: "M05K003",    name: "保麗龍",      category: "包材",   spec: "磁控用4入(A)",                  unit: "PCS", unitCost: 23.30,  supplierId: "s39", leadDays: 45, stockOnHand: 200,  safetyStock: 80,  kind: "purchase" }, // 龍星
+  { id: "p105", code: "M05K004",    name: "保麗龍",      category: "包材",   spec: "磁控用4入(B)",                  unit: "PCS", unitCost: 23.30,  supplierId: "s39", leadDays: 45, stockOnHand: 200,  safetyStock: 80,  kind: "purchase" }, // 龍星
+  // 主體採購件
+  { id: "p106", code: "M09A12",     name: "扣環",        category: "扣件",   spec: "ψ12軸用",                        unit: "PCS", unitCost: 0.27,   supplierId: "s1",  leadDays: 45, stockOnHand: 1500, safetyStock: 500, kind: "purchase" }, // 競丞
+  { id: "p107", code: "M14AA044",   name: "螺絲",        category: "扣件",   spec: "圓頭十字M5×11+2@",              unit: "PCS", unitCost: 0.29,   supplierId: "s2",  leadDays: 45, stockOnHand: 3000, safetyStock: 1000,kind: "purchase" }, // 雙成
+  { id: "p108", code: "P03SB155",   name: "軸心",        category: "軸件",   spec: "ψ12*132*89*14*M10*P1.5*48",     unit: "PCS", unitCost: 23.75,  supplierId: "s3",  leadDays: 45, stockOnHand: 80,   safetyStock: 30,  kind: "purchase" }, // 重邑
+  { id: "p109", code: "P13DA01",    name: "滾珠軸承",    category: "軸承",   spec: "NBK 6001 2RS CN",               unit: "PCS", unitCost: 9.10,   supplierId: "s4",  leadDays: 45, stockOnHand: 600,  safetyStock: 200, kind: "purchase" }, // 莊宏億
+  { id: "p110", code: "S01BD03C",   name: "飛輪半成品",  category: "半成品", spec: "ψ250/ψ37-J8+鋁板",              unit: "PCS", unitCost: 265.32, supplierId: "s6",  leadDays: 45, stockOnHand: 60,   safetyStock: 25,  kind: "purchase" }, // 祺驊越南（內部廠視為採購）
+  // 半成品節點（自製，往下還有子件）
+  { id: "p111", code: "S04B002",    name: "框架固定架半成品", category: "半成品", spec: "ψ12*22H+止付",                unit: "PCS", unitCost: 0,      leadDays: 45, stockOnHand: 80,   safetyStock: 30,  kind: "self" },
+  { id: "p112", code: "M14CA003",   name: "止付螺絲",    category: "扣件",   spec: "M6×8L+耐落",                    unit: "PCS", unitCost: 0.60,   supplierId: "s2",  leadDays: 45, stockOnHand: 2000, safetyStock: 800, kind: "purchase" }, // 雙成
+  { id: "p113", code: "P04BA03",    name: "框架固定架",  category: "框架",   spec: "ψ48L*48W*22H*ψ12",              unit: "PCS", unitCost: 13.20,  supplierId: "s7",  leadDays: 45, stockOnHand: 90,   safetyStock: 30,  kind: "purchase" }, // 吉輝
+  { id: "p114", code: "S40A206",    name: "框架半成品",  category: "半成品", spec: "6片開、橘澄塊",                 unit: "PCS", unitCost: 0,      leadDays: 45, stockOnHand: 70,   safetyStock: 25,  kind: "self" },
+  { id: "p115", code: "M06AC01",    name: "A、B膠(紅)", category: "膠材",   spec: "紅膠",                          unit: "g",   unitCost: 0.34,   supplierId: "s9",  leadDays: 45, stockOnHand: 5000, safetyStock: 1500,kind: "purchase" }, // 寒亞
+  { id: "p116", code: "M06AC02",    name: "A、B膠(綠)", category: "膠材",   spec: "綠膠",                          unit: "g",   unitCost: 0.34,   supplierId: "s9",  leadDays: 45, stockOnHand: 5000, safetyStock: 1500,kind: "purchase" }, // 寒亞
+  { id: "p117", code: "M14AC001",   name: "圓頭十字自攻螺絲", category: "扣件", spec: "3×28L@",                      unit: "PCS", unitCost: 0.17,   supplierId: "s3",  leadDays: 45, stockOnHand: 4000, safetyStock: 1500,kind: "purchase" }, // 重邑
+  { id: "p118", code: "P02C02",     name: "磁極片",      category: "磁件",   spec: "R96.5*150*26*W*3t(一般)",       unit: "PCS", unitCost: 7.50,   supplierId: "s21", leadDays: 45, stockOnHand: 300,  safetyStock: 120, kind: "purchase" }, // 逢勝
+  { id: "p119", code: "P04FB01",    name: "前框架",      category: "框架",   spec: "ψ208.5×ψ28×黑色",               unit: "PCS", unitCost: 12.00,  supplierId: "s11", leadDays: 45, stockOnHand: 110,  safetyStock: 40,  kind: "purchase" }, // 海騁
+  { id: "p120", code: "P04GB01",    name: "後框架",      category: "框架",   spec: "ψ208.5×ψ28×黑色",               unit: "PCS", unitCost: 12.00,  supplierId: "s11", leadDays: 45, stockOnHand: 110,  safetyStock: 40,  kind: "purchase" }, // 海騁
+  { id: "p121", code: "P07A01B",    name: "磁石",        category: "磁件",   spec: "8t×26W(著磁四強) 一般內磁控用", unit: "PCS", unitCost: 4.80,   supplierId: "s12", leadDays: 45, stockOnHand: 900,  safetyStock: 300, kind: "purchase" }, // 右在
+  { id: "p122", code: "P10D015",    name: "拉索",        category: "索線",   spec: "36L*ψ1.2",                       unit: "PCS", unitCost: 1.68,   supplierId: "s13", leadDays: 45, stockOnHand: 300,  safetyStock: 120, kind: "purchase" }, // 東台祺電
+  { id: "p123", code: "P11A01",     name: "襯套",        category: "套件",   spec: "ψ8×ψ6×4L",                       unit: "PCS", unitCost: 0.33,   supplierId: "s2",  leadDays: 45, stockOnHand: 800,  safetyStock: 300, kind: "purchase" }, // 雙成
+  { id: "p124", code: "P11B01",     name: "滑套",        category: "套件",   spec: "ψ7×ψ3×10.5L",                    unit: "PCS", unitCost: 0.37,   supplierId: "s2",  leadDays: 45, stockOnHand: 400,  safetyStock: 150, kind: "purchase" }, // 雙成
+  { id: "p125", code: "P11D02",     name: "滑塊",        category: "套件",   spec: "橘色",                          unit: "PCS", unitCost: 1.35,   supplierId: "s14", leadDays: 45, stockOnHand: 200,  safetyStock: 80,  kind: "purchase" }, // 海碧
+  { id: "p126", code: "P15A001",    name: "復位彈簧",    category: "彈簧",   spec: "ψ1.0×10.5×37L",                  unit: "PCS", unitCost: 0.63,   supplierId: "s15", leadDays: 45, stockOnHand: 400,  safetyStock: 150, kind: "purchase" }, // 金倫
 ];
 
 // 機種 FB64・直立車 之下有多個成品品號（H021-A2 商規 / H020-A1 家規）
@@ -81,6 +120,48 @@ export const models: Model[] = [
   { id: "m2", code: "FB64H020-A1", machineFamily: "FB64・直立車", name: "FB64H020-A1 家用直立車", category: "bike", description: "家用規格，輕量化座墊", stdPrice: 18500 },
   { id: "m3", code: "T-PRO-220", machineFamily: "T-PRO・跑步機", name: "Pro 跑步機 T-220", category: "treadmill", description: "商用級折疊跑步機，3HP 馬達", stdPrice: 38000 },
   { id: "m4", code: "R-MAG-100", machineFamily: "R-MAG・划船機", name: "磁控划船機 R-100", category: "rower", description: "雙軌磁控，滑順靜音", stdPrice: 28000 },
+  // 祺驊真實成品 — 內磁式磁控模組
+  { id: "m100", code: "FB13G009", machineFamily: "FB13・內磁式磁控", name: "FB13G009 雙向內磁式磁控", category: "strength", description: "ψ250*132*6片開-M10*P1.5，搭配 ψ250 飛輪、6 片磁極，標準成本 $450", stdPrice: 1500 },
+];
+
+// FB13G009 多階 BOM（依使用者提供的真實 BOM 截圖建檔）
+const FB13G009_BOM: BomLine[] = [
+  // ── Level 1 — FB13G009 主件直接子件 ─────────────────
+  { modelId: "m100", partId: "p100", qtyPerUnit: 1, level: 1, version: 1, isActive: true },  // FB13G009-P 包裝 (Feature)
+  { modelId: "m100", partId: "p106", qtyPerUnit: 2, level: 1, version: 1, isActive: true },  // M09A12 扣環
+  { modelId: "m100", partId: "p107", qtyPerUnit: 4, level: 1, version: 1, isActive: true },  // M14AA044 螺絲
+  { modelId: "m100", partId: "p108", qtyPerUnit: 1, level: 1, version: 1, isActive: true },  // P03SB155 軸心
+  { modelId: "m100", partId: "p109", qtyPerUnit: 2, level: 1, version: 1, isActive: true },  // P13DA01 滾珠軸承
+  { modelId: "m100", partId: "p110", qtyPerUnit: 1, level: 1, version: 1, isActive: true },  // S01BD03C 飛輪半成品（祺驊越南）
+  { modelId: "m100", partId: "p111", qtyPerUnit: 1, level: 1, version: 1, isActive: true },  // S04B002 框架固定架半成品
+  { modelId: "m100", partId: "p114", qtyPerUnit: 1, level: 1, version: 1, isActive: true },  // S40A206 框架半成品
+
+  // ── Level 2 — FB13G009-P 包裝 下展開 ─────────────────
+  { modelId: "m100", partId: "p101", parentPartCode: "FB13G009-P", qtyPerUnit: 1, level: 2, version: 1, isActive: true }, // SPMD002 包裝組合
+
+  // ── Level 3 — SPMD002 下展開（紙箱 / 棧板 / 保麗龍）──
+  { modelId: "m100", partId: "p102", parentPartCode: "SPMD002", qtyPerUnit: 0.25, level: 3, version: 1, isActive: true }, // M05A012 紙箱
+  { modelId: "m100", partId: "p103", parentPartCode: "SPMD002", qtyPerUnit: 0.01, level: 3, version: 1, isActive: true }, // M05J008 棧板
+  { modelId: "m100", partId: "p104", parentPartCode: "SPMD002", qtyPerUnit: 0.25, level: 3, version: 1, isActive: true }, // M05K003 保麗龍 A
+  { modelId: "m100", partId: "p105", parentPartCode: "SPMD002", qtyPerUnit: 0.25, level: 3, version: 1, isActive: true }, // M05K004 保麗龍 B
+
+  // ── Level 2 — S04B002 框架固定架半成品 下展開 ──────
+  { modelId: "m100", partId: "p112", parentPartCode: "S04B002", qtyPerUnit: 2, level: 2, version: 1, isActive: true }, // M14CA003 止付螺絲
+  { modelId: "m100", partId: "p113", parentPartCode: "S04B002", qtyPerUnit: 1, level: 2, version: 1, isActive: true }, // P04BA03 框架固定架
+
+  // ── Level 2 — S40A206 框架半成品 下展開（12 個小料）─
+  { modelId: "m100", partId: "p115", parentPartCode: "S40A206", qtyPerUnit: 1.5, level: 2, version: 1, isActive: true }, // M06AC01 紅膠
+  { modelId: "m100", partId: "p116", parentPartCode: "S40A206", qtyPerUnit: 1.5, level: 2, version: 1, isActive: true }, // M06AC02 綠膠
+  { modelId: "m100", partId: "p117", parentPartCode: "S40A206", qtyPerUnit: 4,   level: 2, version: 1, isActive: true }, // M14AC001 自攻螺絲
+  { modelId: "m100", partId: "p118", parentPartCode: "S40A206", qtyPerUnit: 2,   level: 2, version: 1, isActive: true }, // P02C02 磁極片
+  { modelId: "m100", partId: "p119", parentPartCode: "S40A206", qtyPerUnit: 1,   level: 2, version: 1, isActive: true }, // P04FB01 前框架
+  { modelId: "m100", partId: "p120", parentPartCode: "S40A206", qtyPerUnit: 1,   level: 2, version: 1, isActive: true }, // P04GB01 後框架
+  { modelId: "m100", partId: "p121", parentPartCode: "S40A206", qtyPerUnit: 6,   level: 2, version: 1, isActive: true }, // P07A01B 磁石
+  { modelId: "m100", partId: "p122", parentPartCode: "S40A206", qtyPerUnit: 2,   level: 2, version: 1, isActive: true }, // P10D015 拉索
+  { modelId: "m100", partId: "p123", parentPartCode: "S40A206", qtyPerUnit: 4,   level: 2, version: 1, isActive: true }, // P11A01 襯套
+  { modelId: "m100", partId: "p124", parentPartCode: "S40A206", qtyPerUnit: 2,   level: 2, version: 1, isActive: true }, // P11B01 滑套
+  { modelId: "m100", partId: "p125", parentPartCode: "S40A206", qtyPerUnit: 1,   level: 2, version: 1, isActive: true }, // P11D02 滑塊
+  { modelId: "m100", partId: "p126", parentPartCode: "S40A206", qtyPerUnit: 2,   level: 2, version: 1, isActive: true }, // P15A001 復位彈簧
 ];
 
 export const bom: BomLine[] = [
@@ -118,6 +199,8 @@ export const bom: BomLine[] = [
   { modelId: "m4", partId: "p3", qtyPerUnit: 1, version: 1, isActive: true },
   { modelId: "m4", partId: "p5", qtyPerUnit: 1, version: 1, isActive: true },
   { modelId: "m4", partId: "p9", qtyPerUnit: 1, version: 1, isActive: true },
+  // FB13G009 完整多階 BOM（祺驊真實資料）
+  ...FB13G009_BOM,
 ];
 
 const TODAY = "2026-05-08";
