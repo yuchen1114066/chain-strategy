@@ -11,6 +11,7 @@ const links = [
   { href: "/erp/simulator", label: "缺料模擬器", icon: "🔮" },
   { href: "/erp/work-orders", label: "工單追蹤", icon: "📋" },
   { href: "/erp/calendar", label: "排程日曆", icon: "📅" },
+  { href: "/erp/customers", label: "客戶分析", icon: "👥" },
   { href: "/erp/models", label: "型號 + BOM", icon: "🏗️" },
   { href: "/erp/parts", label: "零件主檔", icon: "🔩" },
   { href: "/erp/suppliers", label: "供應商", icon: "🏭" },
