@@ -130,6 +130,7 @@ export type Recipe = {
   steps: string[];
   benefits: string[];
   imageColor: string;
+  image?: string;
   rating: number;
   reviews: number;
   author: string;
@@ -167,6 +168,7 @@ export const recipes: Recipe[] = [
     ],
     benefits: ["補中益氣", "養血安神", "增強免疫力", "改善疲勞"],
     imageColor: "from-amber-100 to-orange-200",
+    image: "/recipes/huangqi-hongzao-jitang.jpg",
     rating: 4.8,
     reviews: 234,
     author: "陳美華",
@@ -198,6 +200,7 @@ export const recipes: Recipe[] = [
     ],
     benefits: ["清熱利濕", "健脾止瀉", "養心安神", "美白祛斑"],
     imageColor: "from-green-100 to-emerald-200",
+    image: "/recipes/yiren-lianzi-zhou.jpg",
     rating: 4.6,
     reviews: 189,
     author: "林志玲",
@@ -229,6 +232,7 @@ export const recipes: Recipe[] = [
     ],
     benefits: ["活血化瘀", "疏肝解鬱", "美容養顏", "助消化"],
     imageColor: "from-rose-100 to-pink-200",
+    image: "/recipes/meigui-shanzha-cha.jpg",
     rating: 4.9,
     reviews: 312,
     author: "王小芳",
@@ -259,6 +263,7 @@ export const recipes: Recipe[] = [
     ],
     benefits: ["滋肝補腎", "明目護眼", "清熱散風", "抗氧化"],
     imageColor: "from-yellow-100 to-amber-200",
+    image: "/recipes/gouqi-juhua-cha.jpg",
     rating: 4.7,
     reviews: 428,
     author: "張健康",
@@ -293,6 +298,7 @@ export const recipes: Recipe[] = [
     ],
     benefits: ["溫中補虛", "祛寒止痛", "補血活血", "暖胃驅寒"],
     imageColor: "from-orange-100 to-red-200",
+    image: "/recipes/danggui-shengjiang-yangroutang.jpg",
     rating: 4.8,
     reviews: 156,
     author: "劉大廚",
@@ -326,6 +332,7 @@ export const recipes: Recipe[] = [
     ],
     benefits: ["滋陰潤燥", "養顏美膚", "安神助眠", "潤肺止咳"],
     imageColor: "from-sky-100 to-blue-200",
+    image: "/recipes/yiner-lianzi-baihe.jpg",
     rating: 4.9,
     reviews: 567,
     author: "美容達人小林",
@@ -360,6 +367,7 @@ export const recipes: Recipe[] = [
     ],
     benefits: ["健脾益胃", "補腎固精", "強筋健骨", "增強體力"],
     imageColor: "from-amber-100 to-yellow-200",
+    image: "/recipes/shanyao-paigutang.jpg",
     rating: 4.5,
     reviews: 201,
     author: "養生廚師老李",
@@ -391,6 +399,7 @@ export const recipes: Recipe[] = [
     ],
     benefits: ["健脾化痰", "利水除濕", "消腫減重", "改善消化"],
     imageColor: "from-teal-100 to-cyan-200",
+    image: "/recipes/fuling-chenpi-donggua-cha.jpg",
     rating: 4.4,
     reviews: 143,
     author: "中醫師陳文彬",

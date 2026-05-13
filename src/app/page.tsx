@@ -73,7 +73,15 @@ const dimensionCards = [
   },
 ];
 
-const currentSeason = seasonalTips[3];
+function getSeasonInfo() {
+  const month = new Date().getMonth() + 1; // 1-12
+  if (month >= 3 && month <= 5) return seasonalTips[0]; // 春
+  if (month >= 6 && month <= 8) return seasonalTips[1]; // 夏
+  if (month >= 9 && month <= 11) return seasonalTips[2]; // 秋
+  return seasonalTips[3]; // 冬
+}
+
+const currentSeason = getSeasonInfo();
 
 export default function HomePage() {
   const featuredRecipes = recipes.slice(0, 4);
@@ -130,18 +138,6 @@ export default function HomePage() {
               </Link>
             </div>
 
-            <div className="mt-16 grid grid-cols-3 gap-8 max-w-md">
-              {[
-                { value: "5,000+", label: "養生食譜" },
-                { value: "50,000+", label: "用戶社群" },
-                { value: "100+", label: "中醫師顧問" },
-              ].map((stat) => (
-                <div key={stat.label}>
-                  <div className="text-2xl font-bold" style={{ color: "#c87941" }}>{stat.value}</div>
-                  <div className="text-sm mt-1" style={{ color: "#7a9b7a" }}>{stat.label}</div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </section>
@@ -387,7 +383,7 @@ export default function HomePage() {
           <div className="text-5xl mb-6">🌿</div>
           <h2 className="text-3xl md:text-4xl font-bold mb-6">開始您的養生之旅</h2>
           <p className="text-lg mb-10 max-w-2xl mx-auto leading-relaxed" style={{ color: "#9ab89a" }}>
-            加入超過五萬名養生愛好者，透過中醫智慧改善您和家人的健康狀況。
+            加入養生愛好者的行列，透過中醫智慧改善您和家人的健康狀況。
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
