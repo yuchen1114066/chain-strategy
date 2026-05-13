@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { workOrders, models, today, currentStageLabel } from "@/lib/erp/seed";
 import { computeAlerts } from "@/lib/erp/alerts";
+import { analyzeBottlenecks } from "@/lib/erp/flow-advisor";
 import { STAGES } from "@/lib/erp/types";
+import BottleneckAdvisor from "@/components/erp/BottleneckAdvisor";
 
 function daysBetween(a: string, b: string): number {
   return Math.round(
@@ -80,6 +82,9 @@ export default function FlowDashboardPage() {
   const redCount = alerts.filter((a) => a.severity === "red").length;
   const yellowCount = alerts.filter((a) => a.severity === "yellow").length;
 
+  // 瓶頸顧問：每個塞車階段即時生成根因 + 解方
+  const bottlenecks = analyzeBottlenecks();
+
   return (
     <div className="p-6 space-y-6">
       <header className="flex items-end justify-between flex-wrap gap-3">
@@ -149,6 +154,24 @@ export default function FlowDashboardPage() {
             })}
           </div>
         </div>
+      </section>
+
+      {/* ============ 瓶頸即時解方 ============ */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              ✨ 瓶頸即時解方
+              {bottlenecks.length > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded bg-rose-500 text-white">{bottlenecks.length}</span>
+              )}
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              偵測到塞車階段 → 自動生成根因 + 可執行解方（依優先順序），不只說「卡了」更告訴你「怎麼救」
+            </p>
+          </div>
+        </div>
+        <BottleneckAdvisor analyses={bottlenecks} />
       </section>
 
       {/* ============ 漏斗轉換 ============ */}

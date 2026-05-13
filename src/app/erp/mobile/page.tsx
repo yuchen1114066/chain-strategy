@@ -43,8 +43,17 @@ export default function MobileLookupPage() {
         <div>
           <h1 className="text-2xl font-bold">📱 QR 查碼工具</h1>
           <p className="text-sm text-slate-500 mt-1">
-            掃 QR → 立刻顯示品名 / 廠商 / 庫存 / 倉位等資訊。<b className="text-amber-700">不做扣帳，同仁回 iGP ERP 操作</b>。
+            掃 QR → <b className="text-cyan-700">即時連線 iGP</b> 看實際庫存。
+            <b className="text-amber-700">不做扣帳，同仁回 iGP ERP 操作。</b>
           </p>
+        </div>
+        <div className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span className="font-semibold text-emerald-800">已連線 iGP</span>
+          <span className="text-emerald-700">資料更新 {new Date().toISOString().slice(11, 16)}</span>
         </div>
       </header>
 
@@ -56,9 +65,15 @@ export default function MobileLookupPage() {
               <span>9:41</span>
               <span>📶 LTE 🔋 87%</span>
             </div>
-            <div className="bg-cyan-600 text-white px-4 py-3">
-              <div className="text-[10px] opacity-80">ChainOps</div>
-              <div className="text-sm font-bold">📷 QR 查碼</div>
+            <div className="bg-cyan-600 text-white px-4 py-3 flex items-center justify-between">
+              <div>
+                <div className="text-[10px] opacity-80">ChainOps</div>
+                <div className="text-sm font-bold">📷 QR 查碼</div>
+              </div>
+              <span className="text-[9px] bg-emerald-500 px-1.5 py-0.5 rounded flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                iGP 即時
+              </span>
             </div>
 
             <div className="flex-1 overflow-y-auto bg-slate-50 p-3 space-y-3">
@@ -233,9 +248,19 @@ function PartResult({ code }: { code: string }) {
     <div className="text-xs space-y-1.5">
       <div className="font-mono text-sm font-bold">{p.code}</div>
       <div className="text-sm">{p.name}</div>
+      <div className="rounded-md bg-cyan-50 border border-cyan-200 p-2 mt-1">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[10px] font-bold text-cyan-700">🔄 iGP 即時庫存</span>
+          <span className="text-[9px] text-cyan-600">同步於 {new Date().toISOString().slice(11, 16)}</span>
+        </div>
+        <div className={`text-2xl font-bold tabular-nums ${low ? "text-rose-600" : "text-slate-900"}`}>
+          {p.stockOnHand}
+          <span className="text-sm text-slate-500 ml-1">{p.unit}</span>
+          {low && <span className="ml-2 text-xs text-rose-600">⚠ 低於安全庫存</span>}
+        </div>
+        <div className="text-[10px] text-slate-500 mt-0.5">安全庫存 {p.safetyStock} {p.unit}</div>
+      </div>
       <div className="grid grid-cols-2 gap-1.5 pt-1 text-[11px]">
-        <Field label="iGP 庫存" value={<span className={low ? "text-rose-600 font-bold" : ""}>{p.stockOnHand} {p.unit}{low && " ⚠"}</span>} />
-        <Field label="安全庫存" value={`${p.safetyStock} ${p.unit}`} />
         <Field label="單價" value={`$${p.unitCost.toLocaleString()}`} />
         <Field label="分類" value={p.category} />
       </div>
