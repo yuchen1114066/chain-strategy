@@ -1,13 +1,42 @@
 import { suppliers, parts } from "@/lib/erp/seed";
+import CsvExportButton from "@/components/erp/CsvExportButton";
 
 export default function SuppliersPage() {
+  const csvRows = suppliers.map((s) => {
+    const supplied = parts.filter((p) => p.supplierId === s.id);
+    return {
+      code: s.code, name: s.name, country: s.country, city: s.city,
+      transitDays: s.transitDays, contact: s.contact,
+      partCount: supplied.length,
+      stockValue: supplied.reduce((sum, p) => sum + p.unitCost * p.stockOnHand, 0),
+      supplied: supplied.map((p) => p.code).join("、"),
+    };
+  });
+
   return (
     <div className="p-6">
-      <header className="mb-5">
-        <h1 className="text-2xl font-bold">供應商</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          工廠位置 → 平均運送天數 → 影響到廠日 → 影響上線排程
-        </p>
+      <header className="mb-5 flex items-end justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold">供應商</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            工廠位置 → 平均運送天數 → 影響到廠日 → 影響上線排程
+          </p>
+        </div>
+        <CsvExportButton
+          filename={`suppliers-${new Date().toISOString().slice(0,10)}.csv`}
+          rows={csvRows}
+          columns={[
+            { key: "code", label: "代碼" },
+            { key: "name", label: "供應商" },
+            { key: "country", label: "國家" },
+            { key: "city", label: "城市" },
+            { key: "transitDays", label: "運送(天)" },
+            { key: "contact", label: "聯絡" },
+            { key: "partCount", label: "供應料項" },
+            { key: "stockValue", label: "在庫值" },
+            { key: "supplied", label: "供應料號" },
+          ]}
+        />
       </header>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {suppliers.map((s) => {

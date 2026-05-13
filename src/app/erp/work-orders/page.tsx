@@ -2,6 +2,7 @@ import Link from "next/link";
 import { workOrders, models, today, currentStageLabel } from "@/lib/erp/seed";
 import { computeAlerts } from "@/lib/erp/alerts";
 import StageBar from "@/components/erp/StageBar";
+import CsvExportButton from "@/components/erp/CsvExportButton";
 
 function daysUntil(iso: string): number {
   const ms = new Date(iso + "T00:00:00Z").getTime() - new Date(today + "T00:00:00Z").getTime();
@@ -26,15 +27,44 @@ export default function WorkOrdersPage() {
     alertCountByWo.set(a.woId, c);
   }
 
+  const csvRows = workOrders.map((w) => {
+    const m = models.find((m) => m.id === w.modelId);
+    return {
+      woNo: w.woNo, source: w.source, customer: w.customer,
+      finishedCode: m?.code ?? "", machineFamily: m?.machineFamily ?? "",
+      qty: w.qty, orderDate: w.orderDate, shipDate: w.shipDate,
+      destination: w.destination, currentStage: currentStageLabel(w),
+      status: w.statusLabel ?? w.status, notes: w.notes ?? "",
+    };
+  });
+
   return (
     <div className="p-6">
-      <header className="mb-5 flex items-end justify-between">
+      <header className="mb-5 flex items-end justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">工單追蹤</h1>
           <p className="text-sm text-slate-500 mt-1">
             來源 ERP 訂單 → BOM 自動展開零件 → 八階段追蹤 → 預測異常
           </p>
         </div>
+        <CsvExportButton
+          filename={`work-orders-${new Date().toISOString().slice(0,10)}.csv`}
+          rows={csvRows}
+          columns={[
+            { key: "woNo", label: "訂單號" },
+            { key: "source", label: "來源" },
+            { key: "customer", label: "客戶" },
+            { key: "finishedCode", label: "成品品號" },
+            { key: "machineFamily", label: "機種" },
+            { key: "qty", label: "數量" },
+            { key: "orderDate", label: "下單日" },
+            { key: "shipDate", label: "船期" },
+            { key: "destination", label: "目的地" },
+            { key: "currentStage", label: "目前站別" },
+            { key: "status", label: "狀態" },
+            { key: "notes", label: "備註" },
+          ]}
+        />
       </header>
 
       {/* Compact table — exact match to screenshot columns */}

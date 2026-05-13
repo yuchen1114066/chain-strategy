@@ -1,17 +1,57 @@
 import { parts, suppliers } from "@/lib/erp/seed";
 import { computePartDemand } from "@/lib/erp/alerts";
+import CsvExportButton from "@/components/erp/CsvExportButton";
 
 export default function PartsPage() {
   const demand = computePartDemand();
   const map = new Map(demand.map((d) => [d.part.id, d]));
 
+  const csvRows = parts.map((p) => {
+    const d = map.get(p.id);
+    const supp = suppliers.find((s) => s.id === p.supplierId);
+    return {
+      code: p.code, name: p.name, spec: p.spec ?? "", category: p.category,
+      unit: p.unit, unitCost: p.unitCost, leadDays: p.leadDays,
+      stockOnHand: p.stockOnHand, safetyStock: p.safetyStock,
+      kind: p.kind ?? "purchase",
+      required: d?.totalRequired ?? 0,
+      netBalance: d?.netBalance ?? p.stockOnHand,
+      shortage: d?.shortage ?? 0,
+      supplier: supp?.name ?? "—",
+      supplierCountry: supp?.country ?? "—",
+    };
+  });
+
   return (
     <div className="p-6">
-      <header className="mb-5">
-        <h1 className="text-2xl font-bold">零件主檔</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          需求量 = 所有進行中 / 規劃中工單透過 BOM 展開的總用料
-        </p>
+      <header className="mb-5 flex items-end justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold">零件主檔</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            需求量 = 所有進行中 / 規劃中工單透過 BOM 展開的總用料
+          </p>
+        </div>
+        <CsvExportButton
+          filename={`parts-${new Date().toISOString().slice(0,10)}.csv`}
+          rows={csvRows}
+          columns={[
+            { key: "code", label: "料號" },
+            { key: "name", label: "品名" },
+            { key: "spec", label: "規格" },
+            { key: "category", label: "分類" },
+            { key: "unit", label: "單位" },
+            { key: "unitCost", label: "單價" },
+            { key: "leadDays", label: "交期(天)" },
+            { key: "stockOnHand", label: "在庫" },
+            { key: "safetyStock", label: "安全庫存" },
+            { key: "kind", label: "屬性" },
+            { key: "required", label: "本期需求" },
+            { key: "netBalance", label: "餘額" },
+            { key: "shortage", label: "缺額" },
+            { key: "supplier", label: "供應商" },
+            { key: "supplierCountry", label: "國家" },
+          ]}
+        />
       </header>
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <table className="w-full text-sm">
