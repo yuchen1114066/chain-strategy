@@ -1,164 +1,222 @@
 import Link from "next/link";
-import { models, parts, suppliers, workOrders, today, currentStageLabel } from "@/lib/erp/seed";
-import { computeAlerts, computePartDemand } from "@/lib/erp/alerts";
-import StageBar from "@/components/erp/StageBar";
-import AlertList from "@/components/erp/AlertList";
+import { workOrders, models, today } from "@/lib/erp/seed";
+import { computeAlerts } from "@/lib/erp/alerts";
+import { analyzeBottlenecks } from "@/lib/erp/flow-advisor";
+import { STAGES } from "@/lib/erp/types";
+import BottleneckAdvisor from "@/components/erp/BottleneckAdvisor";
 
 function daysUntil(iso: string): number {
   const ms = new Date(iso + "T00:00:00Z").getTime() - new Date(today + "T00:00:00Z").getTime();
   return Math.round(ms / 86_400_000);
 }
 
-export default function ErpCockpitPage() {
-  const alerts = computeAlerts();
-  const demand = computePartDemand();
-  const shortageCount = demand.filter((d) => d.shortage > 0).length;
-  const activeWos = workOrders.filter((w) => w.status === "active" || w.status === "planning");
-  const upcoming = [...activeWos].sort((a, b) => a.shipDate.localeCompare(b.shipDate)).slice(0, 5);
+function currentStageSeq(wo: typeof workOrders[number]): number {
+  const inprog = wo.stages.find((s) => s.status === "in_progress");
+  if (inprog) return inprog.seq;
+  const next = wo.stages.find((s) => s.status !== "done");
+  if (next) return next.seq;
+  return 8;
+}
 
+export default function CockpitPage() {
+  const activeWos = workOrders.filter((w) => w.status !== "done" && w.status !== "cancelled");
+  const alerts = computeAlerts();
+  const bottlenecks = analyzeBottlenecks();
+
+  // 依階段分組工單
+  const wosByStage = new Map<number, typeof workOrders>();
+  for (const w of activeWos) {
+    const seq = currentStageSeq(w);
+    const arr = wosByStage.get(seq) ?? [];
+    arr.push(w);
+    wosByStage.set(seq, arr);
+  }
+
+  // KPI
   const redCount = alerts.filter((a) => a.severity === "red").length;
   const yellowCount = alerts.filter((a) => a.severity === "yellow").length;
+  const totalActiveValue = activeWos.reduce((s, w) => {
+    const m = models.find((m) => m.id === w.modelId);
+    return s + (m ? m.stdPrice * w.qty : 0);
+  }, 0);
+  const within7Days = activeWos.filter((w) => {
+    const d = daysUntil(w.shipDate);
+    return d >= 0 && d <= 7;
+  }).length;
 
   return (
     <div className="p-6 space-y-6">
       <header className="flex items-end justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">戰情室 Command Center</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            基準日 {today}　·　業務 / 採購 / 生產 / 出貨即時概況
+          <h1 className="text-2xl font-bold">🎯 貨件流程戰情室</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            每張單目前卡在哪一關 + 卡住自動產出解方
           </p>
         </div>
-        <div className="flex gap-2">
-          <Link
-            href="/erp/flow"
-            className="px-4 py-2 text-sm rounded-md bg-cyan-600 text-white hover:bg-cyan-700 font-semibold flex items-center gap-1"
-          >
-            🌊 流程綜觀
-          </Link>
-          <Link
-            href="/erp/simulator"
-            className="px-3 py-2 text-sm rounded-md border border-cyan-300 text-cyan-700 hover:bg-cyan-50 font-semibold"
-          >
-            🔮 缺料模擬器
-          </Link>
-          <Link
-            href="/erp/import"
-            className="px-3 py-2 text-sm rounded-md border border-slate-300 hover:bg-slate-50"
-          >
-            📥 匯入 iGP
-          </Link>
+        <div className="text-right text-xs text-slate-500">
+          <div>基準日 {today}</div>
+          <div className="mt-1">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-emerald-700 font-semibold">已連線鼎新 ERP（資料同步）</span>
+            </span>
+          </div>
         </div>
       </header>
 
-      {/* Hero CTA — simulator front and center */}
-      <section className="rounded-xl border-2 border-cyan-300 bg-gradient-to-r from-cyan-50 to-sky-50 p-5">
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="text-4xl">🔮</div>
-          <div className="flex-1 min-w-[260px]">
-            <div className="text-xs font-bold text-cyan-700 uppercase tracking-wider">值回票價的一頁</div>
-            <div className="text-lg font-bold text-slate-900">缺料模擬器</div>
-            <p className="text-sm text-slate-600">
-              「我要做 50 台 FB64H021 + 30 台 FB64H020」→ 立刻吐出缺料清單、預計到廠日、能不能趕上船期
-            </p>
-          </div>
-          <Link
-            href="/erp/simulator"
-            className="px-4 py-2 rounded-md bg-cyan-600 text-white hover:bg-cyan-700 text-sm font-semibold"
-          >
-            進入模擬 →
-          </Link>
-        </div>
+      {/* KPI 4 卡 */}
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Kpi label="在製貨件" value={`${activeWos.length}`} sub="張單" tone="cyan" />
+        <Kpi label="在製金額" value={`$${(totalActiveValue / 10000).toFixed(0)}萬`} sub={`$${totalActiveValue.toLocaleString()}`} />
+        <Kpi label="7 日內出貨" value={`${within7Days}`} sub="張單" tone={within7Days > 0 ? "amber" : undefined} />
+        <Kpi label="未處理異常" value={`🔴 ${redCount}　🟡 ${yellowCount}`} sub={`${alerts.length} 條`} tone={redCount > 0 ? "rose" : undefined} />
       </section>
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Kpi label="進行中工單" value={activeWos.length} suffix="張" />
-        <Kpi label="型號 / 零件" value={`${models.length} / ${parts.length}`} />
-        <Kpi label="供應商" value={suppliers.length} suffix="家" />
-        <Kpi label="🔴 紅燈" value={redCount} tone={redCount > 0 ? "red" : undefined} />
-        <Kpi label="🟡 黃燈" value={yellowCount} tone={yellowCount > 0 ? "yellow" : undefined} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <section className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-bold text-slate-900">船期倒數（最近 5 張）</h2>
-            <Link href="/erp/work-orders" className="text-xs text-cyan-700 hover:underline">查看全部 →</Link>
+      {/* ============ 核心 1：貨件流程可視化 — 每張單卡在哪一關 ============ */}
+      <section className="bg-white rounded-xl border border-slate-200 p-5">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <div>
+            <h2 className="font-bold text-lg">📍 每張單目前位置</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              工單卡片落在所在階段欄位 — 紅色 = 已延遲 / 黃色 = 預警 / 綠色 = 正常 / 灰色 = 未開始
+            </p>
           </div>
-          <ul className="space-y-3">
-            {upcoming.map((w) => {
-              const m = models.find((m) => m.id === w.modelId);
-              const dleft = daysUntil(w.shipDate);
+        </div>
+
+        <div className="overflow-x-auto">
+          <div className="flex gap-2 min-w-[920px]">
+            {STAGES.map((meta, i) => {
+              const seq = i + 1;
+              const stageWos = wosByStage.get(seq) ?? [];
+              const stageBottleneck = bottlenecks.find((b) => b.stage === meta.key);
               return (
-                <li key={w.id} className="border-b border-slate-100 last:border-0 pb-3 last:pb-0">
-                  <div className="flex items-center justify-between mb-2 flex-wrap gap-2 text-xs">
-                    <Link href={`/erp/work-orders/${w.id}`} className="font-mono text-sm font-semibold text-cyan-700 hover:underline">
-                      {w.woNo}
-                    </Link>
-                    <span className="text-slate-700">
-                      <span className="font-mono">{m?.code}</span> × {w.qty} · {w.customer} · {currentStageLabel(w)}
-                    </span>
-                    <span className={`font-bold tabular-nums ${dleft < 7 ? "text-rose-600" : dleft < 21 ? "text-amber-600" : "text-slate-500"}`}>
-                      船期 {w.shipDate}（{dleft >= 0 ? `T-${dleft}` : `已逾 ${-dleft}d`}）
-                    </span>
+                <div
+                  key={meta.key}
+                  className={`flex-1 min-w-[110px] rounded-lg border-2 ${
+                    stageBottleneck
+                      ? "border-rose-300 bg-rose-50/40"
+                      : stageWos.length > 0
+                      ? "border-cyan-200 bg-cyan-50/30"
+                      : "border-slate-200 bg-slate-50"
+                  }`}
+                >
+                  <div className="px-2 py-2 border-b border-slate-200/60 text-center">
+                    <div className="text-lg">{meta.icon}</div>
+                    <div className="text-xs font-bold">{meta.label}</div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">
+                      {stageWos.length > 0 ? `${stageWos.length} 張` : "—"}
+                    </div>
+                    {stageBottleneck && (
+                      <div className="mt-1 text-[9px] px-1 py-0.5 rounded bg-rose-500 text-white font-bold inline-block">
+                        ⚠ 瓶頸
+                      </div>
+                    )}
                   </div>
-                  <StageBar stages={w.stages} today={today} />
-                </li>
+                  <div className="p-1.5 space-y-1.5 min-h-[120px]">
+                    {stageWos.map((w) => {
+                      const m = models.find((m) => m.id === w.modelId);
+                      const d = daysUntil(w.shipDate);
+                      const wAlerts = alerts.filter((a) => a.woId === w.id);
+                      const tone =
+                        wAlerts.some((a) => a.severity === "red")
+                          ? "border-rose-300 bg-white shadow-rose-100 shadow-sm"
+                          : wAlerts.length > 0
+                          ? "border-amber-300 bg-white shadow-amber-100 shadow-sm"
+                          : d < 7
+                          ? "border-amber-200 bg-white"
+                          : "border-slate-200 bg-white";
+                      return (
+                        <Link
+                          key={w.id}
+                          href={`/erp/work-orders/${w.id}`}
+                          className={`block rounded border ${tone} p-1.5 hover:border-cyan-400 transition-colors`}
+                        >
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="font-mono text-[10px] font-bold text-cyan-700 truncate">{w.woNo}</span>
+                            {wAlerts.length > 0 && (
+                              <span className="text-[9px]">
+                                {wAlerts.some((a) => a.severity === "red") ? "🔴" : "🟡"}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-slate-700 truncate">{w.customer}</div>
+                          <div className="text-[9px] text-slate-500 truncate">
+                            {m?.code} × {w.qty}
+                          </div>
+                          <div className={`text-[9px] font-bold tabular-nums mt-0.5 ${
+                            d < 0 ? "text-slate-400" :
+                            d < 7 ? "text-rose-600" :
+                            d < 21 ? "text-amber-600" :
+                            "text-slate-500"
+                          }`}>
+                            {d >= 0 ? `T-${d}d` : `已逾 ${-d}d`}
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
               );
             })}
-          </ul>
-        </section>
-
-        <section className="bg-white rounded-xl border border-slate-200 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-bold text-slate-900">缺料 Top 5</h2>
-            <span className="text-xs text-slate-500">{shortageCount} 項缺料</span>
           </div>
-          <ul className="space-y-2 text-sm">
-            {demand.filter((d) => d.shortage > 0).slice(0, 5).map((d) => (
-              <li key={d.part.id} className="flex items-center justify-between border-b border-slate-100 last:border-0 pb-2 last:pb-0">
-                <div>
-                  <div className="font-mono text-xs text-slate-500">{d.part.code}</div>
-                  <div className="font-medium">{d.part.name}</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-bold text-rose-600 tabular-nums">-{d.shortage}</div>
-                  <div className="text-xs text-slate-500">交期 {d.part.leadDays}d</div>
-                </div>
-              </li>
-            ))}
-            {shortageCount === 0 && (
-              <li className="text-emerald-700 text-sm">✅ 全料件庫存充足</li>
-            )}
-          </ul>
-        </section>
-      </div>
-
-      <section className="bg-white rounded-xl border border-slate-200 p-5">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-bold text-slate-900">🚨 異常警訊（含預測）</h2>
-          <Link href="/erp/alerts" className="text-xs text-cyan-700 hover:underline">完整列表 →</Link>
         </div>
-        <AlertList alerts={alerts.slice(0, 6)} />
+
+        <p className="text-[11px] text-slate-500 mt-3 text-center">
+          ← 算料 / 採購 …………………… 生產 / 測試 …………………… 出貨 / 簽收 →
+        </p>
+      </section>
+
+      {/* ============ 核心 2：AI 解方 — 卡住自動產出建議 ============ */}
+      <section>
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div>
+            <h2 className="font-bold text-lg flex items-center gap-2">
+              🤖 AI 卡點解方
+              {bottlenecks.length > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded bg-rose-500 text-white">{bottlenecks.length} 個瓶頸</span>
+              )}
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              偵測到塞車階段 → 自動生成根因 + 可執行解方（按優先順序）
+            </p>
+          </div>
+        </div>
+        <BottleneckAdvisor analyses={bottlenecks} />
+      </section>
+
+      {/* ============ 底部：對齊鼎新 ERP 提示 ============ */}
+      <section className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-700">
+        <div className="flex items-start gap-3">
+          <span className="text-2xl">🔗</span>
+          <div>
+            <div className="font-bold text-slate-900 mb-1">本系統定位</div>
+            <p>
+              <b>視覺化監控 + 決策輔助</b>。所有工單 / 庫存 / BOM / 採購數量以
+              <b className="text-rose-700"> 鼎新 ERP iGP </b>
+              為準，本系統僅做即時同步顯示與異常分析。實際扣帳 / 異動請至 ERP 操作。
+            </p>
+            <p className="mt-1 text-slate-500">
+              對應外部來源：WorkFlow ERP iGP　·　R:\業務&採購協調追蹤　·　Q:\採購課\成品成本分析
+            </p>
+          </div>
+        </div>
       </section>
     </div>
   );
 }
 
-function Kpi({ label, value, suffix, tone }: { label: string; value: number | string; suffix?: string; tone?: "red" | "yellow" }) {
-  const ring =
-    tone === "red"
-      ? "ring-2 ring-rose-300 bg-rose-50"
-      : tone === "yellow"
-      ? "ring-2 ring-amber-300 bg-amber-50"
-      : "bg-white";
+function Kpi({ label, value, sub, tone }: { label: string; value: string; sub: string; tone?: "cyan" | "amber" | "rose" }) {
+  const cls = {
+    cyan: "border-cyan-200 bg-cyan-50/40",
+    amber: "border-amber-200 bg-amber-50/40",
+    rose: "border-rose-200 bg-rose-50/40",
+  }[tone ?? "cyan"] ?? "border-slate-200 bg-white";
+  const c = tone ? cls : "border-slate-200 bg-white";
   return (
-    <div className={`rounded-xl border border-slate-200 px-4 py-3 ${ring}`}>
+    <div className={`rounded-xl border px-4 py-3 ${c}`}>
       <div className="text-xs text-slate-500">{label}</div>
-      <div className="mt-1 text-2xl font-bold tabular-nums">
-        {value}
-        {suffix && <span className="text-sm font-normal text-slate-500 ml-1">{suffix}</span>}
-      </div>
+      <div className="mt-1 text-2xl font-bold tabular-nums">{value}</div>
+      <div className="text-[11px] text-slate-500 mt-0.5">{sub}</div>
     </div>
   );
 }
