@@ -27,6 +27,7 @@ const advancedLinks = [
   { href: "/erp/po-generator", label: "採購單生成", icon: "🛒" },
   { href: "/erp/import", label: "BOM 匯入", icon: "📥" },
   { href: "/erp/mobile", label: "QR 查碼", icon: "📱" },
+  { href: "/erp/mobile/count", label: "盤點對照", icon: "📋" },
 ];
 
 export default function Sidebar() {
