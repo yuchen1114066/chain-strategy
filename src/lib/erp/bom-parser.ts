@@ -62,6 +62,7 @@ export function parseKind(s: string | null | undefined): PartKind {
   if (str.includes("採購")) return "purchase";
   if (str.includes("虛設")) return "dummy";
   if (str.includes("Feature")) return "feature";
+  if (str.includes("Option")) return "option";
   if (str.includes("託外") || str.includes("外加工")) return "outsource";
   return "purchase";
 }

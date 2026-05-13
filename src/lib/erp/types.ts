@@ -10,8 +10,8 @@ export type Supplier = {
   contact: string;
 };
 
-export type PartKind = "purchase" | "self" | "dummy" | "feature" | "outsource";
-// 採購件 / 自製件 / 虛設品號 / Feature件 / 託外加工件
+export type PartKind = "purchase" | "self" | "dummy" | "feature" | "outsource" | "option";
+// 採購件 / 自製件 / 虛設品號 / Feature件 / 託外加工件 / Option件
 
 export type Part = {
   id: string;

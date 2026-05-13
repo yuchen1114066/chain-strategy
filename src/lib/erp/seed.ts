@@ -14,24 +14,24 @@ import type {
 export const suppliers: Supplier[] = [
   // 祺驊真實供應商（從 FB11G003 / FB44H013 / FB44H035 / FH63H007 / FB93B003 BOM 截圖認到）
   // 交貨天數一律 45 天（依使用者提供）
-  { id: "s1",  code: "SUP-JC",   name: "競丞",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s1",  code: "SUP-JC",   name: "竟丞",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
   { id: "s2",  code: "SUP-SC",   name: "雙成",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
   { id: "s3",  code: "SUP-CY",   name: "重邑",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
   { id: "s4",  code: "SUP-ZHY",  name: "莊宏億",       country: "台灣", city: "—", transitDays: 45, contact: "—" },
   { id: "s5",  code: "SUP-YN",   name: "應拿",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
   { id: "s6",  code: "SUP-CHV",  name: "祺驊（越南）", country: "越南", city: "—", transitDays: 45, contact: "內部廠" },
   { id: "s7",  code: "SUP-JH",   name: "吉輝",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
-  { id: "s8",  code: "SUP-TT",   name: "鈦泰",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
-  { id: "s9",  code: "SUP-HY",   name: "寒亞",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s8",  code: "SUP-YT",   name: "鉞泰",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s9",  code: "SUP-HUY",  name: "寰亞",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
   { id: "s10", code: "SUP-ZS",   name: "這勝",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
   { id: "s11", code: "SUP-HC",   name: "海騁",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
-  { id: "s12", code: "SUP-YZ",   name: "右在",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s12", code: "SUP-YR",   name: "右任",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
   { id: "s13", code: "SUP-DTC",  name: "東台祺電",     country: "台灣", city: "—", transitDays: 45, contact: "—" },
   { id: "s14", code: "SUP-HB",   name: "海碧",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
   { id: "s15", code: "SUP-JL",   name: "金倫",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
   // 新增（從 FB44H013 等 BOM 截圖認到）
-  { id: "s16", code: "SUP-LD",   name: "荔得",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
-  { id: "s17", code: "SUP-MS",   name: "銘昇",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s16", code: "SUP-LD",   name: "劦得",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  { id: "s17", code: "SUP-YS",   name: "鎰昇",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
   { id: "s18", code: "SUP-LL",   name: "荔龍",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
   { id: "s19", code: "SUP-QL",   name: "企龍",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
   { id: "s20", code: "SUP-FZ",   name: "福展",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
@@ -55,6 +55,8 @@ export const suppliers: Supplier[] = [
   { id: "s37", code: "SUP-YS",   name: "允升",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
   { id: "s38", code: "SUP-WC",   name: "五傳",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
   { id: "s39", code: "SUP-LX",   name: "龍星",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
+  // 從 FB42K001 BOM 新增
+  { id: "s40", code: "SUP-YX",   name: "譽象",         country: "台灣", city: "—", transitDays: 45, contact: "—" },
 ];
 
 export const parts: Part[] = [
@@ -126,6 +128,78 @@ export const parts: Part[] = [
   { id: "p157", code: "P21D055",    name: "漆包線",        category: "電線",   spec: "2EIW-ψ0.55",         unit: "g",   unitCost: 0.369,  supplierId: "s35", leadDays: 45, stockOnHand: 100000,safetyStock: 40000, kind: "purchase" }, // 台一
   { id: "p158", code: "M06BB04",    name: "稀薄劑",        category: "化工",   spec: "RTH-031A",           unit: "g",   unitCost: 0.082,  supplierId: "s30", leadDays: 45, stockOnHand: 50000, safetyStock: 15000, kind: "purchase" }, // 大同精化
   { id: "p159", code: "M06BA05",    name: "凡立水",        category: "化工",   spec: "TCV-225",            unit: "g",   unitCost: 0.147,  supplierId: "s30", leadDays: 45, stockOnHand: 30000, safetyStock: 10000, kind: "purchase" }, // 大同精化
+
+  // ==================================================================
+  // 祺驊真實 BOM — FB42HA01 / FB42K001 / FB62H032（由 xlsx 解析器產生）
+  // ==================================================================
+  { id: "p200", code: "FB42HA01-P", name: "包裝", category: "半成品", unit: "PCS", unitCost: 0.0, leadDays: 45, stockOnHand: 0, safetyStock: 0, kind: "feature" },
+  { id: "p201", code: "M09A15", name: "扣環", spec: "ψ15軸用", category: "扣件", unit: "PCS", unitCost: 0.32, supplierId: "s1", leadDays: 45, stockOnHand: 2000, safetyStock: 800, kind: "purchase" },
+  { id: "p202", code: "M10A05", name: "法蘭螺帽", spec: "M5", category: "扣件", unit: "PCS", unitCost: 0.22, supplierId: "s16", leadDays: 45, stockOnHand: 2000, safetyStock: 800, kind: "purchase" },
+  { id: "p203", code: "M10A06", name: "法蘭螺帽", spec: "M6", category: "扣件", unit: "PCS", unitCost: 0.29, supplierId: "s16", leadDays: 45, stockOnHand: 2000, safetyStock: 800, kind: "purchase" },
+  { id: "p204", code: "M11A11", name: "平墊圈", spec: "ψ5xψ18x1.5t", category: "扣件", unit: "PCS", unitCost: 0.34, supplierId: "s16", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p205", code: "M12B02", name: "雙頭圓鍵", spec: "5x5x15L", category: "扣件", unit: "PCS", unitCost: 3.0, supplierId: "s17", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p206", code: "M14BA001", name: "傘頭(十+一)螺絲", spec: "M5*8L+耐落", category: "扣件", unit: "PCS", unitCost: 0.5, supplierId: "s16", leadDays: 45, stockOnHand: 2000, safetyStock: 800, kind: "purchase" },
+  { id: "p207", code: "M14BA002", name: "傘頭(十+一)螺絲", spec: "M5×10L+耐落", category: "扣件", unit: "PCS", unitCost: 0.5, supplierId: "s16", leadDays: 45, stockOnHand: 2000, safetyStock: 800, kind: "purchase" },
+  { id: "p208", code: "M14BA005", name: "傘頭(十+一)螺絲", spec: "M5×68L+壓花", category: "扣件", unit: "PCS", unitCost: 0.9, supplierId: "s16", leadDays: 45, stockOnHand: 2000, safetyStock: 800, kind: "purchase" },
+  { id: "p209", code: "P03NA001", name: "定位軸", spec: "ψ10×55L/M6×11-2", category: "其他", unit: "PCS", unitCost: 5.5, supplierId: "s19", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p210", code: "P03SE013-A1", name: "軸心", spec: "ψ20*90.6*11*9*16.5", category: "軸件", unit: "PCS", unitCost: 58.0, supplierId: "s8", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p211", code: "P04EB01", name: "煞車鐵心固定架", spec: "14.3L", category: "框架", unit: "PCS", unitCost: 6.0, supplierId: "s7", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p212", code: "P04EB02", name: "煞車鐵心固定架", spec: "10.3L", category: "框架", unit: "PCS", unitCost: 6.0, supplierId: "s7", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p213", code: "P06D803", name: "皮帶輪", spec: "ψ30-J8/ψ15-鍵槽", category: "傳動", unit: "PCS", unitCost: 24.9, supplierId: "s20", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p214", code: "P09BA01", name: "切角型前托架", spec: "橫孔", category: "框架", unit: "PCS", unitCost: 49.6, supplierId: "s21", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p215", code: "P09BB01", name: "切角型後托架", spec: "橫孔", category: "框架", unit: "PCS", unitCost: 48.6, supplierId: "s21", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p216", code: "P13AA04", name: "滾珠軸承", spec: "SKF 6002 ZZ C3", category: "軸承", unit: "PCS", unitCost: 30.0, supplierId: "s23", leadDays: 45, stockOnHand: 300, safetyStock: 100, kind: "purchase" },
+  { id: "p217", code: "P13ED01", name: "滾針離合器", spec: "HF 2016", category: "軸承", unit: "PCS", unitCost: 67.0, supplierId: "s5", leadDays: 45, stockOnHand: 300, safetyStock: 100, kind: "purchase" },
+  { id: "p218", code: "P16DA03-A1", name: "煞車鐵心", spec: "H23-0.5t/R122", category: "鐵心", unit: "PCS", unitCost: 55.8, supplierId: "s22", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p219", code: "S01EC03H", name: "飛輪半成品", spec: "ψ242.7+R(單向)加軸承&平衡", category: "半成品", unit: "PCS", unitCost: 0.0, leadDays: 45, stockOnHand: 0, safetyStock: 0, kind: "self" },
+  { id: "p220", code: "P01EC03", name: "飛輪", spec: "ψ242.7+R*ψ181*52.5W*ψ26", category: "飛輪", unit: "PCS", unitCost: 604.206, supplierId: "s6", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p221", code: "S05A001", name: "軸承座半成品 #75A+軸承", spec: "P05A01+6002+內扣", category: "半成品", unit: "PCS", unitCost: 0.0, leadDays: 45, stockOnHand: 0, safetyStock: 0, kind: "self" },
+  { id: "p222", code: "M09B32", name: "扣環", spec: "ψ32孔用", category: "扣件", unit: "PCS", unitCost: 0.85, supplierId: "s1", leadDays: 45, stockOnHand: 2000, safetyStock: 800, kind: "purchase" },
+  { id: "p223", code: "P05A01-A2", name: "軸承座", spec: "ψ75*15.5L*ψ32+內扣*M5", category: "軸承", unit: "PCS", unitCost: 19.8, supplierId: "s7", leadDays: 45, stockOnHand: 300, safetyStock: 100, kind: "purchase" },
+  { id: "p224", code: "S05A007", name: "軸承座半成品 #75G+軸承", spec: "P05A07+6202", category: "半成品", unit: "PCS", unitCost: 0.0, leadDays: 45, stockOnHand: 0, safetyStock: 0, kind: "self" },
+  { id: "p225", code: "P05A07-A2", name: "軸承座", spec: "ψ75*17.5L*ψ35*M5", category: "軸承", unit: "PCS", unitCost: 19.8, supplierId: "s7", leadDays: 45, stockOnHand: 300, safetyStock: 100, kind: "purchase" },
+  { id: "p226", code: "P13AA06", name: "滾珠軸承", spec: "SKF 6202 ZZ C3", category: "軸承", unit: "PCS", unitCost: 29.0, supplierId: "s23", leadDays: 45, stockOnHand: 300, safetyStock: 100, kind: "purchase" },
+  { id: "p227", code: "S43A001", name: "煞車線圈", spec: "1000t/100L(含浸)", category: "半成品", unit: "PCS", unitCost: 0.0, leadDays: 45, stockOnHand: 0, safetyStock: 0, kind: "self" },
+  { id: "p228", code: "FB42K001-P", name: "包裝", category: "半成品", unit: "PCS", unitCost: 0.0, leadDays: 45, stockOnHand: 0, safetyStock: 0, kind: "feature" },
+  { id: "p229", code: "SPMA010", name: "包裝組合", spec: "單包裝+棧板", category: "半成品", unit: "PCS", unitCost: 0.0, leadDays: 45, stockOnHand: 0, safetyStock: 0, kind: "dummy" },
+  { id: "p230", code: "M05A017", name: "紙箱", spec: "375L*330W*195H(242 1入)", category: "絕緣材", unit: "PCS", unitCost: 23.0, supplierId: "s37", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p231", code: "M05J015", name: "棧板", spec: "1150L*1050W*130(mm)", category: "包材", unit: "PCS", unitCost: 415.9998, supplierId: "s38", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p232", code: "M05K018", name: "保麗龍", spec: "242單包裝改265 (A)", category: "包材", unit: "PCS", unitCost: 17.85, supplierId: "s39", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p233", code: "M05K019", name: "保麗龍", spec: "242單包裝改265 (B)", category: "包材", unit: "PCS", unitCost: 17.85, supplierId: "s39", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p234", code: "M14DA033", name: "有頭內六角螺絲", spec: "M5*65L-染黑防銹", category: "扣件", unit: "PCS", unitCost: 1.6, supplierId: "s16", leadDays: 45, stockOnHand: 2000, safetyStock: 800, kind: "purchase" },
+  { id: "p235", code: "P03NA006", name: "定位軸", spec: "ψ10*50L/M6*11L-2", category: "其他", unit: "PCS", unitCost: 8.37, supplierId: "s3", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p236", code: "P03SF008-A1", name: "軸心", spec: "ψ25*93.8*11+4.2*10*21", category: "軸件", unit: "PCS", unitCost: 75.0, supplierId: "s8", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p237", code: "P04EB05", name: "煞車鐵心固定架", spec: "9.9L", category: "框架", unit: "PCS", unitCost: 7.0, supplierId: "s7", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p238", code: "P06DA01", name: "皮帶輪", spec: "ψ30-J10/ψ15-鍵槽", category: "傳動", unit: "PCS", unitCost: 33.0, supplierId: "s20", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p239", code: "P09DA17", name: "特殊型前托架", spec: "210*194*5t*圓+直", category: "框架", unit: "PCS", unitCost: 101.5, supplierId: "s40", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p240", code: "P09DB17", name: "特殊型後托架", spec: "210*194*5t *圓+直孔", category: "框架", unit: "PCS", unitCost: 101.5, supplierId: "s40", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p241", code: "P13AA05", name: "滾珠軸承", spec: "SKF 6003 ZZ C3", category: "軸承", unit: "PCS", unitCost: 40.0, supplierId: "s23", leadDays: 45, stockOnHand: 300, safetyStock: 100, kind: "purchase" },
+  { id: "p242", code: "P13ED02", name: "滾針離合器", spec: "HF 2520", category: "軸承", unit: "PCS", unitCost: 70.0, supplierId: "s5", leadDays: 45, stockOnHand: 300, safetyStock: 100, kind: "purchase" },
+  { id: "p243", code: "P16DA04", name: "煞車鐵心", spec: "H23-0.5t/R133", category: "鐵心", unit: "PCS", unitCost: 55.0, supplierId: "s22", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p244", code: "S01ED02H", name: "飛輪半成品", spec: "ψ265+R加軸承&平衡", category: "半成品", unit: "PCS", unitCost: 0.0, leadDays: 45, stockOnHand: 0, safetyStock: 0, kind: "self" },
+  { id: "p245", code: "P01ED02", name: "飛輪", spec: "ψ265+R*ψ175*41W*ψ32", category: "飛輪", unit: "PCS", unitCost: 691.777, supplierId: "s6", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p246", code: "S05A015", name: "軸承座半成品 #P05A20+軸承", spec: "P05A20+6202", category: "半成品", unit: "PCS", unitCost: 0.0, leadDays: 45, stockOnHand: 0, safetyStock: 0, kind: "self" },
+  { id: "p247", code: "P05A20-A2", name: "軸承座", spec: "ψ75*16L*ψ35*M5", category: "軸承", unit: "PCS", unitCost: 100.0, supplierId: "s20", leadDays: 45, stockOnHand: 300, safetyStock: 100, kind: "purchase" },
+  { id: "p248", code: "S43A011", name: "煞車線圈", spec: "1000t/110L(含浸)", category: "半成品", unit: "PCS", unitCost: 0.0, leadDays: 45, stockOnHand: 0, safetyStock: 0, kind: "self" },
+  { id: "p249", code: "S42J011", name: "煞車繞線半成品", spec: "0.55×1000t/110L(3-641435-2)", category: "電線", unit: "PCS", unitCost: 189.0, supplierId: "s26", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p250", code: "FB62H032-P", name: "包裝", category: "半成品", unit: "PCS", unitCost: 0.0, leadDays: 45, stockOnHand: 0, safetyStock: 0, kind: "feature" },
+  { id: "p251", code: "SPMC003", name: "包裝組合", spec: "21入大包裝+棧板", category: "半成品", unit: "PCS", unitCost: 0.0, leadDays: 45, stockOnHand: 0, safetyStock: 0, kind: "dummy" },
+  { id: "p252", code: "M05F001", name: "大包裝紙箱", spec: "1010*947*343(mm)242-21入", category: "絕緣材", unit: "PCS", unitCost: 399.9996, supplierId: "s37", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p253", code: "M05J013", name: "棧板", spec: "950L*1000W*130H(mm)242用", category: "包材", unit: "PCS", unitCost: 360.9984, supplierId: "s38", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p254", code: "M05K005", name: "保麗龍", spec: "90L×20W×200H", category: "包材", unit: "PCS", unitCost: 0.73, supplierId: "s39", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p255", code: "M05K006", name: "保麗龍", spec: "90L×30W×200H", category: "包材", unit: "PCS", unitCost: 0.97, supplierId: "s39", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p256", code: "FB62H032-O", name: "配件", category: "其他", unit: "PCS", unitCost: 0.0, leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "option" },
+  { id: "p257", code: "M14BA003", name: "傘頭(十+一)螺絲", spec: "M5×12L+耐落", category: "扣件", unit: "PCS", unitCost: 0.42, supplierId: "s2", leadDays: 45, stockOnHand: 2000, safetyStock: 800, kind: "purchase" },
+  { id: "p258", code: "M14EA016", name: "六角頭十字螺絲", spec: "M5×30+1", category: "扣件", unit: "PCS", unitCost: 0.51, supplierId: "s16", leadDays: 45, stockOnHand: 2000, safetyStock: 800, kind: "purchase" },
+  { id: "p259", code: "P03SF005-A1", name: "軸心", spec: "ψ25*88.8*11*10*21", category: "軸件", unit: "PCS", unitCost: 73.0, supplierId: "s20", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p260", code: "P09AA13", name: "一般型前托架", spec: "直孔+底座切角", category: "框架", unit: "PCS", unitCost: 47.5, supplierId: "s21", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p261", code: "P09AB01", name: "一般型後托架", spec: "直孔", category: "框架", unit: "PCS", unitCost: 49.8, supplierId: "s21", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p262", code: "S04A008", name: "線圈固定架半成品 #102J", spec: "P04AA10/ 6202+內扣", category: "半成品", unit: "PCS", unitCost: 0.0, leadDays: 45, stockOnHand: 0, safetyStock: 0, kind: "self" },
+  { id: "p263", code: "M09B35", name: "扣環", spec: "ψ35孔用", category: "扣件", unit: "PCS", unitCost: 1.5, supplierId: "s1", leadDays: 45, stockOnHand: 2000, safetyStock: 800, kind: "purchase" },
+  { id: "p264", code: "P04AA10", name: "線圈固定架", spec: "ψ102×21W×9.5×ψ35", category: "電線", unit: "PCS", unitCost: 38.0, supplierId: "s7", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p265", code: "S41A001-A1", name: "電樞半成品", spec: "3相/0.4 ×70t/有端子", category: "電氣", unit: "PCS", unitCost: 299.115, supplierId: "s6", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+  { id: "p266", code: "S01FH07FV", name: "飛輪半成品 #242.7K", spec: "ψ242.7+R(單向)/磁鐵+軸承+平衡,越南製", category: "飛輪", unit: "PCS", unitCost: 557.175, supplierId: "s6", leadDays: 45, stockOnHand: 200, safetyStock: 60, kind: "purchase" },
+
 ];
 
 // 機種 FB64・直立車 之下有多個成品品號（H021-A2 商規 / H020-A1 家規）
@@ -138,6 +212,10 @@ export const models: Model[] = [
   { id: "m100", code: "FB13G009", machineFamily: "FB13・內磁式磁控", name: "FB13G009 雙向內磁式磁控", category: "strength", description: "ψ250*132*6片開-M10*P1.5，搭配 ψ250 飛輪、6 片磁極，標準成本 $450", stdPrice: 1500 },
   // 半成品（有自己的 BOM）— 將會作為其他成品的零件
   { id: "m101", code: "S43A001", machineFamily: "S43・煞車線圈", name: "S43A001 煞車線圈半成品", category: "strength", description: "1000t/100L(含浸)，含繞線+塑膠繞線架託外加工+漆包線+含浸劑，標準成本 $136.07", stdPrice: 200 },
+  // 從 xlsx 匯入的 3 個新成品（4 階 BOM）
+  { id: "m102", code: "FB42HA01", machineFamily: "FB42・單向高扭渦流式煞車", name: "FB42HA01 單向高扭渦流式煞車(標準前置)", category: "strength", description: "ψ242.7+R*30J8*前置正單向*橫孔，標準成本 $1246.33", stdPrice: 2500 },
+  { id: "m103", code: "FB42K001", machineFamily: "FB42・單向高扭渦流式煞車", name: "FB42K001 單向高扭渦流式煞車(特殊)", category: "strength", description: "ψ265+R*30J10*後置正單*圓孔+直孔，標準成本 $1770.99", stdPrice: 3500 },
+  { id: "m104", code: "FB62H032", machineFamily: "FB62・單向高扭混合發電機", name: "FB62H032 單向高扭混合發電機(標準前置)", category: "strength", description: "ψ242.7+R*30J8*前置正單*直孔，發電機，標準成本 $1580.21", stdPrice: 3000 },
 ];
 
 // FB13G009 多階 BOM（依使用者提供的真實 BOM 截圖建檔）
@@ -201,6 +279,142 @@ const S43A001_BOM: BomLine[] = [
   { modelId: "m101", partId: "p157", parentPartCode: "P04HA05", qtyPerUnit: 320, level: 4, version: 1, isActive: true }, // P21D055 漆包線 320g
 ];
 
+// ============================================================
+// xlsx 匯入：FB42HA01 / FB42K001 / FB62H032 多階 BOM
+// （由 lib/erp/bom-parser + python gen_seed.py 解析祺驊原始 xlsx）
+// ============================================================
+// FB42HA01 單向高扭渦流式煞車(標準前置)
+const FB42HA01_BOM: BomLine[] = [
+  { modelId: "m102", partId: "p200", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p201", qtyPerUnit: 4.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p202", qtyPerUnit: 3.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p203", qtyPerUnit: 4.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p204", qtyPerUnit: 2.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p205", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p206", qtyPerUnit: 6.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p207", qtyPerUnit: 2.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p208", qtyPerUnit: 3.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p209", qtyPerUnit: 2.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p210", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p211", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p212", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p213", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p214", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p215", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p216", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p217", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p218", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p219", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p220", parentPartCode: "S01EC03H", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m102", partId: "p216", parentPartCode: "S01EC03H", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m102", partId: "p221", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p222", parentPartCode: "S05A001", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m102", partId: "p223", parentPartCode: "S05A001", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m102", partId: "p216", parentPartCode: "S05A001", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m102", partId: "p224", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p225", parentPartCode: "S05A007", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m102", partId: "p226", parentPartCode: "S05A007", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m102", partId: "p227", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m102", partId: "p150", parentPartCode: "S43A001", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m102", partId: "p152", parentPartCode: "S42J001", qtyPerUnit: 1.0, level: 3, version: 1, isActive: true },
+  { modelId: "m102", partId: "p153", parentPartCode: "S42J001", qtyPerUnit: 2.0, level: 3, version: 1, isActive: true },
+  { modelId: "m102", partId: "p154", parentPartCode: "S42J001", qtyPerUnit: 1.0, level: 3, version: 1, isActive: true },
+  { modelId: "m102", partId: "p151", parentPartCode: "S42J001", qtyPerUnit: 1.0, level: 3, version: 1, isActive: true },
+  { modelId: "m102", partId: "p155", parentPartCode: "S42R006", qtyPerUnit: 1.0, level: 4, version: 1, isActive: true },
+  { modelId: "m102", partId: "p156", parentPartCode: "P04HA05", qtyPerUnit: 26.0, level: 5, version: 1, isActive: true },
+  { modelId: "m102", partId: "p157", parentPartCode: "S42R006", qtyPerUnit: 320.0, level: 4, version: 1, isActive: true },
+  { modelId: "m102", partId: "p158", parentPartCode: "S43A001", qtyPerUnit: 9.0, level: 2, version: 1, isActive: true },
+  { modelId: "m102", partId: "p159", parentPartCode: "S43A001", qtyPerUnit: 3.0, level: 2, version: 1, isActive: true },
+];
+
+// FB42K001 單向高扭渦流式煞車(特殊)
+const FB42K001_BOM: BomLine[] = [
+  { modelId: "m103", partId: "p228", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p229", parentPartCode: "FB42K001-P", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m103", partId: "p230", parentPartCode: "SPMA010", qtyPerUnit: 1.0, level: 3, version: 1, isActive: true },
+  { modelId: "m103", partId: "p231", parentPartCode: "SPMA010", qtyPerUnit: 0.018518519, level: 3, version: 1, isActive: true },
+  { modelId: "m103", partId: "p232", parentPartCode: "SPMA010", qtyPerUnit: 1.0, level: 3, version: 1, isActive: true },
+  { modelId: "m103", partId: "p233", parentPartCode: "SPMA010", qtyPerUnit: 1.0, level: 3, version: 1, isActive: true },
+  { modelId: "m103", partId: "p201", qtyPerUnit: 5.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p202", qtyPerUnit: 3.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p203", qtyPerUnit: 4.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p204", qtyPerUnit: 2.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p205", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p207", qtyPerUnit: 12.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p234", qtyPerUnit: 3.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p235", qtyPerUnit: 2.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p236", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p237", qtyPerUnit: 2.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p238", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p239", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p240", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p241", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p242", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p243", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p244", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p245", parentPartCode: "S01ED02H", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m103", partId: "p241", parentPartCode: "S01ED02H", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m103", partId: "p246", qtyPerUnit: 2.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p247", parentPartCode: "S05A015", qtyPerUnit: 2.0, level: 2, version: 1, isActive: true },
+  { modelId: "m103", partId: "p226", parentPartCode: "S05A015", qtyPerUnit: 2.0, level: 2, version: 1, isActive: true },
+  { modelId: "m103", partId: "p248", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m103", partId: "p249", parentPartCode: "S43A011", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m103", partId: "p158", parentPartCode: "S43A011", qtyPerUnit: 9.0, level: 2, version: 1, isActive: true },
+  { modelId: "m103", partId: "p159", parentPartCode: "S43A011", qtyPerUnit: 3.0, level: 2, version: 1, isActive: true },
+];
+
+// FB62H032 單向高扭混合發電機(標準前置)
+const FB62H032_BOM: BomLine[] = [
+  { modelId: "m104", partId: "p250", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p251", parentPartCode: "FB62H032-P", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m104", partId: "p252", parentPartCode: "SPMC003", qtyPerUnit: 0.047619048, level: 3, version: 1, isActive: true },
+  { modelId: "m104", partId: "p253", parentPartCode: "SPMC003", qtyPerUnit: 0.011904762, level: 3, version: 1, isActive: true },
+  { modelId: "m104", partId: "p254", parentPartCode: "SPMC003", qtyPerUnit: 1.0, level: 3, version: 1, isActive: true },
+  { modelId: "m104", partId: "p255", parentPartCode: "SPMC003", qtyPerUnit: 1.0, level: 3, version: 1, isActive: true },
+  { modelId: "m104", partId: "p256", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p201", qtyPerUnit: 4.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p202", qtyPerUnit: 3.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p203", qtyPerUnit: 4.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p204", qtyPerUnit: 2.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p205", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p206", qtyPerUnit: 3.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p207", qtyPerUnit: 2.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p257", qtyPerUnit: 3.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p208", qtyPerUnit: 3.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p258", qtyPerUnit: 4.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p209", qtyPerUnit: 2.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p259", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p211", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p212", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p213", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p260", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p261", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p241", qtyPerUnit: 2.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p242", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p218", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p262", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p263", parentPartCode: "S04A008", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m104", partId: "p264", parentPartCode: "S04A008", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m104", partId: "p226", parentPartCode: "S04A008", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m104", partId: "p224", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p225", parentPartCode: "S05A007", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m104", partId: "p226", parentPartCode: "S05A007", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m104", partId: "p265", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p227", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+  { modelId: "m104", partId: "p150", parentPartCode: "S43A001", qtyPerUnit: 1.0, level: 2, version: 1, isActive: true },
+  { modelId: "m104", partId: "p152", parentPartCode: "S42J001", qtyPerUnit: 1.0, level: 3, version: 1, isActive: true },
+  { modelId: "m104", partId: "p153", parentPartCode: "S42J001", qtyPerUnit: 2.0, level: 3, version: 1, isActive: true },
+  { modelId: "m104", partId: "p154", parentPartCode: "S42J001", qtyPerUnit: 1.0, level: 3, version: 1, isActive: true },
+  { modelId: "m104", partId: "p151", parentPartCode: "S42J001", qtyPerUnit: 1.0, level: 3, version: 1, isActive: true },
+  { modelId: "m104", partId: "p155", parentPartCode: "S42R006", qtyPerUnit: 1.0, level: 4, version: 1, isActive: true },
+  { modelId: "m104", partId: "p156", parentPartCode: "P04HA05", qtyPerUnit: 26.0, level: 5, version: 1, isActive: true },
+  { modelId: "m104", partId: "p157", parentPartCode: "S42R006", qtyPerUnit: 320.0, level: 4, version: 1, isActive: true },
+  { modelId: "m104", partId: "p158", parentPartCode: "S43A001", qtyPerUnit: 9.0, level: 2, version: 1, isActive: true },
+  { modelId: "m104", partId: "p159", parentPartCode: "S43A001", qtyPerUnit: 3.0, level: 2, version: 1, isActive: true },
+  { modelId: "m104", partId: "p266", qtyPerUnit: 1.0, level: 1, version: 1, isActive: true },
+];
+
+
 export const bom: BomLine[] = [
   // FB64H021-A2（商規，飛輪 + 完整儀表）
   { modelId: "m1", partId: "p1", qtyPerUnit: 1, version: 1, isActive: true },
@@ -240,6 +454,10 @@ export const bom: BomLine[] = [
   ...FB13G009_BOM,
   // S43A001 煞車線圈半成品 4 階 BOM
   ...S43A001_BOM,
+  // 3 個新成品 4 階 BOM（xlsx 匯入）
+  ...FB42HA01_BOM,
+  ...FB42K001_BOM,
+  ...FB62H032_BOM,
 ];
 
 const TODAY = "2026-05-08";

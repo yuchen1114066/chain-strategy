@@ -5,21 +5,25 @@ import * as XLSX from "xlsx";
 import { parseBomAoa, type ParsedBom } from "@/lib/erp/bom-parser";
 import { suppliers as existingSuppliers } from "@/lib/erp/seed";
 
-const KIND_LABEL = {
+import type { PartKind } from "@/lib/erp/types";
+
+const KIND_LABEL: Record<PartKind, string> = {
   purchase: "採購件",
   self: "自製件",
   dummy: "虛設品號",
   feature: "Feature 件",
   outsource: "託外加工件",
-} as const;
+  option: "Option 件",
+};
 
-const KIND_TONE = {
+const KIND_TONE: Record<PartKind, string> = {
   purchase: "bg-slate-100 text-slate-700",
   self: "bg-rose-100 text-rose-700",
   dummy: "bg-amber-100 text-amber-700",
   feature: "bg-violet-100 text-violet-700",
   outsource: "bg-cyan-100 text-cyan-700",
-} as const;
+  option: "bg-emerald-100 text-emerald-700",
+};
 
 export default function ImportPage() {
   const [fileName, setFileName] = useState<string>("");
