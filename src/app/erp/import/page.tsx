@@ -2,34 +2,18 @@
 
 import { useState } from "react";
 import * as XLSX from "xlsx";
-import { parseBomAoa, type ParsedBom } from "@/lib/erp/bom-parser";
-import { suppliers as existingSuppliers } from "@/lib/erp/seed";
+import {
+  parseDingxinReport,
+  REPORT_LABEL,
+  type ParsedDingxin,
+} from "@/lib/erp/dingxin-parser";
 
-import type { PartKind } from "@/lib/erp/types";
-
-const KIND_LABEL: Record<PartKind, string> = {
-  purchase: "採購件",
-  self: "自製件",
-  dummy: "虛設品號",
-  feature: "Feature 件",
-  outsource: "託外加工件",
-  option: "Option 件",
-};
-
-const KIND_TONE: Record<PartKind, string> = {
-  purchase: "bg-slate-100 text-slate-700",
-  self: "bg-rose-100 text-rose-700",
-  dummy: "bg-amber-100 text-amber-700",
-  feature: "bg-violet-100 text-violet-700",
-  outsource: "bg-cyan-100 text-cyan-700",
-  option: "bg-emerald-100 text-emerald-700",
-};
-
-export default function ImportPage() {
+export default function DingxinSyncPage() {
   const [fileName, setFileName] = useState<string>("");
-  const [parsed, setParsed] = useState<ParsedBom | null>(null);
+  const [parsed, setParsed] = useState<ParsedDingxin | null>(null);
   const [error, setError] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [syncedAt, setSyncedAt] = useState<string>("");
 
   async function handleFile(file: File) {
     setBusy(true);
@@ -38,56 +22,85 @@ export default function ImportPage() {
     setFileName(file.name);
     try {
       const buf = await file.arrayBuffer();
+      // SheetJS 同時支援 .xls (BIFF) 與 .xlsx
       const wb = XLSX.read(buf, { type: "array" });
-      // 用第一個 sheet
-      const sheetName = wb.SheetNames[0];
-      const sheet = wb.Sheets[sheetName];
-      const aoa = XLSX.utils.sheet_to_json<(string | number | null | undefined)[]>(sheet, {
-        header: 1,
-        defval: null,
-      }) as (string | number | null | undefined)[][];
-      const result = parseBomAoa(aoa);
-      if (!result.masterCode) {
-        setError("解析失敗：找不到階 0 主件。請確認 Excel 結構是否符合祺驊 BOM 格式（A 主件品號 / B 階次 / C 元件品號…）");
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const aoa = XLSX.utils.sheet_to_json<(string | number | null | undefined)[]>(
+        sheet,
+        { header: 1, defval: null }
+      ) as (string | number | null | undefined)[][];
+      const result = parseDingxinReport(aoa);
+      if (result.type === "unknown") {
+        setError(
+          "無法辨識報表類型。本系統支援鼎新 INVR60 品號主檔 / LRPR05 庫存報表 / BOMR05 BOM 報表 / CSTR07 製令成本。請確認匯出的是這 4 種報表之一。"
+        );
         setBusy(false);
         return;
       }
       setParsed(result);
+      setSyncedAt(new Date().toISOString());
     } catch (e: unknown) {
       setError(`讀檔失敗：${e instanceof Error ? e.message : String(e)}`);
     }
     setBusy(false);
   }
 
-  const supplierMatches = (parsed?.suppliersFound ?? []).map((name) => {
-    const match = existingSuppliers.find((s) => s.name === name || s.name.startsWith(name));
-    return { name, match };
-  });
-
   return (
     <div className="p-6 max-w-6xl space-y-5">
       <header>
-        <h1 className="text-2xl font-bold">📥 BOM Excel 匯入</h1>
+        <h1 className="text-2xl font-bold">📥 鼎新報表同步（單向讀取）</h1>
         <p className="text-sm text-slate-500 mt-1">
-          上傳 <b>祺驊 BOM Excel</b>（A~O 欄格式：主件品號 / 階次 / 元件品號 / 品名 / 規格 / 單位 / 屬性 / 標準批量 / 標準用量 / 材料單價 / 標準成本 / 廠商 / 售成本 / 備註）
+          上傳鼎新 ERP iGP 匯出的報表 → 系統自動辨識並解析 →
+          倉庫掃 QR 即可查詢。<b className="text-emerald-700">純讀取，不回寫鼎新。</b>
         </p>
       </header>
+
+      {/* 資料流程說明 */}
+      <section className="bg-cyan-50 border border-cyan-200 rounded-xl p-4 text-sm">
+        <div className="font-bold text-cyan-900 mb-2">🔗 單向資料流程</div>
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <span className="px-3 py-1.5 rounded bg-white border font-semibold">鼎新 ERP iGP</span>
+          <span className="text-cyan-700">→ IT 定期匯出 4 報表 →</span>
+          <span className="px-3 py-1.5 rounded bg-white border font-semibold">本系統解析</span>
+          <span className="text-cyan-700">→ 倉庫掃 QR →</span>
+          <span className="px-3 py-1.5 rounded bg-white border font-semibold">即時查詢</span>
+          <span className="text-rose-600 font-bold">（不回寫）</span>
+        </div>
+      </section>
+
+      {/* 4 報表對照 */}
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { code: "INVR60", name: "品號主檔", use: "掃 QR 對應料件（含條碼編號）" },
+          { code: "LRPR05", name: "庫存報表", use: "顯示即時庫存可用量" },
+          { code: "BOMR05", name: "BOM 報表", use: "多階 BOM 展開" },
+          { code: "CSTR07", name: "製令成本", use: "工單 / 成本追蹤" },
+        ].map((r) => (
+          <div key={r.code} className="bg-white rounded-xl border border-slate-200 p-3">
+            <div className="font-mono text-xs text-cyan-700 font-bold">{r.code}</div>
+            <div className="text-sm font-semibold">{r.name}</div>
+            <div className="text-[11px] text-slate-500 mt-1">{r.use}</div>
+          </div>
+        ))}
+      </section>
 
       {/* 上傳區 */}
       <section className="bg-white rounded-xl border border-slate-200 p-5">
         <label
-          htmlFor="bom-file"
+          htmlFor="dx-file"
           className="block border-2 border-dashed border-slate-300 rounded-lg p-10 text-center hover:border-cyan-400 hover:bg-cyan-50/30 cursor-pointer transition-colors"
         >
           <div className="text-5xl mb-3">📊</div>
           <div className="font-medium text-slate-700">
-            {fileName ? `已選擇：${fileName}` : "拖曳 .xlsx 到此處，或點擊選擇檔案"}
+            {fileName ? `已選擇：${fileName}` : "拖曳鼎新報表 .xls / .xlsx 到此，或點擊選擇"}
           </div>
-          <div className="text-xs text-slate-500 mt-2">支援 .xlsx / .xls 格式</div>
+          <div className="text-xs text-slate-500 mt-2">
+            自動辨識 INVR60 / LRPR05 / BOMR05 / CSTR07
+          </div>
           <input
-            id="bom-file"
+            id="dx-file"
             type="file"
-            accept=".xlsx,.xls"
+            accept=".xls,.xlsx"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -103,152 +116,239 @@ export default function ImportPage() {
         )}
       </section>
 
-      {/* 解析結果 */}
-      {parsed && (
+      {parsed && parsed.type !== "unknown" && (
         <>
           <section className="bg-white rounded-xl border border-slate-200 p-5">
-            <h2 className="font-bold mb-3">✓ 解析結果摘要</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-              <Stat label="主件品號" value={parsed.masterCode} />
-              <Stat label="主件名稱" value={parsed.masterName || "—"} />
-              <Stat label="標準成本" value={`$${parsed.masterStdCost.toLocaleString()}`} />
-              <Stat label="BOM 階層" value={`${parsed.rows.length} 行 / ${maxLevel(parsed.rows)} 階`} />
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+              <h2 className="font-bold">
+                ✓ 已辨識：{REPORT_LABEL[parsed.type]}
+              </h2>
+              <span className="text-xs text-emerald-700 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                同步於 {syncedAt.slice(11, 19)}　·　{parsed.rows.length} 筆
+              </span>
             </div>
-            {parsed.masterSpec && (
-              <div className="mt-3 text-xs text-slate-600">
-                <span className="text-slate-500">規格：</span>{parsed.masterSpec}
-              </div>
-            )}
-            {parsed.warnings.length > 0 && (
-              <details className="mt-3 text-xs">
-                <summary className="text-amber-700 cursor-pointer">⚠️ {parsed.warnings.length} 條警告</summary>
-                <ul className="mt-1 space-y-0.5 text-slate-600">
-                  {parsed.warnings.map((w, i) => <li key={i}>· {w}</li>)}
-                </ul>
-              </details>
-            )}
+            {parsed.type === "item_master" && <ItemMasterPreview rows={parsed.rows} />}
+            {parsed.type === "stock" && <StockPreview rows={parsed.rows} />}
+            {parsed.type === "bom" && <BomPreview rows={parsed.rows} />}
+            {parsed.type === "wo_cost" && <WoCostPreview rows={parsed.rows} />}
           </section>
 
-          {/* 廠商比對 */}
-          <section className="bg-white rounded-xl border border-slate-200 p-5">
-            <h2 className="font-bold mb-3">廠商比對（{parsed.suppliersFound.length} 家）</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 text-xs">
-              {supplierMatches.map((m) => (
-                <div
-                  key={m.name}
-                  className={`px-2 py-1.5 rounded border flex items-center gap-2 ${
-                    m.match
-                      ? "border-emerald-200 bg-emerald-50"
-                      : "border-amber-200 bg-amber-50"
-                  }`}
-                >
-                  <span className={m.match ? "text-emerald-600" : "text-amber-600"}>
-                    {m.match ? "✓" : "+"}
-                  </span>
-                  <span className="truncate">{m.name}</span>
-                  {!m.match && <span className="text-[10px] text-amber-700 ml-auto">新增</span>}
-                </div>
-              ))}
-            </div>
-            <p className="text-[11px] text-slate-500 mt-2">
-              ✓ 已存在於系統　·　+ 將新增到供應商主檔（預設交期 45 天）
-            </p>
-          </section>
-
-          {/* BOM 樹狀預覽 */}
-          <section className="bg-white rounded-xl border border-slate-200 p-5">
-            <h2 className="font-bold mb-3">BOM 預覽（階層樹）</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead className="bg-slate-50 text-slate-600">
-                  <tr>
-                    <th className="text-left px-2 py-1.5 w-72">階 / 料號 / 名稱</th>
-                    <th className="text-left px-2 py-1.5">屬性</th>
-                    <th className="text-right px-2 py-1.5">用量</th>
-                    <th className="text-left px-2 py-1.5">單位</th>
-                    <th className="text-right px-2 py-1.5">單價</th>
-                    <th className="text-right px-2 py-1.5">小計</th>
-                    <th className="text-left px-2 py-1.5">廠商</th>
-                    <th className="text-left px-2 py-1.5">規格</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {parsed.rows.map((r) => (
-                    <tr key={`${r.rowNumber}-${r.componentCode}`} className="border-t border-slate-100 hover:bg-slate-50">
-                      <td className="px-2 py-1.5" style={{ paddingLeft: `${r.level * 16 + 8}px` }}>
-                        <span className="text-slate-400 mr-1">{".".repeat(r.level)}{r.level}</span>
-                        <span className="font-mono text-cyan-700">{r.componentCode}</span>
-                        <div className="text-slate-600 ml-4">{r.name}</div>
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${KIND_TONE[r.kind]}`}>
-                          {KIND_LABEL[r.kind]}
-                        </span>
-                      </td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">{r.qtyPerUnit}</td>
-                      <td className="px-2 py-1.5">{r.unit}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">{r.unitCostNow.toFixed(2)}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{r.stdCost.toFixed(2)}</td>
-                      <td className="px-2 py-1.5 text-slate-600">{r.supplierName || "—"}</td>
-                      <td className="px-2 py-1.5 text-slate-500 max-w-[200px] truncate" title={r.spec}>{r.spec}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-3">
-              ✓ 解析成功 — 目前為「預覽模式」。<b>實際寫入資料庫需 IT 部門開通 Supabase 寫入權限</b>後即可一鍵套用，
-              現階段可重複上傳不同 BOM 驗證解析正確性。
-            </p>
+          <section className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-900">
+            <b>📌 上線方式：</b>本頁目前為「解析驗證」模式。正式部署時 IT 設定鼎新定期匯出（每日 / 每班）
+            這 4 報表到指定資料夾，系統自動讀取，倉庫掃 QR 即看到最新數字 —— 全程單向，不回寫鼎新。
           </section>
         </>
       )}
 
-      {/* 格式說明 */}
+      {/* IT 部署說明 */}
       <section className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-700">
         <details>
-          <summary className="font-bold cursor-pointer text-slate-900">📖 支援的 Excel 欄位格式（已對齊祺驊現有 BOM）</summary>
+          <summary className="font-bold cursor-pointer text-slate-900">
+            🛠️ 給 IT：鼎新報表匯出對照
+          </summary>
           <table className="mt-3 w-full">
             <thead className="text-slate-500">
               <tr>
-                <th className="text-left py-1">欄</th>
-                <th className="text-left py-1">內容</th>
-                <th className="text-left py-1">範例</th>
+                <th className="text-left py-1">鼎新報表代碼</th>
+                <th className="text-left py-1">用途</th>
+                <th className="text-left py-1">關鍵欄位</th>
               </tr>
             </thead>
             <tbody>
-              <tr className="border-t"><td>A</td><td>主件品號</td><td className="font-mono">FB11G003</td></tr>
-              <tr className="border-t"><td>B</td><td>階次（0 / .1 / ..2 / ....4）</td><td className="font-mono">.1</td></tr>
-              <tr className="border-t"><td>C</td><td>元件品號</td><td className="font-mono">P13DA01</td></tr>
-              <tr className="border-t"><td>D</td><td>品名</td><td>滾珠軸承</td></tr>
-              <tr className="border-t"><td>E</td><td>規格</td><td>NBK 6001 2RS</td></tr>
-              <tr className="border-t"><td>F</td><td>單位</td><td>PCS / F / g / SET</td></tr>
-              <tr className="border-t"><td>G</td><td>屬性</td><td>自製件 / 採購件 / 虛設品號 / Feature件 / 託外加工件</td></tr>
-              <tr className="border-t"><td>H</td><td>標準批量</td><td className="font-mono">1.00</td></tr>
-              <tr className="border-t"><td>I</td><td>標準用量</td><td className="font-mono">2.00</td></tr>
-              <tr className="border-t"><td>J</td><td>材料單價（目前+未來）</td><td className="font-mono">9.10</td></tr>
-              <tr className="border-t"><td>K</td><td>標準成本</td><td className="font-mono">18.20</td></tr>
-              <tr className="border-t"><td>L</td><td>廠商</td><td>莊宏億 / 祺驊（越南）</td></tr>
-              <tr className="border-t"><td>M</td><td>材料單價（2023.01）</td><td className="font-mono">9.10</td></tr>
-              <tr className="border-t"><td>N</td><td>售成本</td><td className="font-mono">18.20</td></tr>
-              <tr className="border-t"><td>O</td><td>備註</td><td>—</td></tr>
+              <tr className="border-t"><td>INVR60</td><td>品號主檔</td><td>品號 / 條碼編號 / 品名 / 規格 / 主要庫別 / 廠商名稱 / 品號屬性</td></tr>
+              <tr className="border-t"><td>LRPR05</td><td>庫存報表</td><td>品號 / 異動別（庫存可用量）/ 預計結存 / 計劃進貨</td></tr>
+              <tr className="border-t"><td>BOMR05</td><td>BOM 報表</td><td>元件品號 / 階次 / 主件品號 / 組成用量 / 屬性</td></tr>
+              <tr className="border-t"><td>CSTR07</td><td>製令成本</td><td>製令編號 / 產品品號 / 已生產量 / 材料/人工/製造成本</td></tr>
             </tbody>
           </table>
+          <p className="mt-2 text-slate-500">
+            匯出格式 .xls 或 .xlsx 皆可。系統依標題列關鍵欄位自動判型，IT 不需手動指定報表類型。
+          </p>
         </details>
       </section>
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+// ── 各報表預覽 ──
+function ItemMasterPreview({ rows }: { rows: import("@/lib/erp/dingxin-parser").DxItem[] }) {
+  const withBarcode = rows.filter((r) => r.barcode).length;
   return (
-    <div className="rounded-lg bg-slate-50 px-3 py-2">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="font-bold text-base tabular-nums truncate" title={value}>{value}</div>
-    </div>
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm">
+        <Stat label="料件總數" value={`${rows.length}`} />
+        <Stat label="有條碼" value={`${withBarcode}`} hint="可掃 QR" />
+        <Stat label="庫別數" value={`${new Set(rows.map((r) => r.warehouseName).filter(Boolean)).size}`} />
+        <Stat label="供應商數" value={`${new Set(rows.map((r) => r.supplier).filter(Boolean)).size}`} />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="text-left px-2 py-1.5">品號</th>
+              <th className="text-left px-2 py-1.5">條碼</th>
+              <th className="text-left px-2 py-1.5">品名 / 規格</th>
+              <th className="text-left px-2 py-1.5">屬性</th>
+              <th className="text-left px-2 py-1.5">主庫別</th>
+              <th className="text-left px-2 py-1.5">廠商</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 30).map((r, i) => (
+              <tr key={i} className="border-t border-slate-100">
+                <td className="px-2 py-1.5 font-mono text-cyan-700">{r.code}</td>
+                <td className="px-2 py-1.5 font-mono text-slate-500">{r.barcode || "—"}</td>
+                <td className="px-2 py-1.5">{r.name}<span className="text-slate-400 ml-1">{r.spec}</span></td>
+                <td className="px-2 py-1.5 text-slate-600">{r.kind}</td>
+                <td className="px-2 py-1.5">{r.warehouseName || r.mainWarehouse}</td>
+                <td className="px-2 py-1.5 text-slate-600">{r.supplier || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 30 && <p className="text-[11px] text-slate-400 mt-2">… 共 {rows.length} 筆，僅顯示前 30</p>}
+    </>
   );
 }
 
-function maxLevel(rows: { level: number }[]): number {
-  return rows.reduce((m, r) => (r.level > m ? r.level : m), 0);
+function StockPreview({ rows }: { rows: import("@/lib/erp/dingxin-parser").DxStock[] }) {
+  const lowStock = rows.filter((r) => r.belowSafety).length;
+  return (
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm">
+        <Stat label="品號數" value={`${rows.length}`} />
+        <Stat label="低於安全量" value={`${lowStock}`} hint="需注意" />
+        <Stat label="有計劃進貨" value={`${rows.filter((r) => r.incoming.length > 0).length}`} />
+        <Stat label="可用量總計" value={rows.reduce((s, r) => s + r.available, 0).toLocaleString()} />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="text-left px-2 py-1.5">品號</th>
+              <th className="text-left px-2 py-1.5">品名 / 規格</th>
+              <th className="text-right px-2 py-1.5">庫存可用量</th>
+              <th className="text-right px-2 py-1.5">計劃進貨</th>
+              <th className="text-left px-2 py-1.5">最近到貨</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 30).map((r, i) => {
+              const nextIn = r.incoming[0];
+              return (
+                <tr key={i} className={`border-t border-slate-100 ${r.belowSafety ? "bg-rose-50/40" : ""}`}>
+                  <td className="px-2 py-1.5 font-mono text-cyan-700">{r.code}</td>
+                  <td className="px-2 py-1.5">{r.name}<span className="text-slate-400 ml-1">{r.spec}</span></td>
+                  <td className={`px-2 py-1.5 text-right tabular-nums font-bold ${r.belowSafety ? "text-rose-600" : ""}`}>
+                    {r.available} {r.unit}{r.belowSafety && " ⚠"}
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">
+                    {r.incoming.reduce((s, x) => s + x.qty, 0) || "—"}
+                  </td>
+                  <td className="px-2 py-1.5 text-slate-500">
+                    {nextIn ? `${nextIn.date} +${nextIn.qty}` : "—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 30 && <p className="text-[11px] text-slate-400 mt-2">… 共 {rows.length} 筆，僅顯示前 30</p>}
+    </>
+  );
+}
+
+function BomPreview({ rows }: { rows: import("@/lib/erp/dingxin-parser").DxBomLine[] }) {
+  const masters = new Set(rows.filter((r) => r.level === 0).map((r) => r.componentCode));
+  return (
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm">
+        <Stat label="BOM 行數" value={`${rows.length}`} />
+        <Stat label="主件數" value={`${masters.size}`} />
+        <Stat label="最深階" value={`${rows.reduce((m, r) => Math.max(m, r.level), 0)} 階`} />
+        <Stat label="自製/採購" value={`${rows.filter((r) => r.kind.includes("自製")).length}/${rows.filter((r) => r.kind.includes("採購")).length}`} />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="text-left px-2 py-1.5">階</th>
+              <th className="text-left px-2 py-1.5">元件品號</th>
+              <th className="text-left px-2 py-1.5">主件品號</th>
+              <th className="text-left px-2 py-1.5">品名</th>
+              <th className="text-left px-2 py-1.5">屬性</th>
+              <th className="text-right px-2 py-1.5">組成用量</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 30).map((r, i) => (
+              <tr key={i} className="border-t border-slate-100">
+                <td className="px-2 py-1.5 text-slate-400 font-mono">{".".repeat(r.level)}{r.level}</td>
+                <td className="px-2 py-1.5 font-mono text-cyan-700">{r.componentCode}</td>
+                <td className="px-2 py-1.5 font-mono text-slate-500">{r.masterCode || "—"}</td>
+                <td className="px-2 py-1.5">{r.name}</td>
+                <td className="px-2 py-1.5 text-slate-600">{r.kind}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums">{r.qtyPerUnit}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 30 && <p className="text-[11px] text-slate-400 mt-2">… 共 {rows.length} 筆，僅顯示前 30</p>}
+    </>
+  );
+}
+
+function WoCostPreview({ rows }: { rows: import("@/lib/erp/dingxin-parser").DxWoCost[] }) {
+  const totalMat = rows.reduce((s, r) => s + r.materialCost, 0);
+  return (
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm">
+        <Stat label="製令數（去重）" value={`${rows.length}`} />
+        <Stat label="材料成本合計" value={`$${(totalMat / 10000).toFixed(0)}萬`} />
+        <Stat label="已完工" value={`${rows.filter((r) => r.finishDate).length}`} />
+        <Stat label="生產中" value={`${rows.filter((r) => r.startDate && !r.finishDate).length}`} />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="text-left px-2 py-1.5">製令編號</th>
+              <th className="text-left px-2 py-1.5">產品品號</th>
+              <th className="text-left px-2 py-1.5">品名</th>
+              <th className="text-right px-2 py-1.5">已生產</th>
+              <th className="text-left px-2 py-1.5">開工 / 完工</th>
+              <th className="text-right px-2 py-1.5">材料成本</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 30).map((r, i) => (
+              <tr key={i} className="border-t border-slate-100">
+                <td className="px-2 py-1.5 font-mono text-cyan-700">{r.woNo}</td>
+                <td className="px-2 py-1.5 font-mono">{r.productCode}</td>
+                <td className="px-2 py-1.5">{r.productName}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums">{r.producedQty}</td>
+                <td className="px-2 py-1.5 text-slate-500">{r.startDate} / {r.finishDate || "—"}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums">${r.materialCost.toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 30 && <p className="text-[11px] text-slate-400 mt-2">… 共 {rows.length} 筆，僅顯示前 30</p>}
+    </>
+  );
+}
+
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="rounded-lg bg-slate-50 px-3 py-2">
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="font-bold text-base tabular-nums">{value}</div>
+      {hint && <div className="text-[10px] text-slate-400">{hint}</div>}
+    </div>
+  );
 }

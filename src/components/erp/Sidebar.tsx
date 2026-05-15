@@ -25,7 +25,7 @@ const advancedLinks = [
   { href: "/erp/parts", label: "零件主檔", icon: "🔩" },
   { href: "/erp/suppliers", label: "供應商", icon: "🏭" },
   { href: "/erp/po-generator", label: "採購單生成", icon: "🛒" },
-  { href: "/erp/import", label: "BOM 匯入", icon: "📥" },
+  { href: "/erp/import", label: "鼎新報表同步", icon: "📥" },
   { href: "/erp/mobile", label: "QR 查碼", icon: "📱" },
   { href: "/erp/mobile/count", label: "盤點對照", icon: "📋" },
 ];
