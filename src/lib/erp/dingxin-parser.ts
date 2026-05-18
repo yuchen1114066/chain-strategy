@@ -12,7 +12,9 @@
 
 export type DingxinReportType =
   | "item_master"   // INVR60 品號主檔
-  | "stock"         // LRPR05 庫存報表
+  | "stock"         // LRPR05 庫存報表（異動別/預計結存）
+  | "stock_qty"     // INVR18 庫存數量表（品號/庫存數量）
+  | "stock_inout"   // INVR19 進銷存表（期初/期末庫存量）
   | "bom"           // BOMR05 BOM 報表
   | "wo_cost"       // CSTR07 製令成本
   | "unknown";
@@ -23,19 +25,33 @@ type Aoa = Cell[][];
 function cell(v: Cell): string {
   return v == null ? "" : String(v).trim();
 }
+// 去掉所有空白（鼎新標題常含填充空格，如「品       號」→「品號」）
+function norm(v: Cell): string {
+  return cell(v).replace(/\s+/g, "");
+}
 function numCell(v: Cell): number {
   if (v == null || v === "") return 0;
   const n = typeof v === "number" ? v : parseFloat(String(v).replace(/,/g, ""));
   return isNaN(n) ? 0 : n;
 }
+// 小計 / 合計列判斷（鼎新報表會夾小計列：品號空 or 含「小計」「合計」）
+function isSubtotalRow(firstCol: Cell, anyCell: Cell[]): boolean {
+  if (norm(firstCol) !== "") return false;
+  return anyCell.some((c) => {
+    const s = norm(c);
+    return s.includes("小計") || s.includes("合計") || s.includes("總計");
+  });
+}
 
-// ── 報表類型自動偵測（看標題列關鍵欄位）──
+// ── 報表類型自動偵測（看標題列關鍵欄位；用 norm 去空白）──
 export function detectReportType(aoa: Aoa): DingxinReportType {
-  const header = (aoa[0] ?? []).map((c) => cell(c));
+  const header = (aoa[0] ?? []).map((c) => norm(c));
   const has = (s: string) => header.some((h) => h.includes(s));
 
   if (has("條碼編號") && has("品號屬性")) return "item_master";
   if (has("異動別") && has("預計結存") && has("庫別名稱")) return "stock";
+  if (has("期初庫存量") && has("期末庫存量")) return "stock_inout"; // INVR19
+  if (has("庫存數量") && has("品號") && !has("異動別")) return "stock_qty"; // INVR18
   if (has("元件品號") && has("階次") && has("主件品號")) return "bom";
   if (has("製令編號") && has("產品品號") && has("材料成本")) return "wo_cost";
   return "unknown";
@@ -175,6 +191,108 @@ export function parseStock(aoa: Aoa): DxStock[] {
 }
 
 // ===================================================================
+// INVR18 庫存數量表 → DxStock[]
+// 欄位：品號 / 品名 / 單位 / 小單位 / 庫別 / 庫別名稱 / 庫存數量
+// 多庫別會分列，依品號加總；跳過「小計」列
+// ===================================================================
+export function parseStockQty(aoa: Aoa): DxStock[] {
+  const h = (aoa[0] ?? []).map((c) => norm(c));
+  const idx = (n: string) => h.findIndex((x) => x === n);
+  const iCode = idx("品號");
+  const iName = idx("品名");
+  const iUnit = idx("單位");
+  const iWh = idx("庫別");
+  const iWhName = idx("庫別名稱");
+  const iQty = idx("庫存數量");
+
+  const map = new Map<string, DxStock>();
+  for (let r = 1; r < aoa.length; r++) {
+    const row = aoa[r] ?? [];
+    if (isSubtotalRow(row[iCode], row)) continue;
+    const code = cell(row[iCode]);
+    if (!code) continue;
+    const qty = numCell(row[iQty]);
+    let s = map.get(code);
+    if (!s) {
+      s = {
+        code,
+        name: cell(row[iName]),
+        spec: "",
+        unit: cell(row[iUnit]) || "PCS",
+        available: 0,
+        belowSafety: false,
+        incoming: [],
+      };
+      map.set(code, s);
+    }
+    s.available += qty;
+    const wh = cell(row[iWh]);
+    if (wh && qty !== 0) {
+      s.incoming.push({
+        date: "",
+        qty,
+        warehouse: wh,
+        warehouseName: cell(row[iWhName]),
+        runningBalance: s.available,
+      });
+    }
+  }
+  return [...map.values()];
+}
+
+// ===================================================================
+// INVR19 進銷存表 → DxStock[]
+// 欄位（去空白後）：品號 / 品名 / 規格 / 單位 / 庫別代號 / 庫別名稱
+//   / 期初庫存量 / … / 期末庫存量（目前庫存）
+// 多庫別分列，依品號加總期末庫存量；跳過「小計」列
+// ===================================================================
+export function parseStockInout(aoa: Aoa): DxStock[] {
+  const h = (aoa[0] ?? []).map((c) => norm(c));
+  const idx = (n: string) => h.findIndex((x) => x === n);
+  const iCode = idx("品號");
+  const iName = idx("品名");
+  const iSpec = idx("規格");
+  const iUnit = idx("單位");
+  const iWh = h.findIndex((x) => x === "庫別代號" || x === "庫別");
+  const iWhName = idx("庫別名稱");
+  const iClosing = idx("期末庫存量"); // 目前庫存
+
+  const map = new Map<string, DxStock>();
+  for (let r = 1; r < aoa.length; r++) {
+    const row = aoa[r] ?? [];
+    if (isSubtotalRow(row[iCode], row)) continue;
+    const code = cell(row[iCode]);
+    if (!code) continue;
+    const qty = numCell(row[iClosing]);
+    let s = map.get(code);
+    if (!s) {
+      s = {
+        code,
+        name: cell(row[iName]),
+        spec: cell(row[iSpec]),
+        unit: cell(row[iUnit]) || "PCS",
+        available: 0,
+        belowSafety: false,
+        incoming: [],
+      };
+      map.set(code, s);
+    }
+    s.available += qty;
+    const wh = cell(row[iWh]);
+    if (wh && qty !== 0) {
+      s.incoming.push({
+        date: "",
+        qty,
+        warehouse: wh,
+        warehouseName: cell(row[iWhName]),
+        runningBalance: s.available,
+      });
+    }
+  }
+  return [...map.values()];
+}
+
+// ===================================================================
 // BOMR05 BOM 報表（多階）
 // ===================================================================
 export type DxBomLine = {
@@ -302,6 +420,8 @@ export function parseWoCost(aoa: Aoa): DxWoCost[] {
 export type ParsedDingxin =
   | { type: "item_master"; rows: DxItem[] }
   | { type: "stock"; rows: DxStock[] }
+  | { type: "stock_qty"; rows: DxStock[] }
+  | { type: "stock_inout"; rows: DxStock[] }
   | { type: "bom"; rows: DxBomLine[] }
   | { type: "wo_cost"; rows: DxWoCost[] }
   | { type: "unknown"; rows: never[] };
@@ -311,6 +431,8 @@ export function parseDingxinReport(aoa: Aoa): ParsedDingxin {
   switch (t) {
     case "item_master": return { type: t, rows: parseItemMaster(aoa) };
     case "stock":       return { type: t, rows: parseStock(aoa) };
+    case "stock_qty":   return { type: t, rows: parseStockQty(aoa) };
+    case "stock_inout": return { type: t, rows: parseStockInout(aoa) };
     case "bom":         return { type: t, rows: parseBomReport(aoa) };
     case "wo_cost":     return { type: t, rows: parseWoCost(aoa) };
     default:            return { type: "unknown", rows: [] };
@@ -320,6 +442,8 @@ export function parseDingxinReport(aoa: Aoa): ParsedDingxin {
 export const REPORT_LABEL: Record<DingxinReportType, string> = {
   item_master: "INVR60 品號主檔",
   stock: "LRPR05 庫存報表",
+  stock_qty: "INVR18 庫存數量表",
+  stock_inout: "INVR19 進銷存表",
   bom: "BOMR05 BOM 報表",
   wo_cost: "CSTR07 製令成本",
   unknown: "未知格式",

@@ -130,6 +130,8 @@ export default function DingxinSyncPage() {
             </div>
             {parsed.type === "item_master" && <ItemMasterPreview rows={parsed.rows} />}
             {parsed.type === "stock" && <StockPreview rows={parsed.rows} />}
+            {parsed.type === "stock_qty" && <StockPreview rows={parsed.rows} />}
+            {parsed.type === "stock_inout" && <StockPreview rows={parsed.rows} />}
             {parsed.type === "bom" && <BomPreview rows={parsed.rows} />}
             {parsed.type === "wo_cost" && <WoCostPreview rows={parsed.rows} />}
           </section>
