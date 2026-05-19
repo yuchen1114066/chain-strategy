@@ -16,7 +16,8 @@ export type DingxinReportType =
   | "stock_qty"     // INVR18 庫存數量表（品號/庫存數量）
   | "stock_inout"   // INVR19 進銷存表（期初/期末庫存量）
   | "bom"           // BOMR05 BOM 報表
-  | "wo_cost"       // CSTR07 製令成本
+  | "wo_cost"       // CSTR07 製令成本分析表
+  | "wo_cost_detail"// CSTR08 製令成本明細表（含領料明細）
   | "unknown";
 
 type Cell = string | number | null | undefined;
@@ -53,6 +54,8 @@ export function detectReportType(aoa: Aoa): DingxinReportType {
   if (has("期初庫存量") && has("期末庫存量")) return "stock_inout"; // INVR19
   if (has("庫存數量") && has("品號") && !has("異動別")) return "stock_qty"; // INVR18
   if (has("元件品號") && has("階次") && has("主件品號")) return "bom";
+  // CSTR08 須先判（領料明細欄）— 它是 CSTR07 的超集
+  if (has("製令編號") && has("領料編號") && has("材料品號")) return "wo_cost_detail";
   if (has("製令編號") && has("產品品號") && has("材料成本")) return "wo_cost";
   return "unknown";
 }
@@ -416,6 +419,101 @@ export function parseWoCost(aoa: Aoa): DxWoCost[] {
   return out;
 }
 
+// ===================================================================
+// CSTR08 製令成本明細表 → DxWoCostDetail[]
+// CSTR07 超集 + 領料明細（每張製令多列：1 列 = 1 個領用材料）
+// 依製令編號分組：WO 表頭取首列，materials[] 收集所有領料列
+// ===================================================================
+export type DxWoMaterial = {
+  materialCode: string;  // 材料品號
+  materialName: string;
+  materialSpec: string;
+  unit: string;
+  issueDate: string;     // 領料日期
+  issueNo: string;       // 領料編號（追溯憑證）
+  actualQty: number;     // 實際用量
+  unitCost: number;      // 單位材料成本
+  cost: number;          // 材料成本
+};
+export type DxWoCostDetail = DxWoCost & {
+  productionCost: number;  // 生產成本
+  unitProductionCost: number;
+  materials: DxWoMaterial[];
+};
+
+export function parseWoCostDetail(aoa: Aoa): DxWoCostDetail[] {
+  const h = (aoa[0] ?? []).map((c) => norm(c));
+  const idx = (name: string) => h.findIndex((x) => x === name);
+  const iWo = idx("製令編號");
+  const iProd = idx("產品品號");
+  const iName = idx("產品品名");
+  const iSpec = idx("產品規格");
+  const iUnit = h.findIndex((x) => x === "單位"); // 首個「單位」= 產品單位
+  const iStart = idx("實際開工");
+  const iFinish = idx("實際完工");
+  const iQty = idx("已生產量");
+  const iMat = idx("材料成本");
+  const iLab = idx("人工成本");
+  const iOh = idx("總製造費用");
+  const iProc = idx("加工費用");
+  const iProdCost = idx("生產成本");
+  const iUnitProdCost = idx("單位生產成本");
+  // 領料明細欄（材料品號之後）
+  const iMatCode = idx("材料品號");
+  const iMatName = idx("材料品名");
+  const iMatSpec = idx("材料規格");
+  const iIssueDate = idx("領料日期");
+  const iIssueNo = idx("領料編號");
+  const iActualQty = idx("實際用量");
+  // 材料區的「單位/單位材料成本/材料成本」是後段欄位（材料品號之後）
+  const iMatUnit = h.findIndex((x, i) => x === "單位" && i > iMatCode);
+  const iMatUnitCost = h.findIndex((x, i) => x === "單位材料成本" && i > iMatCode);
+  const iMatCost = h.findIndex((x, i) => x === "材料成本" && i > iMatCode);
+
+  const map = new Map<string, DxWoCostDetail>();
+  for (let r = 1; r < aoa.length; r++) {
+    const row = aoa[r] ?? [];
+    const wo = cell(row[iWo]);
+    if (!wo) continue;
+    let d = map.get(wo);
+    if (!d) {
+      d = {
+        woNo: wo,
+        productCode: cell(row[iProd]),
+        productName: cell(row[iName]),
+        spec: cell(row[iSpec]),
+        unit: cell(row[iUnit]) || "PCS",
+        startDate: cell(row[iStart]),
+        finishDate: cell(row[iFinish]),
+        producedQty: numCell(row[iQty]),
+        materialCost: numCell(row[iMat]),
+        laborCost: numCell(row[iLab]),
+        overheadCost: numCell(row[iOh]),
+        processingCost: numCell(row[iProc]),
+        productionCost: numCell(row[iProdCost]),
+        unitProductionCost: numCell(row[iUnitProdCost]),
+        materials: [],
+      };
+      map.set(wo, d);
+    }
+    const mCode = cell(row[iMatCode]);
+    if (mCode) {
+      d.materials.push({
+        materialCode: mCode,
+        materialName: cell(row[iMatName]),
+        materialSpec: cell(row[iMatSpec]),
+        unit: iMatUnit >= 0 ? cell(row[iMatUnit]) : "",
+        issueDate: cell(row[iIssueDate]),
+        issueNo: cell(row[iIssueNo]),
+        actualQty: numCell(row[iActualQty]),
+        unitCost: iMatUnitCost >= 0 ? numCell(row[iMatUnitCost]) : 0,
+        cost: iMatCost >= 0 ? numCell(row[iMatCost]) : 0,
+      });
+    }
+  }
+  return [...map.values()];
+}
+
 // ── 統一入口：給 AOA 自動判型 + 解析 ──
 export type ParsedDingxin =
   | { type: "item_master"; rows: DxItem[] }
@@ -424,18 +522,20 @@ export type ParsedDingxin =
   | { type: "stock_inout"; rows: DxStock[] }
   | { type: "bom"; rows: DxBomLine[] }
   | { type: "wo_cost"; rows: DxWoCost[] }
+  | { type: "wo_cost_detail"; rows: DxWoCostDetail[] }
   | { type: "unknown"; rows: never[] };
 
 export function parseDingxinReport(aoa: Aoa): ParsedDingxin {
   const t = detectReportType(aoa);
   switch (t) {
-    case "item_master": return { type: t, rows: parseItemMaster(aoa) };
-    case "stock":       return { type: t, rows: parseStock(aoa) };
-    case "stock_qty":   return { type: t, rows: parseStockQty(aoa) };
-    case "stock_inout": return { type: t, rows: parseStockInout(aoa) };
-    case "bom":         return { type: t, rows: parseBomReport(aoa) };
-    case "wo_cost":     return { type: t, rows: parseWoCost(aoa) };
-    default:            return { type: "unknown", rows: [] };
+    case "item_master":    return { type: t, rows: parseItemMaster(aoa) };
+    case "stock":          return { type: t, rows: parseStock(aoa) };
+    case "stock_qty":      return { type: t, rows: parseStockQty(aoa) };
+    case "stock_inout":    return { type: t, rows: parseStockInout(aoa) };
+    case "bom":            return { type: t, rows: parseBomReport(aoa) };
+    case "wo_cost":        return { type: t, rows: parseWoCost(aoa) };
+    case "wo_cost_detail": return { type: t, rows: parseWoCostDetail(aoa) };
+    default:               return { type: "unknown", rows: [] };
   }
 }
 
@@ -443,8 +543,9 @@ export const REPORT_LABEL: Record<DingxinReportType, string> = {
   item_master: "INVR60 品號主檔",
   stock: "LRPR05 庫存報表",
   stock_qty: "INVR18 庫存數量表",
-  stock_inout: "INVR19 進銷存表",
+  stock_inout: "INVR19 進耗存統計表",
   bom: "BOMR05 BOM 報表",
-  wo_cost: "CSTR07 製令成本",
+  wo_cost: "CSTR07 製令成本分析表",
+  wo_cost_detail: "CSTR08 製令成本明細表（含領料）",
   unknown: "未知格式",
 };

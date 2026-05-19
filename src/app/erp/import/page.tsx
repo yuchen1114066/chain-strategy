@@ -134,6 +134,7 @@ export default function DingxinSyncPage() {
             {parsed.type === "stock_inout" && <StockPreview rows={parsed.rows} />}
             {parsed.type === "bom" && <BomPreview rows={parsed.rows} />}
             {parsed.type === "wo_cost" && <WoCostPreview rows={parsed.rows} />}
+            {parsed.type === "wo_cost_detail" && <WoCostDetailPreview rows={parsed.rows} />}
           </section>
 
           <section className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-900">
@@ -341,6 +342,70 @@ function WoCostPreview({ rows }: { rows: import("@/lib/erp/dingxin-parser").DxWo
         </table>
       </div>
       {rows.length > 30 && <p className="text-[11px] text-slate-400 mt-2">… 共 {rows.length} 筆，僅顯示前 30</p>}
+    </>
+  );
+}
+
+function WoCostDetailPreview({ rows }: { rows: import("@/lib/erp/dingxin-parser").DxWoCostDetail[] }) {
+  const totalMat = rows.reduce((s, r) => s + r.materialCost, 0);
+  const totalMatLines = rows.reduce((s, r) => s + r.materials.length, 0);
+  return (
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm">
+        <Stat label="製令數（分組）" value={`${rows.length}`} />
+        <Stat label="領料明細筆數" value={`${totalMatLines}`} hint="可追溯料件" />
+        <Stat label="材料成本合計" value={`$${(totalMat / 10000).toFixed(0)}萬`} />
+        <Stat label="已完工" value={`${rows.filter((r) => r.finishDate).length}`} />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="text-left px-2 py-1.5">製令編號</th>
+              <th className="text-left px-2 py-1.5">產品品號 / 品名</th>
+              <th className="text-right px-2 py-1.5">已生產</th>
+              <th className="text-left px-2 py-1.5">開工 / 完工</th>
+              <th className="text-right px-2 py-1.5">生產成本</th>
+              <th className="text-right px-2 py-1.5">領用料項</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 25).map((r, i) => (
+              <tr key={i} className="border-t border-slate-100 align-top">
+                <td className="px-2 py-1.5 font-mono text-cyan-700">{r.woNo}</td>
+                <td className="px-2 py-1.5">
+                  <div className="font-mono">{r.productCode}</div>
+                  <div className="text-slate-500">{r.productName}</div>
+                </td>
+                <td className="px-2 py-1.5 text-right tabular-nums">{r.producedQty}</td>
+                <td className="px-2 py-1.5 text-slate-500">{r.startDate} / {r.finishDate || "—"}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums">${r.productionCost.toLocaleString()}</td>
+                <td className="px-2 py-1.5">
+                  <details>
+                    <summary className="cursor-pointer text-cyan-700">{r.materials.length} 項領料</summary>
+                    <ul className="mt-1 space-y-0.5">
+                      {r.materials.slice(0, 8).map((m, j) => (
+                        <li key={j} className="text-[11px] text-slate-600">
+                          <span className="font-mono">{m.materialCode}</span> {m.materialName}
+                          {" ×"}{m.actualQty} {m.unit}
+                          {m.issueNo && <span className="text-slate-400"> · {m.issueNo.trim()}</span>}
+                        </li>
+                      ))}
+                      {r.materials.length > 8 && (
+                        <li className="text-[11px] text-slate-400">… 共 {r.materials.length} 項</li>
+                      )}
+                    </ul>
+                  </details>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 25 && <p className="text-[11px] text-slate-400 mt-2">… 共 {rows.length} 張製令，僅顯示前 25</p>}
+      <p className="text-[11px] text-cyan-700 mt-2">
+        ✓ CSTR08 含領料追溯：每張製令實際領了哪些料、領多少、領料單號（批號追溯基礎）
+      </p>
     </>
   );
 }
