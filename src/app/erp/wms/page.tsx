@@ -3,7 +3,8 @@ import { workOrders, models, today, parts } from "@/lib/erp/seed";
 import { computeAlerts, computePartDemand } from "@/lib/erp/alerts";
 import LiveClock from "@/components/erp/LiveClock";
 
-// CHI HUA Pulse — 世界級製造流程戰情 Dashboard（暗色旗艦頁）
+// CHI HUA Pulse — WMS 智慧倉儲戰情 Dashboard
+// 套用 Stitch chi_hua_pulse_wms_v2 版型：淺色暖調 + 玻璃擬態 + 紅色 pulse 漸層
 
 const WMS_STAGES = ["下單", "採購", "IQC", "生產", "OQC", "包裝", "船期", "交付"];
 
@@ -18,128 +19,185 @@ export default function WmsDashboardPage() {
   const demand = computePartDemand();
   const active = workOrders.filter((w) => w.status === "active" || w.status === "planning");
   const done = workOrders.filter((w) => w.status === "done");
-  const redWoIds = new Set(alerts.filter((a) => a.severity === "red").map((a) => a.woId));
-  const lateWos = workOrders.filter((w) =>
-    w.status !== "done" && w.stages.some((s) => !s.actualDate && s.plannedDate < today && s.status !== "done")
-  );
   const onTime = done.filter((w) => {
     const ship = w.stages.find((s) => s.stage === "ship");
     return ship?.actualDate && ship.actualDate <= w.shipDate;
   });
   const onTimePct = done.length ? (onTime.length / done.length) * 100 : 92.3;
-  const avgLead = done.length
-    ? Math.round(done.reduce((acc, w) => {
-        const ship = w.stages.find((s) => s.stage === "ship");
-        return acc + (ship?.actualDate ? daysUntil(ship.actualDate) - daysUntil(w.orderDate) : 14);
-      }, 0) / done.length)
-    : 14;
-
-  const redCount = alerts.filter((a) => a.severity === "red").length;
-  const yellowCount = alerts.filter((a) => a.severity === "yellow").length;
+  const totalStockValue = parts.reduce((s, p) => s + p.stockOnHand * p.unitCost, 0);
   const shortageParts = demand.filter((d) => d.shortage > 0);
 
-  // 訂單狀態分布
-  const statusDist = [
-    { label: "正常", n: workOrders.filter((w) => w.status !== "cancelled" && !redWoIds.has(w.id) && !lateWos.includes(w)).length, color: "#22c55e" },
-    { label: "進行中", n: active.length, color: "#3b82f6" },
-    { label: "延遲", n: lateWos.length, color: "#f59e0b" },
-    { label: "異常", n: redWoIds.size, color: "#ef4444" },
-  ];
-  const statusTotal = statusDist.reduce((s, x) => s + x.n, 0) || 1;
-
-  // 庫存健康度
   const stockHealth = [
-    { label: "健康庫存", n: parts.filter((p) => p.stockOnHand >= p.safetyStock).length, color: "#22c55e" },
+    { label: "健康庫存", n: parts.filter((p) => p.stockOnHand >= p.safetyStock).length, color: "#16a34a" },
     { label: "低庫存", n: parts.filter((p) => p.stockOnHand < p.safetyStock && p.stockOnHand > 0).length, color: "#f59e0b" },
-    { label: "缺料", n: shortageParts.length, color: "#ef4444" },
+    { label: "缺料", n: shortageParts.length, color: "#dc2626" },
   ];
   const healthTotal = parts.length || 1;
 
-  // 呆滯料 Top 5（用庫存值高 + 無需求 近似）
-  const slowMoving = [...parts]
-    .map((p) => {
-      const d = demand.find((x) => x.part.id === p.id);
-      return { p, required: d?.totalRequired ?? 0, value: p.stockOnHand * p.unitCost };
-    })
-    .filter((x) => x.required === 0 && x.p.stockOnHand > 0)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 5);
-
-  // 即將到期船期
   const upcoming = active
     .filter((w) => { const d = daysUntil(w.shipDate); return d >= -14 && d <= 14; })
     .sort((a, b) => a.shipDate.localeCompare(b.shipDate))
     .slice(0, 5);
 
+  // 倉區熱力（用分類近似）
+  const cats = [...new Set(parts.map((p) => p.category))].slice(0, 4);
+  const zones = cats.map((cat, i) => {
+    const catParts = parts.filter((p) => p.category === cat);
+    const util = Math.min(96, 35 + (catParts.length * 9) % 62);
+    return { name: `${cat} 區`, util, count: catParts.length, idx: i };
+  });
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex">
-      {/* ===== 左側暗色 sidebar ===== */}
-      <aside className="w-56 shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col">
-        <div className="px-5 py-5 border-b border-slate-800">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center font-bold text-white">⚡</div>
-            <div>
-              <div className="font-bold tracking-wide leading-tight">CHI HUA <span className="text-red-500">Pulse</span></div>
-              <div className="text-[9px] text-slate-500 tracking-widest">GREEN · HEALTH · INNOVATION</div>
+    <div className="min-h-screen text-[#281715]" style={{ background: "#fff8f7", fontFamily: "Montserrat, system-ui, sans-serif" }}>
+      {/* ===== 頂部導覽（sticky 玻璃）===== */}
+      <header className="sticky top-0 z-50 h-16 flex items-center justify-between px-6 lg:px-10 border-b border-rose-200/40"
+        style={{ background: "rgba(255,248,247,0.85)", backdropFilter: "blur(16px)" }}>
+        <div className="flex items-center gap-5">
+          <span className="text-xl font-extrabold tracking-tight" style={{ color: "#b70011" }}>CHI HUA Pulse</span>
+          <div className="hidden md:flex items-center bg-white/70 border border-rose-200/50 rounded-full px-4 py-1.5">
+            <span className="text-rose-300">🔍</span>
+            <input className="bg-transparent border-none outline-none text-sm px-2 w-56" placeholder="搜尋訂單 / 料件 / 客戶…" />
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link href="/erp/alerts" className="text-white text-sm font-semibold px-5 py-2 rounded-full hover:scale-105 active:scale-95 transition-transform"
+            style={{ background: "linear-gradient(135deg,#b70011,#dc2626)" }}>
+            🚨 異常中心
+          </Link>
+          <span className="bg-white/70 border border-rose-200/50 rounded-full px-3 py-2 text-sm">🔔 {alerts.length}</span>
+          <span className="hidden lg:flex items-center gap-2 bg-white/70 border border-rose-200/50 rounded-full pl-1 pr-4 py-1 text-sm">
+            <span className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs" style={{ background: "#dc2626" }}>祺</span>
+            祺驊
+          </span>
+        </div>
+      </header>
+
+      <div className="flex">
+        {/* ===== 左側固定 sidebar ===== */}
+        <aside className="w-60 shrink-0 min-h-[calc(100vh-4rem)] bg-white/60 border-r border-rose-200/40 flex flex-col">
+          <nav className="p-3 space-y-1.5">
+            <SideItem icon="📊" label="WMS Dashboard" active />
+            <SideItem icon="🎯" label="戰情室" href="/erp" />
+            <SideItem icon="🌊" label="流程綜觀" href="/erp/flow" />
+            <SideItem icon="📈" label="可視化儀表板" href="/erp/viz" />
+            <SideItem icon="🏭" label="製造流程追蹤" href="/erp/work-orders" />
+            <SideItem icon="🚨" label="異常警訊 + AI" href="/erp/alerts" />
+            <SideItem icon="📥" label="鼎新報表同步" href="/erp/import" />
+            <SideItem icon="📱" label="QR 查碼" href="/erp/mobile" />
+          </nav>
+          <div className="mt-auto p-4 border-t border-rose-200/40">
+            <div className="text-xs text-[#5c403c] mb-1">⏱ <LiveClock /></div>
+            <div className="flex items-center gap-1.5 text-xs mt-2 font-semibold" style={{ color: "#b70011" }}>
+              <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#b70011" }} />
+              系統狀態：運作中
             </div>
           </div>
-        </div>
-        <nav className="py-3 text-sm flex-1">
-          <NavItem label="WMS Dashboard" active />
-          <NavItem label="戰情室" href="/erp" />
-          <NavItem label="流程綜觀" href="/erp/flow" />
-          <NavItem label="可視化儀表板" href="/erp/viz" />
-          <NavItem label="異常警訊" href="/erp/alerts" />
-          <NavItem label="工單追蹤" href="/erp/work-orders" />
-          <NavItem label="鼎新報表同步" href="/erp/import" />
-          <NavItem label="QR 查碼" href="/erp/mobile" />
-        </nav>
-        <div className="px-5 py-4 border-t border-slate-800">
-          <div className="text-xs text-slate-400 mb-1">⏱ <LiveClock /></div>
-          <div className="flex items-center gap-1.5 text-xs mt-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-emerald-400">即時更新中</span>
-          </div>
-        </div>
-      </aside>
+        </aside>
 
-      {/* ===== 主內容 ===== */}
-      <main className="flex-1 p-6 overflow-y-auto">
-        {/* 頂部 */}
-        <header className="flex items-end justify-between flex-wrap gap-3 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold">
-              WMS Dashboard <span className="text-sm font-normal text-slate-400 ml-2">倉儲與製造流程戰情中心</span>
-            </h1>
-            <p className="text-xs text-slate-500 mt-1">CHI HUA Smart Manufacturing Command Center · 基準日 {today}</p>
+        {/* ===== 主內容 ===== */}
+        <main className="flex-1 p-6 lg:p-8 max-w-[1500px]">
+          {/* 頁首 */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
+            <div>
+              <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#b70011" }}>Intelligent Logistics</span>
+              <h1 className="text-3xl font-extrabold mt-1">WMS 智慧倉儲戰情中心</h1>
+              <p className="text-[#5c403c] mt-1 text-sm">倉儲與製造流程一站式監控　·　基準日 {today}　·　資料同步鼎新 ERP</p>
+            </div>
+            <div className="flex gap-2">
+              <Link href="/erp/import" className="flex items-center gap-2 px-5 py-2.5 bg-white/80 border border-rose-200/50 rounded-xl text-sm font-semibold hover:bg-white transition-colors">
+                📊 報表匯入
+              </Link>
+              <Link href="/erp/work-orders" className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-semibold shadow-lg hover:scale-105 active:scale-95 transition-transform"
+                style={{ background: "linear-gradient(135deg,#b70011,#dc2626)", boxShadow: "0 8px 24px rgba(183,0,17,0.25)" }}>
+                📋 工單追蹤
+              </Link>
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="bg-slate-800 rounded-lg px-3 py-2">🔔 {alerts.length}</span>
-            <span className="bg-slate-800 rounded-lg px-3 py-2">資料更新 <LiveClock /></span>
+
+          {/* 健康卡 + 異常欄 grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-5">
+            <HealthCard icon="💰" label="總庫存價值" value={`$${(totalStockValue / 10000).toFixed(0)}萬`} tag="↑ 即時" accent="#316bf3" />
+            <HealthCard icon="✅" label="準時完成率" value={`${onTimePct.toFixed(1)}%`} tag={onTimePct >= 90 ? "達標" : "待改善"} accent="#16a34a" />
+            <HealthCard icon="📦" label="在製訂單" value={`${active.length}`} tag={`平均交期估算`} accent="#dc2626" />
+
+            {/* Critical Alerts 欄（佔 2 row）*/}
+            <div className="lg:row-span-2 rounded-xl p-5 flex flex-col"
+              style={{ background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.4)" }}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold flex items-center gap-2">⚠️ 即時異常警訊</h3>
+                <span className="text-white px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: "#dc2626" }}>
+                  {alerts.filter((a) => a.severity === "red").length} 紅燈
+                </span>
+              </div>
+              <div className="space-y-2 flex-grow">
+                {alerts.slice(0, 6).map((a) => (
+                  <div key={a.id} className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                    a.severity === "red" ? "border-rose-300/40 hover:bg-rose-50" : "border-amber-300/40 hover:bg-amber-50"
+                  }`} style={{ background: a.severity === "red" ? "rgba(255,218,214,0.35)" : "rgba(254,243,199,0.4)" }}>
+                    <p className="text-sm font-semibold truncate">{a.title}</p>
+                    <p className="text-[11px] text-[#5c403c] truncate">{a.detail}</p>
+                  </div>
+                ))}
+                {alerts.length === 0 && <p className="text-sm text-emerald-700">✅ 目前無異常</p>}
+              </div>
+              <Link href="/erp/alerts" className="w-full mt-3 py-2.5 text-center text-sm font-bold text-[#5c403c] hover:bg-white/60 rounded-xl transition-colors">
+                查看全部異常 →
+              </Link>
+            </div>
+
+            {/* 倉區熱力圖（佔 3 欄）*/}
+            <div className="lg:col-span-3 rounded-xl p-5 relative overflow-hidden"
+              style={{
+                background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px)",
+                border: "1px solid rgba(255,255,255,0.4)",
+                backgroundImage: "radial-gradient(circle,#e6bdb8 1px,transparent 1px)",
+                backgroundSize: "20px 20px",
+              }}>
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="font-bold">倉區庫存熱力圖</h3>
+                  <div className="flex gap-4 mt-2 text-[11px] text-[#5c403c]">
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-rose-500" />吃緊 (85%+)</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-500" />正常 (50-85%)</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-emerald-500" />寬鬆 (&lt;50%)</span>
+                  </div>
+                </div>
+                <Link href="/erp/analytics" className="text-xs font-semibold" style={{ color: "#b70011" }}>查看分析 →</Link>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {zones.map((z) => {
+                  const tone = z.util >= 85 ? { bg: "rgba(220,38,38,0.12)", bd: "rgba(220,38,38,0.4)", tx: "#dc2626" }
+                    : z.util >= 50 ? { bg: "rgba(49,107,243,0.12)", bd: "rgba(49,107,243,0.35)", tx: "#316bf3" }
+                    : { bg: "rgba(22,163,74,0.12)", bd: "rgba(22,163,74,0.35)", tx: "#16a34a" };
+                  return (
+                    <div key={z.name} className="rounded-xl p-4 transition-transform hover:scale-[1.03]"
+                      style={{ background: tone.bg, border: `2px solid ${tone.bd}` }}>
+                      <div className="text-sm font-bold" style={{ color: tone.tx }}>{z.name}</div>
+                      <div className="text-2xl font-extrabold tabular-nums mt-1" style={{ color: tone.tx }}>{z.util}%</div>
+                      <div className="h-1.5 rounded-full bg-white/60 overflow-hidden mt-2">
+                        <div className="h-full rounded-full" style={{ width: `${z.util}%`, background: tone.tx }} />
+                      </div>
+                      <div className="text-[10px] text-[#5c403c] mt-1">{z.count} 個料件</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        </header>
 
-        {/* 6 KPI */}
-        <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
-          <Kpi label="今日訂單總數" value={`${workOrders.length}`} sub="↑ 全部工單" tone="cyan" />
-          <Kpi label="進行中訂單" value={`${active.length}`} sub={`佔 ${Math.round(active.length / workOrders.length * 100)}%`} tone="blue" />
-          <Kpi label="準時完成率" value={`${onTimePct.toFixed(1)}%`} sub="↑ 目標 95%" tone="emerald" />
-          <Kpi label="異常訂單" value={`${redWoIds.size}`} sub="🔴 紅燈" tone="rose" />
-          <Kpi label="延遲訂單" value={`${lateWos.length}`} sub="🟡 已逾期" tone="amber" />
-          <Kpi label="平均交期(天)" value={`${avgLead}`} sub="下單→出貨" tone="slate" />
-        </section>
-
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-          {/* 左 2/3：End-to-End 流程追蹤 */}
-          <section className="xl:col-span-2 bg-slate-900 rounded-2xl border border-slate-800 p-5">
-            <h2 className="font-bold mb-4">End-to-End 流程追蹤</h2>
-            {/* 階段標題 */}
-            <div className="hidden md:grid grid-cols-[140px_repeat(8,1fr)_88px] gap-1 text-[10px] text-slate-500 mb-2 px-1">
+          {/* End-to-End 流程追蹤 */}
+          <section className="rounded-xl overflow-hidden mb-5"
+            style={{ background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.4)" }}>
+            <div className="p-5 border-b border-rose-200/40 flex justify-between items-center">
+              <h3 className="font-extrabold text-lg">End-to-End 製造流程追蹤</h3>
+              <span className="text-xs text-[#5c403c] italic">資料同步鼎新 ERP · <LiveClock /></span>
+            </div>
+            <div className="hidden md:grid grid-cols-[150px_repeat(8,1fr)_96px] gap-1 text-[10px] text-[#5c403c] px-5 pt-3 font-semibold">
               <div />
               {WMS_STAGES.map((s, i) => <div key={s} className="text-center">{i + 1}.{s}</div>)}
               <div className="text-right">進度</div>
             </div>
-            <div className="space-y-1.5">
+            <div className="px-3 pb-3">
               {workOrders.map((w) => {
                 const m = models.find((m) => m.id === w.modelId);
                 const dleft = daysUntil(w.shipDate);
@@ -148,224 +206,122 @@ export default function WmsDashboardPage() {
                 const doneCount = w.stages.filter((s) => s.status === "done").length;
                 const progress = Math.round((doneCount / 8) * 100);
                 const priority = hasRed ? "Critical" : dleft < 7 ? "High" : w.status === "planning" ? "Low" : "Normal";
-                const prTone = priority === "Critical" ? "bg-red-600" : priority === "High" ? "bg-amber-600" : priority === "Low" ? "bg-slate-600" : "bg-slate-700";
+                const prTone = priority === "Critical" ? "#dc2626" : priority === "High" ? "#f59e0b" : priority === "Low" ? "#94a3b8" : "#316bf3";
                 return (
-                  <Link
-                    key={w.id}
-                    href={`/erp/work-orders/${w.id}`}
-                    className={`grid grid-cols-[140px_repeat(8,1fr)_88px] gap-1 items-center rounded-lg px-1 py-2 hover:bg-slate-800/60 transition-colors ${hasRed ? "bg-red-950/30" : ""}`}
-                  >
+                  <Link key={w.id} href={`/erp/work-orders/${w.id}`}
+                    className="grid grid-cols-[150px_repeat(8,1fr)_96px] gap-1 items-center rounded-lg px-2 py-2.5 hover:bg-rose-50/60 transition-colors">
                     <div className="min-w-0">
-                      <div className={`font-mono text-xs font-bold ${hasRed ? "text-red-400" : "text-cyan-400"}`}>{w.woNo}</div>
-                      <div className="text-[10px] text-slate-500 truncate">{w.customer} · {m?.code}</div>
-                      <div className="text-[10px] text-slate-600">× {w.qty}</div>
+                      <div className="font-mono text-xs font-bold" style={{ color: hasRed ? "#dc2626" : "#b70011" }}>{w.woNo}</div>
+                      <div className="text-[10px] text-[#5c403c] truncate">{w.customer} · {m?.code}</div>
                     </div>
                     {w.stages.map((s, i) => {
                       const late = !s.actualDate && s.plannedDate < today && s.status !== "done";
-                      const color =
-                        s.status === "done" ? "bg-emerald-500 border-emerald-400" :
-                        s.status === "in_progress" ? "bg-cyan-500 border-cyan-300 ring-2 ring-cyan-500/40" :
-                        s.status === "blocked" ? "bg-red-500 border-red-400" :
-                        late ? "bg-amber-500 border-amber-400" :
-                        "bg-slate-700 border-slate-600";
-                      const icon = s.status === "done" ? "✓" : s.status === "blocked" ? "✕" : s.status === "in_progress" ? "●" : late ? "!" : "";
+                      const bg = s.status === "done" ? "#16a34a"
+                        : s.status === "in_progress" ? "#316bf3"
+                        : s.status === "blocked" ? "#dc2626"
+                        : late ? "#f59e0b" : "#e2d4d1";
+                      const icon = s.status === "done" ? "✓" : s.status === "blocked" ? "✕"
+                        : s.status === "in_progress" ? "●" : late ? "!" : "";
                       return (
                         <div key={i} className="flex flex-col items-center">
-                          <div className={`w-6 h-6 rounded-full border flex items-center justify-center text-[10px] font-bold text-white ${color}`}>
+                          <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+                            style={{ background: bg, boxShadow: s.status === "in_progress" ? "0 0 0 3px rgba(49,107,243,0.25)" : "none" }}>
                             {icon}
                           </div>
-                          <div className="text-[8px] text-slate-600 mt-0.5">{(s.actualDate ?? s.plannedDate).slice(5)}</div>
                         </div>
                       );
                     })}
                     <div className="text-right">
                       <div className="text-sm font-bold tabular-nums">{progress}%</div>
-                      <div className="h-1 bg-slate-800 rounded-full overflow-hidden my-0.5">
-                        <div className="h-full bg-gradient-to-r from-red-500 to-orange-400" style={{ width: `${progress}%` }} />
+                      <div className="h-1.5 rounded-full overflow-hidden my-1" style={{ background: "#f0dcd9" }}>
+                        <div className="h-full" style={{ width: `${progress}%`, background: "linear-gradient(90deg,#b70011,#f97316)" }} />
                       </div>
-                      <div className={`text-[9px] tabular-nums ${dleft < 0 ? "text-red-400" : dleft < 7 ? "text-amber-400" : "text-slate-500"}`}>
-                        {w.shipDate.slice(5)}
-                      </div>
-                      <span className={`inline-block text-[8px] px-1.5 py-0.5 rounded ${prTone} text-white mt-0.5`}>{priority}</span>
+                      <span className="inline-block text-[8px] px-1.5 py-0.5 rounded text-white font-bold" style={{ background: prTone }}>
+                        {priority}
+                      </span>
                     </div>
                   </Link>
                 );
               })}
             </div>
-            <div className="mt-3 pt-3 border-t border-slate-800 flex flex-wrap gap-3 text-[10px] text-slate-400">
-              <Legend c="bg-emerald-500" t="完成" />
-              <Legend c="bg-cyan-500" t="進行中" />
-              <Legend c="bg-amber-500" t="延遲" />
-              <Legend c="bg-red-500" t="阻塞" />
-              <Legend c="bg-slate-700" t="未開始" />
-            </div>
           </section>
 
-          {/* 右 1/3 */}
-          <section className="space-y-5">
-            {/* 今日異常警訊 */}
-            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-5">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-bold">今日異常警訊</h2>
-                <Link href="/erp/alerts" className="text-[10px] text-cyan-400 hover:underline">查看全部 →</Link>
-              </div>
-              <ul className="space-y-2">
-                {alerts.slice(0, 5).map((a) => (
-                  <li key={a.id} className="flex items-start gap-2 bg-slate-800/60 rounded-xl px-3 py-2">
-                    <span className={`mt-1 w-2 h-2 rounded-full shrink-0 ${a.severity === "red" ? "bg-red-500" : "bg-amber-500"}`} />
-                    <div className="min-w-0">
-                      <div className="text-xs font-semibold truncate">{a.title}</div>
-                      <div className="text-[10px] text-slate-500 truncate">{a.detail}</div>
-                    </div>
-                  </li>
-                ))}
-                {alerts.length === 0 && <li className="text-xs text-emerald-400">✅ 無異常</li>}
-              </ul>
-              <div className="mt-3 flex gap-2 text-[10px]">
-                <span className="bg-red-950/50 text-red-400 rounded-lg px-2 py-1">🔴 {redCount} 紅燈</span>
-                <span className="bg-amber-950/50 text-amber-400 rounded-lg px-2 py-1">🟡 {yellowCount} 黃燈</span>
-              </div>
-            </div>
-
-            {/* 訂單狀態分布 */}
-            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-5">
-              <h2 className="font-bold mb-3">訂單狀態分布</h2>
-              <div className="flex items-center gap-4">
-                <Donut slices={statusDist} total={statusTotal} center={`${workOrders.length}`} />
-                <ul className="text-xs space-y-1.5 flex-1">
-                  {statusDist.map((s) => (
+          {/* 底部：庫存健康度 + 即將到期船期 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <section className="rounded-xl p-5" style={{ background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.4)" }}>
+              <h3 className="font-bold mb-3">庫存健康度</h3>
+              <div className="flex items-center gap-5">
+                <Donut slices={stockHealth} total={healthTotal} center={`${parts.length}`} />
+                <ul className="text-sm space-y-2 flex-1">
+                  {stockHealth.map((s) => (
                     <li key={s.label} className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-sm" style={{ background: s.color }} />
-                      <span className="flex-1 text-slate-300">{s.label}</span>
-                      <span className="tabular-nums text-slate-400">{s.n}（{Math.round(s.n / statusTotal * 100)}%）</span>
+                      <span className="w-3 h-3 rounded-sm" style={{ background: s.color }} />
+                      <span className="flex-1">{s.label}</span>
+                      <span className="tabular-nums text-[#5c403c]">{s.n}（{Math.round(s.n / healthTotal * 100)}%）</span>
                     </li>
                   ))}
                 </ul>
               </div>
-            </div>
+            </section>
 
-            {/* 即將到期船期 */}
-            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-5">
-              <h2 className="font-bold mb-3">即將到期船期（14 日內）</h2>
-              <ul className="text-xs space-y-2">
+            <section className="rounded-xl p-5" style={{ background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.4)" }}>
+              <h3 className="font-bold mb-3">即將到期船期（14 日內）</h3>
+              <ul className="text-sm space-y-2">
                 {upcoming.map((w) => {
                   const d = daysUntil(w.shipDate);
                   return (
-                    <li key={w.id} className="flex items-center justify-between bg-slate-800/60 rounded-lg px-3 py-1.5">
-                      <span className="text-slate-300">{w.shipDate.slice(5)} · {w.customer}</span>
-                      <span className="font-mono text-cyan-400">{w.woNo}</span>
-                      <span className={`tabular-nums font-bold ${d < 0 ? "text-red-400" : d < 7 ? "text-amber-400" : "text-slate-500"}`}>
+                    <li key={w.id} className="flex items-center justify-between bg-white/60 rounded-lg px-3 py-2">
+                      <span>{w.shipDate.slice(5)} · {w.customer}</span>
+                      <span className="font-mono" style={{ color: "#b70011" }}>{w.woNo}</span>
+                      <span className={`tabular-nums font-bold ${d < 0 ? "text-rose-600" : d < 7 ? "text-amber-600" : "text-[#5c403c]"}`}>
                         {d >= 0 ? `T-${d}` : `逾${-d}`}
                       </span>
                     </li>
                   );
                 })}
-                {upcoming.length === 0 && <li className="text-slate-500">14 日內無排定船期</li>}
+                {upcoming.length === 0 && <li className="text-[#5c403c]">14 日內無排定船期</li>}
               </ul>
-            </div>
-          </section>
-        </div>
+            </section>
+          </div>
 
-        {/* 底部 3 欄 */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 mt-5">
-          {/* 倉庫庫存概況 */}
-          <section className="bg-slate-900 rounded-2xl border border-slate-800 p-5">
-            <h2 className="font-bold mb-3">倉庫庫存概況</h2>
-            <div className="grid grid-cols-2 gap-3">
-              {(() => {
-                // 用分類近似 4 個倉
-                const cats = [...new Set(parts.map((p) => p.category))].slice(0, 4);
-                const palette = ["#22c55e", "#3b82f6", "#ef4444", "#a855f7"];
-                return cats.map((cat, i) => {
-                  const catParts = parts.filter((p) => p.category === cat);
-                  const util = Math.min(99, 40 + (catParts.length * 7) % 60);
-                  return (
-                    <div key={cat} className="bg-slate-800/60 rounded-xl p-3">
-                      <div className="text-xs text-slate-400">{cat} 區</div>
-                      <div className="text-2xl font-bold tabular-nums mt-1" style={{ color: palette[i] }}>{util}%</div>
-                      <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden mt-1.5">
-                        <div className="h-full rounded-full" style={{ width: `${util}%`, background: palette[i] }} />
-                      </div>
-                      <div className="text-[10px] text-slate-500 mt-1">{catParts.length} 個料件</div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-          </section>
-
-          {/* 庫存健康度 */}
-          <section className="bg-slate-900 rounded-2xl border border-slate-800 p-5">
-            <h2 className="font-bold mb-3">庫存健康度</h2>
-            <div className="flex items-center gap-4">
-              <Donut slices={stockHealth} total={healthTotal} center={`${parts.length}`} />
-              <ul className="text-xs space-y-1.5 flex-1">
-                {stockHealth.map((s) => (
-                  <li key={s.label} className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-sm" style={{ background: s.color }} />
-                    <span className="flex-1 text-slate-300">{s.label}</span>
-                    <span className="tabular-nums text-slate-400">{s.n}（{Math.round(s.n / healthTotal * 100)}%）</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </section>
-
-          {/* 呆滯料 TOP 5 */}
-          <section className="bg-slate-900 rounded-2xl border border-slate-800 p-5">
-            <h2 className="font-bold mb-3">呆滯料 TOP 5</h2>
-            {slowMoving.length === 0 ? (
-              <p className="text-xs text-slate-500">無呆滯料</p>
-            ) : (
-              <table className="w-full text-xs">
-                <thead className="text-slate-500">
-                  <tr><th className="text-left py-1">料號 / 品名</th><th className="text-right py-1">庫存值</th><th className="text-right py-1">數量</th></tr>
-                </thead>
-                <tbody>
-                  {slowMoving.map((x) => (
-                    <tr key={x.p.id} className="border-t border-slate-800">
-                      <td className="py-1.5"><span className="font-mono text-slate-300">{x.p.code}</span><br /><span className="text-slate-500">{x.p.name}</span></td>
-                      <td className="py-1.5 text-right tabular-nums text-amber-400">${x.value.toLocaleString()}</td>
-                      <td className="py-1.5 text-right tabular-nums text-slate-400">{x.p.stockOnHand}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
-        </div>
-
-        <footer className="mt-6 pt-4 border-t border-slate-800 text-center text-[10px] text-slate-600">
-          CHI HUA Pulse v1.0　·　倉儲與製造流程戰情中心　·　資料同步鼎新 ERP iGP
-        </footer>
-      </main>
+          <footer className="mt-6 pt-4 border-t border-rose-200/40 text-center text-[11px] text-[#916f6b]">
+            CHI HUA Pulse · WMS 智慧倉儲戰情中心 · v2　·　© 祺驊股份有限公司
+          </footer>
+        </main>
+      </div>
     </div>
   );
 }
 
-function NavItem({ label, href, active }: { label: string; href?: string; active?: boolean }) {
-  const cls = `block mx-3 my-1 px-3 py-2.5 rounded-xl text-sm ${
-    active ? "bg-red-600 text-white font-semibold" : "bg-slate-800/40 text-slate-300 hover:bg-slate-800"
+function SideItem({ icon, label, href, active }: { icon: string; label: string; href?: string; active?: boolean }) {
+  const cls = `flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm transition-all ${
+    active
+      ? "font-bold text-white"
+      : "text-[#5c403c] hover:bg-rose-100/60 hover:translate-x-1"
   }`;
-  return href ? <Link href={href} className={cls}>{label}</Link> : <div className={cls}>{label}</div>;
+  const style = active ? { background: "linear-gradient(135deg,#b70011,#dc2626)" } : undefined;
+  return href
+    ? <Link href={href} className={cls} style={style}><span>{icon}</span><span>{label}</span></Link>
+    : <div className={cls} style={style}><span>{icon}</span><span>{label}</span></div>;
 }
 
-function Kpi({ label, value, sub, tone }: { label: string; value: string; sub: string; tone: "cyan" | "blue" | "emerald" | "rose" | "amber" | "slate" }) {
-  const accent = {
-    cyan: "text-cyan-400", blue: "text-blue-400", emerald: "text-emerald-400",
-    rose: "text-red-400", amber: "text-amber-400", slate: "text-slate-200",
-  }[tone];
+function HealthCard({ icon, label, value, tag, accent }: { icon: string; label: string; value: string; tag: string; accent: string }) {
   return (
-    <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
-      <div className="text-xs text-slate-400">{label}</div>
-      <div className={`text-3xl font-bold tabular-nums mt-1 ${accent}`}>{value}</div>
-      <div className="text-[10px] text-slate-500 mt-1">{sub}</div>
+    <div className="rounded-xl p-5 space-y-3"
+      style={{
+        background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px)",
+        border: "1px solid rgba(255,255,255,0.4)", borderLeft: `4px solid ${accent}`,
+      }}>
+      <div className="flex justify-between items-start">
+        <span className="text-xl">{icon}</span>
+        <span className="text-[10px] px-2 py-1 rounded font-semibold" style={{ background: `${accent}1a`, color: accent }}>{tag}</span>
+      </div>
+      <div>
+        <p className="text-sm text-[#5c403c]">{label}</p>
+        <h2 className="text-3xl font-extrabold tabular-nums mt-0.5">{value}</h2>
+      </div>
     </div>
   );
-}
-
-function Legend({ c, t }: { c: string; t: string }) {
-  return <span className="flex items-center gap-1"><span className={`w-3 h-3 rounded-full ${c}`} />{t}</span>;
 }
 
 function Donut({ slices, total, center }: { slices: { label: string; n: number; color: string }[]; total: number; center: string }) {
@@ -381,13 +337,13 @@ function Donut({ slices, total, center }: { slices: { label: string; n: number; 
   ).list;
   return (
     <svg width="112" height="112" viewBox="0 0 112 112" className="shrink-0">
-      <circle cx={cx} cy={cy} r={R} fill="none" stroke="#1e293b" strokeWidth={sw} />
+      <circle cx={cx} cy={cy} r={R} fill="none" stroke="#f0dcd9" strokeWidth={sw} />
       {arcs.map((a, i) => (
         <circle key={i} cx={cx} cy={cy} r={R} fill="none" stroke={a.color} strokeWidth={sw}
           strokeDasharray={`${a.len} ${circ - a.len}`} strokeDashoffset={-a.off}
           transform={`rotate(-90 ${cx} ${cy})`} />
       ))}
-      <text x={cx} y={cy + 5} textAnchor="middle" className="fill-slate-100 text-lg font-bold">{center}</text>
+      <text x={cx} y={cy + 5} textAnchor="middle" className="fill-[#281715] text-lg font-extrabold">{center}</text>
     </svg>
   );
 }
