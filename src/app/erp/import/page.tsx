@@ -135,6 +135,9 @@ export default function DingxinSyncPage() {
             {parsed.type === "bom" && <BomPreview rows={parsed.rows} />}
             {parsed.type === "wo_cost" && <WoCostPreview rows={parsed.rows} />}
             {parsed.type === "wo_cost_detail" && <WoCostDetailPreview rows={parsed.rows} />}
+            {parsed.type === "shipment" && <ShipmentPreview rows={parsed.rows} />}
+            {parsed.type === "purchase" && <PurchasePreview rows={parsed.rows} />}
+            {parsed.type === "product_usage" && <ProductUsagePreview rows={parsed.rows} />}
           </section>
 
           <section className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-900">
@@ -406,6 +409,143 @@ function WoCostDetailPreview({ rows }: { rows: import("@/lib/erp/dingxin-parser"
       <p className="text-[11px] text-cyan-700 mt-2">
         ✓ CSTR08 含領料追溯：每張製令實際領了哪些料、領多少、領料單號（批號追溯基礎）
       </p>
+    </>
+  );
+}
+
+function ShipmentPreview({ rows }: { rows: import("@/lib/erp/dingxin-parser").DxShipment[] }) {
+  const totalAmt = rows.reduce((s, r) => s + r.amount, 0);
+  const customers = new Set(rows.map((r) => r.customerName).filter(Boolean));
+  return (
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm">
+        <Stat label="出貨明細筆數" value={`${rows.length}`} />
+        <Stat label="客戶數" value={`${customers.size}`} />
+        <Stat label="出貨金額合計" value={`$${(totalAmt / 10000).toFixed(0)}萬`} />
+        <Stat label="出貨通知單數" value={`${new Set(rows.map((r) => r.noticeNo)).size}`} />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="text-left px-2 py-1.5">出貨通知單</th>
+              <th className="text-left px-2 py-1.5">客戶</th>
+              <th className="text-left px-2 py-1.5">品號 / 品名</th>
+              <th className="text-right px-2 py-1.5">出貨數量</th>
+              <th className="text-left px-2 py-1.5">裝船日 / ETD</th>
+              <th className="text-right px-2 py-1.5">金額</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 30).map((r, i) => (
+              <tr key={i} className="border-t border-slate-100">
+                <td className="px-2 py-1.5 font-mono text-cyan-700">{r.noticeNo}</td>
+                <td className="px-2 py-1.5">{r.customerName}</td>
+                <td className="px-2 py-1.5"><span className="font-mono">{r.itemCode}</span> {r.itemName}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums">{r.shipQty} {r.unit}</td>
+                <td className="px-2 py-1.5 text-slate-500">{r.shipDate || "—"} / {r.etd || "—"}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums">${r.amount.toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 30 && <p className="text-[11px] text-slate-400 mt-2">… 共 {rows.length} 筆，僅顯示前 30</p>}
+      <p className="text-[11px] text-cyan-700 mt-2">✓ EPSR13 出貨資料 → 戰情室出貨追蹤 + 客戶 OTD 變真實</p>
+    </>
+  );
+}
+
+function PurchasePreview({ rows }: { rows: import("@/lib/erp/dingxin-parser").DxPurchase[] }) {
+  const openLines = rows.filter((r) => r.openQty > 0);
+  return (
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm">
+        <Stat label="採購明細筆數" value={`${rows.length}`} />
+        <Stat label="採購單數" value={`${new Set(rows.map((r) => r.poNo)).size}`} />
+        <Stat label="未交明細" value={`${openLines.length}`} hint="採購>進貨" />
+        <Stat label="供應商數" value={`${new Set(rows.map((r) => r.supplierName).filter(Boolean)).size}`} />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="text-left px-2 py-1.5">採購單號</th>
+              <th className="text-left px-2 py-1.5">供應商</th>
+              <th className="text-left px-2 py-1.5">品號 / 品名</th>
+              <th className="text-right px-2 py-1.5">採購 / 進貨</th>
+              <th className="text-right px-2 py-1.5">未交</th>
+              <th className="text-left px-2 py-1.5">預交日</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 30).map((r, i) => (
+              <tr key={i} className={`border-t border-slate-100 ${r.openQty > 0 ? "bg-amber-50/40" : ""}`}>
+                <td className="px-2 py-1.5 font-mono text-cyan-700">{r.poNo}</td>
+                <td className="px-2 py-1.5">{r.supplierName}</td>
+                <td className="px-2 py-1.5"><span className="font-mono">{r.itemCode}</span> {r.itemName}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums">{r.orderedQty} / {r.receivedQty}</td>
+                <td className={`px-2 py-1.5 text-right tabular-nums font-bold ${r.openQty > 0 ? "text-amber-700" : "text-slate-400"}`}>
+                  {r.openQty || "—"}
+                </td>
+                <td className="px-2 py-1.5 text-slate-500">{r.expectedDate || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 30 && <p className="text-[11px] text-slate-400 mt-2">… 共 {rows.length} 筆，僅顯示前 30</p>}
+      <p className="text-[11px] text-cyan-700 mt-2">✓ IPSR02 採購資料 → 計劃進貨 + 缺料預測 + 採購追蹤變真實</p>
+    </>
+  );
+}
+
+function ProductUsagePreview({ rows }: { rows: import("@/lib/erp/dingxin-parser").DxProductUsage[] }) {
+  const totalMatLines = rows.reduce((s, r) => s + r.materials.length, 0);
+  return (
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm">
+        <Stat label="產品數" value={`${rows.length}`} />
+        <Stat label="用料明細筆數" value={`${totalMatLines}`} />
+        <Stat label="平均料項/產品" value={`${rows.length ? Math.round(totalMatLines / rows.length) : 0}`} />
+        <Stat label="總生產數量" value={rows.reduce((s, r) => s + r.productionQty, 0).toLocaleString()} />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="text-left px-2 py-1.5">產品品號 / 品名</th>
+              <th className="text-right px-2 py-1.5">生產數量</th>
+              <th className="text-right px-2 py-1.5">用料項數</th>
+              <th className="text-left px-2 py-1.5">實際用料（單位用量）</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 25).map((r, i) => (
+              <tr key={i} className="border-t border-slate-100 align-top">
+                <td className="px-2 py-1.5"><div className="font-mono text-cyan-700">{r.productCode}</div><div className="text-slate-500">{r.productName}</div></td>
+                <td className="px-2 py-1.5 text-right tabular-nums">{r.productionQty}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums">{r.materials.length}</td>
+                <td className="px-2 py-1.5">
+                  <details>
+                    <summary className="cursor-pointer text-cyan-700">{r.materials.length} 項</summary>
+                    <ul className="mt-1 space-y-0.5">
+                      {r.materials.slice(0, 8).map((m, j) => (
+                        <li key={j} className="text-[11px] text-slate-600">
+                          <span className="font-mono">{m.materialCode}</span> {m.materialName} · 單位用量 {m.unitUsage}
+                        </li>
+                      ))}
+                      {r.materials.length > 8 && <li className="text-[11px] text-slate-400">… 共 {r.materials.length} 項</li>}
+                    </ul>
+                  </details>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 25 && <p className="text-[11px] text-slate-400 mt-2">… 共 {rows.length} 個產品，僅顯示前 25</p>}
+      <p className="text-[11px] text-cyan-700 mt-2">✓ CSTR11 實際用料 → 可對比標準 BOM 用量，抓異常耗損</p>
     </>
   );
 }

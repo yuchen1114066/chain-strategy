@@ -18,6 +18,9 @@ export type DingxinReportType =
   | "bom"           // BOMR05 BOM 報表
   | "wo_cost"       // CSTR07 製令成本分析表
   | "wo_cost_detail"// CSTR08 製令成本明細表（含領料明細）
+  | "product_usage" // CSTR11 製令用料分析（依產品彙總）
+  | "shipment"      // EPSR13 出貨通知明細
+  | "purchase"      // IPSR02 採購進貨明細
   | "unknown";
 
 type Cell = string | number | null | undefined;
@@ -54,9 +57,13 @@ export function detectReportType(aoa: Aoa): DingxinReportType {
   if (has("期初庫存量") && has("期末庫存量")) return "stock_inout"; // INVR19
   if (has("庫存數量") && has("品號") && !has("異動別")) return "stock_qty"; // INVR18
   if (has("元件品號") && has("階次") && has("主件品號")) return "bom";
+  if (has("出貨通知單號") && has("出貨數量")) return "shipment";       // EPSR13
+  if (has("採購單號") && has("採購數量") && has("進貨數量")) return "purchase"; // IPSR02
   // CSTR08 須先判（領料明細欄）— 它是 CSTR07 的超集
   if (has("製令編號") && has("領料編號") && has("材料品號")) return "wo_cost_detail";
   if (has("製令編號") && has("產品品號") && has("材料成本")) return "wo_cost";
+  // CSTR11：產品彙總用料（無製令編號，有生產數量+單位用量）
+  if (has("產品品號") && has("生產數量") && has("單位用量")) return "product_usage";
   return "unknown";
 }
 
@@ -514,6 +521,201 @@ export function parseWoCostDetail(aoa: Aoa): DxWoCostDetail[] {
   return [...map.values()];
 }
 
+// ===================================================================
+// EPSR13 出貨通知明細 → DxShipment[]
+// 真實出貨資料（客戶/裝船日/ETD/ETA/出貨數量）
+// ===================================================================
+export type DxShipment = {
+  noticeNo: string;       // 出貨通知單號
+  noticeDate: string;     // 通知日期
+  customsDate: string;    // 結關日
+  shipDate: string;       // 裝船日
+  customerCode: string;
+  customerName: string;
+  salesPerson: string;    // 業務員名稱
+  currency: string;       // 交易幣別
+  eta: string;            // E.T.A
+  etd: string;            // E.T.D
+  saleNo: string;         // 銷貨單號
+  saleDate: string;       // 銷貨日期
+  itemCode: string;       // 品號
+  itemName: string;
+  spec: string;
+  unit: string;
+  shipQty: number;        // 出貨數量
+  unitPrice: number;
+  amount: number;
+  orderNo: string;        // 訂單單號
+};
+
+export function parseShipment(aoa: Aoa): DxShipment[] {
+  const h = (aoa[0] ?? []).map((c) => norm(c));
+  const idx = (n: string) => h.findIndex((x) => x === n);
+  const i = {
+    noticeNo: idx("出貨通知單號"), noticeDate: idx("通知日期"),
+    customsDate: idx("結關日"), shipDate: idx("裝船日"),
+    custCode: idx("客戶代號"), custName: idx("客戶名稱"),
+    sales: idx("業務員名稱"), currency: idx("交易幣別"),
+    eta: idx("E.T.A"), etd: idx("E.T.D"),
+    saleNo: idx("銷貨單號"), saleDate: idx("銷貨日期"),
+    itemCode: idx("品號"), itemName: idx("品名"), spec: idx("規格"),
+    unit: idx("單位"), shipQty: idx("出貨數量"),
+    price: idx("單價"), amount: idx("金額"), orderNo: idx("訂單單號"),
+  };
+  const out: DxShipment[] = [];
+  for (let r = 1; r < aoa.length; r++) {
+    const row = aoa[r] ?? [];
+    if (isSubtotalRow(row[i.noticeNo], row)) continue;
+    const noticeNo = cell(row[i.noticeNo]);
+    const itemCode = cell(row[i.itemCode]);
+    if (!noticeNo && !itemCode) continue;
+    out.push({
+      noticeNo, noticeDate: cell(row[i.noticeDate]),
+      customsDate: cell(row[i.customsDate]), shipDate: cell(row[i.shipDate]),
+      customerCode: cell(row[i.custCode]), customerName: cell(row[i.custName]),
+      salesPerson: cell(row[i.sales]), currency: cell(row[i.currency]),
+      eta: cell(row[i.eta]), etd: cell(row[i.etd]),
+      saleNo: cell(row[i.saleNo]), saleDate: cell(row[i.saleDate]),
+      itemCode, itemName: cell(row[i.itemName]), spec: cell(row[i.spec]),
+      unit: cell(row[i.unit]) || "PCS", shipQty: numCell(row[i.shipQty]),
+      unitPrice: numCell(row[i.price]), amount: numCell(row[i.amount]),
+      orderNo: cell(row[i.orderNo]),
+    });
+  }
+  return out;
+}
+
+// ===================================================================
+// IPSR02 採購進貨明細 → DxPurchase[]
+// 採購單 + 進貨（採購量 vs 進貨量 / 預交日）→ 缺料預測、計劃進貨
+// ===================================================================
+export type DxPurchase = {
+  poDate: string;         // 採購日期
+  poNo: string;           // 採購單號
+  supplierCode: string;
+  supplierName: string;   // 簡稱
+  expectedDate: string;   // 預交日期
+  itemCode: string;
+  itemName: string;
+  spec: string;
+  orderedQty: number;     // 採購數量
+  receivedQty: number;    // 進貨數量
+  openQty: number;        // 未交量 = 採購 - 進貨
+  customsDate: string;    // 報關日期
+  inspectDate: string;    // 驗收日期
+  receiptNo: string;      // 進貨單號
+};
+
+export function parsePurchase(aoa: Aoa): DxPurchase[] {
+  const h = (aoa[0] ?? []).map((c) => norm(c));
+  const idx = (n: string) => h.findIndex((x) => x === n);
+  const i = {
+    poDate: idx("採購日期"), poNo: idx("採購單號"),
+    supCode: idx("廠商代號"), supName: idx("簡稱"),
+    expected: idx("預交日期"),
+    itemCode: idx("品號"), itemName: idx("品名"), spec: idx("規格"),
+    ordered: idx("採購數量"), received: idx("進貨數量"),
+    customs: idx("報關日期"), inspect: idx("驗收日期"),
+    receiptNo: idx("進貨單號"),
+  };
+  const out: DxPurchase[] = [];
+  for (let r = 1; r < aoa.length; r++) {
+    const row = aoa[r] ?? [];
+    if (isSubtotalRow(row[i.poNo], row)) continue;
+    const poNo = cell(row[i.poNo]);
+    const itemCode = cell(row[i.itemCode]);
+    if (!poNo && !itemCode) continue;
+    const ordered = numCell(row[i.ordered]);
+    const received = numCell(row[i.received]);
+    out.push({
+      poDate: cell(row[i.poDate]), poNo,
+      supplierCode: cell(row[i.supCode]), supplierName: cell(row[i.supName]),
+      expectedDate: cell(row[i.expected]),
+      itemCode, itemName: cell(row[i.itemName]), spec: cell(row[i.spec]),
+      orderedQty: ordered, receivedQty: received,
+      openQty: Math.max(0, ordered - received),
+      customsDate: cell(row[i.customs]), inspectDate: cell(row[i.inspect]),
+      receiptNo: cell(row[i.receiptNo]),
+    });
+  }
+  return out;
+}
+
+// ===================================================================
+// CSTR11 製令用料分析 → DxProductUsage[]
+// 每個產品實際用料彙總（依產品分組，含單位用量 → 對比標準 BOM）
+// ===================================================================
+export type DxProductUsage = {
+  productCode: string;
+  productName: string;
+  spec: string;
+  unit: string;
+  productionQty: number;  // 生產數量
+  materials: {
+    materialCode: string;
+    materialName: string;
+    spec: string;
+    unit: string;
+    unitPrice: number;
+    qty: number;          // 數量（總用量）
+    unitUsage: number;    // 單位用量
+    amount: number;
+  }[];
+};
+
+export function parseProductUsage(aoa: Aoa): DxProductUsage[] {
+  const h = (aoa[0] ?? []).map((c) => norm(c));
+  // 重複欄名：[單位][品名][規格] 出現兩次（產品 / 材料）
+  const firstIdx = (n: string) => h.findIndex((x) => x === n);
+  const secondIdx = (n: string, after: number) => h.findIndex((x, k) => x === n && k > after);
+  const iProd = firstIdx("產品品號");
+  const iProdUnit = firstIdx("單位");
+  const iProdName = firstIdx("品名");
+  const iProdSpec = firstIdx("規格");
+  const iProdQty = firstIdx("生產數量");
+  const iMatCode = firstIdx("材料品號");
+  const iMatUnit = secondIdx("單位", iMatCode);
+  const iMatName = secondIdx("品名", iMatCode);
+  const iMatSpec = secondIdx("規格", iMatCode);
+  const iPrice = firstIdx("單價");
+  const iQty = firstIdx("數量");
+  const iUnitUsage = firstIdx("單位用量");
+  const iAmount = firstIdx("金額");
+
+  const map = new Map<string, DxProductUsage>();
+  for (let r = 1; r < aoa.length; r++) {
+    const row = aoa[r] ?? [];
+    const prod = cell(row[iProd]);
+    if (!prod) continue;
+    let p = map.get(prod);
+    if (!p) {
+      p = {
+        productCode: prod,
+        productName: cell(row[iProdName]),
+        spec: cell(row[iProdSpec]),
+        unit: cell(row[iProdUnit]) || "PCS",
+        productionQty: numCell(row[iProdQty]),
+        materials: [],
+      };
+      map.set(prod, p);
+    }
+    const mCode = cell(row[iMatCode]);
+    if (mCode) {
+      p.materials.push({
+        materialCode: mCode,
+        materialName: iMatName >= 0 ? cell(row[iMatName]) : "",
+        spec: iMatSpec >= 0 ? cell(row[iMatSpec]) : "",
+        unit: iMatUnit >= 0 ? cell(row[iMatUnit]) : "",
+        unitPrice: numCell(row[iPrice]),
+        qty: numCell(row[iQty]),
+        unitUsage: numCell(row[iUnitUsage]),
+        amount: numCell(row[iAmount]),
+      });
+    }
+  }
+  return [...map.values()];
+}
+
 // ── 統一入口：給 AOA 自動判型 + 解析 ──
 export type ParsedDingxin =
   | { type: "item_master"; rows: DxItem[] }
@@ -523,6 +725,9 @@ export type ParsedDingxin =
   | { type: "bom"; rows: DxBomLine[] }
   | { type: "wo_cost"; rows: DxWoCost[] }
   | { type: "wo_cost_detail"; rows: DxWoCostDetail[] }
+  | { type: "product_usage"; rows: DxProductUsage[] }
+  | { type: "shipment"; rows: DxShipment[] }
+  | { type: "purchase"; rows: DxPurchase[] }
   | { type: "unknown"; rows: never[] };
 
 export function parseDingxinReport(aoa: Aoa): ParsedDingxin {
@@ -535,6 +740,9 @@ export function parseDingxinReport(aoa: Aoa): ParsedDingxin {
     case "bom":            return { type: t, rows: parseBomReport(aoa) };
     case "wo_cost":        return { type: t, rows: parseWoCost(aoa) };
     case "wo_cost_detail": return { type: t, rows: parseWoCostDetail(aoa) };
+    case "product_usage":  return { type: t, rows: parseProductUsage(aoa) };
+    case "shipment":       return { type: t, rows: parseShipment(aoa) };
+    case "purchase":       return { type: t, rows: parsePurchase(aoa) };
     default:               return { type: "unknown", rows: [] };
   }
 }
@@ -547,5 +755,8 @@ export const REPORT_LABEL: Record<DingxinReportType, string> = {
   bom: "BOMR05 BOM 報表",
   wo_cost: "CSTR07 製令成本分析表",
   wo_cost_detail: "CSTR08 製令成本明細表（含領料）",
+  product_usage: "CSTR11 製令用料分析",
+  shipment: "EPSR13 出貨通知明細",
+  purchase: "IPSR02 採購進貨明細",
   unknown: "未知格式",
 };
