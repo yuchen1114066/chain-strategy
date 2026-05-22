@@ -22,6 +22,7 @@ const advancedLinks = [
   { href: "/erp/simulator", label: "缺料模擬器", icon: "🔮" },
   { href: "/erp/analytics", label: "零件分析", icon: "📊" },
   { href: "/erp/materials", label: "原物料 AI 戰情室", icon: "🌐" },
+  { href: "/erp/negotiation", label: "AI 議價引擎", icon: "🤝" },
   { href: "/erp/reorder", label: "再下單時點", icon: "📦" },
   { href: "/erp/dead-stock", label: "呆料預警", icon: "🗑️" },
   { href: "/erp/outsource", label: "委外倉管理", icon: "🏭" },
