@@ -22,6 +22,7 @@ const advancedLinks = [
   { href: "/erp/simulator", label: "缺料模擬器", icon: "🔮" },
   { href: "/erp/analytics", label: "零件分析", icon: "📊" },
   { href: "/erp/reorder", label: "再下單時點", icon: "📦" },
+  { href: "/erp/outsource", label: "委外倉管理", icon: "🏭" },
   { href: "/erp/models", label: "型號 + BOM", icon: "🏗️" },
   { href: "/erp/bom-compare", label: "BOM 對照", icon: "🔍" },
   { href: "/erp/parts", label: "零件主檔", icon: "🔩" },
