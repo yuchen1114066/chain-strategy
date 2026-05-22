@@ -21,6 +21,10 @@ export type DingxinReportType =
   | "product_usage" // CSTR11 製令用料分析（依產品彙總）
   | "shipment"      // EPSR13 出貨通知明細
   | "purchase"      // IPSR02 採購進貨明細
+  | "wo_progress"   // MOCR10 製令明細表（製令進度/狀態）
+  | "mat_issue"     // MOCR11 領料明細表
+  | "mat_return"    // MOCR12 退料明細表
+  | "outsource"     // MOCR14 託外進貨單明細表
   | "unknown";
 
 type Cell = string | number | null | undefined;
@@ -59,6 +63,11 @@ export function detectReportType(aoa: Aoa): DingxinReportType {
   if (has("元件品號") && has("階次") && has("主件品號")) return "bom";
   if (has("出貨通知單號") && has("出貨數量")) return "shipment";       // EPSR13
   if (has("採購單號") && has("採購數量") && has("進貨數量")) return "purchase"; // IPSR02
+  // MOC 系列
+  if (has("託外進貨單號") && has("驗收數量")) return "outsource";      // MOCR14
+  if (has("製令編號") && has("狀態碼") && has("預計產量")) return "wo_progress"; // MOCR10
+  if (has("領料單號") && has("領料數量") && has("製令單號")) return "mat_issue"; // MOCR11
+  if (has("退料單號") && has("退料數量")) return "mat_return";         // MOCR12
   // CSTR08 須先判（領料明細欄）— 它是 CSTR07 的超集
   if (has("製令編號") && has("領料編號") && has("材料品號")) return "wo_cost_detail";
   if (has("製令編號") && has("產品品號") && has("材料成本")) return "wo_cost";
@@ -716,6 +725,176 @@ export function parseProductUsage(aoa: Aoa): DxProductUsage[] {
   return [...map.values()];
 }
 
+// ===================================================================
+// MOCR10 製令明細表 → DxWoProgress[]
+// 製令狀態 / 預計vs已生產 / 預計開完工 / 急料 → 戰情室八階段追蹤
+// ===================================================================
+export type DxWoProgress = {
+  woNo: string;           // 製令編號
+  confirmDate: string;    // 確認日期
+  confirmCode: string;    // 確認碼
+  statusCode: string;     // 狀態碼（已完工/生產中…）
+  productCode: string;
+  productName: string;
+  spec: string;
+  unit: string;
+  plannedQty: number;     // 預計產量
+  producedQty: number;    // 已生產量
+  issuedSets: number;     // 已領套數
+  unproducedQty: number;  // 未生產量
+  orderDate: string;      // 開單日期
+  plannedStart: string;   // 預計開工
+  plannedFinish: string;  // 預計完工
+  urgent: string;         // 急料
+  processor: string;      // 加工廠商名稱（託外）
+  warehouseName: string;
+};
+
+export function parseWoProgress(aoa: Aoa): DxWoProgress[] {
+  const h = (aoa[0] ?? []).map((c) => norm(c));
+  const idx = (n: string) => h.findIndex((x) => x === n);
+  const i = {
+    wo: idx("製令編號"), cfDate: idx("確認日期"), cfCode: idx("確認碼"),
+    status: idx("狀態碼"), prod: idx("產品品號"), unit: idx("單位"),
+    name: idx("品名"), spec: idx("規格"),
+    planned: idx("預計產量"), produced: idx("已生產量"),
+    sets: idx("已領套數"), unprod: idx("未生產量"),
+    orderDate: idx("開單日期"), pStart: idx("預計開工"), pFinish: idx("預計完工"),
+    urgent: idx("急料"), processor: idx("廠商名稱"), whName: idx("庫別名稱"),
+  };
+  const out: DxWoProgress[] = [];
+  for (let r = 1; r < aoa.length; r++) {
+    const row = aoa[r] ?? [];
+    const wo = cell(row[i.wo]);
+    if (!wo) continue;
+    out.push({
+      woNo: wo, confirmDate: cell(row[i.cfDate]), confirmCode: cell(row[i.cfCode]),
+      statusCode: cell(row[i.status]),
+      productCode: cell(row[i.prod]), productName: cell(row[i.name]),
+      spec: cell(row[i.spec]), unit: cell(row[i.unit]) || "PCS",
+      plannedQty: numCell(row[i.planned]), producedQty: numCell(row[i.produced]),
+      issuedSets: numCell(row[i.sets]), unproducedQty: numCell(row[i.unprod]),
+      orderDate: cell(row[i.orderDate]), plannedStart: cell(row[i.pStart]),
+      plannedFinish: cell(row[i.pFinish]), urgent: cell(row[i.urgent]),
+      processor: cell(row[i.processor]), warehouseName: cell(row[i.whName]),
+    });
+  }
+  return out;
+}
+
+// ===================================================================
+// MOCR11 領料明細表 / MOCR12 退料明細表 → DxMaterialMove[]
+// 含批號 + 儲存位置 → 批號追溯
+// ===================================================================
+export type DxMaterialMove = {
+  direction: "issue" | "return"; // 領料 / 退料
+  date: string;
+  docNo: string;          // 領料單號 / 退料單號
+  materialCode: string;
+  materialName: string;
+  spec: string;
+  qty: number;            // 領料數量 / 退料數量
+  unit: string;
+  process: string;        // 製程
+  woNo: string;           // 製令單號
+  warehouseName: string;
+  location: string;       // 儲存位置
+  batchNo: string;        // 批號
+};
+
+function parseMaterialMove(aoa: Aoa, dir: "issue" | "return"): DxMaterialMove[] {
+  const h = (aoa[0] ?? []).map((c) => norm(c));
+  const idx = (n: string) => h.findIndex((x) => x === n);
+  const iDate = dir === "issue" ? idx("領料日期") : idx("退料日期");
+  const iDoc = dir === "issue" ? idx("領料單號") : idx("退料單號");
+  const iQty = dir === "issue" ? idx("領料數量") : idx("退料數量");
+  const iMat = idx("材料品號");
+  const iName = idx("品名");
+  const iSpec = idx("規格");
+  const iUnit = idx("單位");
+  const iProc = idx("製程");
+  const iWo = idx("製令單號");
+  const iWh = idx("庫別名稱");
+  const iLoc = idx("儲存位置");
+  const iBatch = idx("批號");
+  const out: DxMaterialMove[] = [];
+  for (let r = 1; r < aoa.length; r++) {
+    const row = aoa[r] ?? [];
+    const mat = cell(row[iMat]);
+    if (!mat) continue;
+    out.push({
+      direction: dir,
+      date: cell(row[iDate]), docNo: cell(row[iDoc]),
+      materialCode: mat, materialName: cell(row[iName]), spec: cell(row[iSpec]),
+      qty: numCell(row[iQty]), unit: cell(row[iUnit]) || "PCS",
+      process: cell(row[iProc]), woNo: cell(row[iWo]),
+      warehouseName: cell(row[iWh]), location: cell(row[iLoc]),
+      batchNo: cell(row[iBatch]),
+    });
+  }
+  return out;
+}
+export const parseMaterialIssue = (aoa: Aoa) => parseMaterialMove(aoa, "issue");
+export const parseMaterialReturn = (aoa: Aoa) => parseMaterialMove(aoa, "return");
+
+// ===================================================================
+// MOCR14 託外進貨單明細表 → DxOutsourceReceipt[]
+// 委外倉管理：加工廠商/進貨/驗收/逾期/檢驗狀態/驗退
+// ===================================================================
+export type DxOutsourceReceipt = {
+  receiptDate: string;    // 進貨日期
+  receiptNo: string;      // 託外進貨單號
+  processorCode: string;  // 加工廠商代號
+  processorName: string;  // 加工廠商簡稱
+  itemCode: string;
+  itemName: string;
+  spec: string;
+  process: string;        // 製程名稱
+  inspectDate: string;    // 驗收日期
+  receivedQty: number;    // 進貨數量
+  inspectedQty: number;   // 驗收數量
+  scrapQty: number;       // 報廢數量
+  rejectedQty: number;    // 驗退數量
+  overdue: string;        // 逾期
+  inspectStatus: string;  // 檢驗狀態
+  woNo: string;           // 製令單號
+  batchNo: string;        // 批號
+  urgent: string;         // 急料
+};
+
+export function parseOutsourceReceipt(aoa: Aoa): DxOutsourceReceipt[] {
+  const h = (aoa[0] ?? []).map((c) => norm(c));
+  const idx = (n: string) => h.findIndex((x) => x === n);
+  const i = {
+    date: idx("進貨日期"), no: idx("託外進貨單號"),
+    pCode: idx("加工廠商代號"), pName: idx("加工廠商簡稱"),
+    itemCode: idx("品號"), itemName: idx("品名"), spec: idx("規格"),
+    proc: idx("製程名稱"), inspectDate: idx("驗收日期"),
+    received: idx("進貨數量"), inspected: idx("驗收數量"),
+    scrap: idx("報廢數量"), rejected: idx("驗退數量"),
+    overdue: idx("逾期"), inspectStatus: idx("檢驗狀態"),
+    wo: idx("製令單號"), batch: idx("批號"), urgent: idx("急料"),
+  };
+  const out: DxOutsourceReceipt[] = [];
+  for (let r = 1; r < aoa.length; r++) {
+    const row = aoa[r] ?? [];
+    const itemCode = cell(row[i.itemCode]);
+    const no = cell(row[i.no]);
+    if (!itemCode && !no) continue;
+    out.push({
+      receiptDate: cell(row[i.date]), receiptNo: no,
+      processorCode: cell(row[i.pCode]), processorName: cell(row[i.pName]),
+      itemCode, itemName: cell(row[i.itemName]), spec: cell(row[i.spec]),
+      process: cell(row[i.proc]), inspectDate: cell(row[i.inspectDate]),
+      receivedQty: numCell(row[i.received]), inspectedQty: numCell(row[i.inspected]),
+      scrapQty: numCell(row[i.scrap]), rejectedQty: numCell(row[i.rejected]),
+      overdue: cell(row[i.overdue]), inspectStatus: cell(row[i.inspectStatus]),
+      woNo: cell(row[i.wo]), batchNo: cell(row[i.batch]), urgent: cell(row[i.urgent]),
+    });
+  }
+  return out;
+}
+
 // ── 統一入口：給 AOA 自動判型 + 解析 ──
 export type ParsedDingxin =
   | { type: "item_master"; rows: DxItem[] }
@@ -728,6 +907,10 @@ export type ParsedDingxin =
   | { type: "product_usage"; rows: DxProductUsage[] }
   | { type: "shipment"; rows: DxShipment[] }
   | { type: "purchase"; rows: DxPurchase[] }
+  | { type: "wo_progress"; rows: DxWoProgress[] }
+  | { type: "mat_issue"; rows: DxMaterialMove[] }
+  | { type: "mat_return"; rows: DxMaterialMove[] }
+  | { type: "outsource"; rows: DxOutsourceReceipt[] }
   | { type: "unknown"; rows: never[] };
 
 export function parseDingxinReport(aoa: Aoa): ParsedDingxin {
@@ -743,6 +926,10 @@ export function parseDingxinReport(aoa: Aoa): ParsedDingxin {
     case "product_usage":  return { type: t, rows: parseProductUsage(aoa) };
     case "shipment":       return { type: t, rows: parseShipment(aoa) };
     case "purchase":       return { type: t, rows: parsePurchase(aoa) };
+    case "wo_progress":    return { type: t, rows: parseWoProgress(aoa) };
+    case "mat_issue":      return { type: t, rows: parseMaterialIssue(aoa) };
+    case "mat_return":     return { type: t, rows: parseMaterialReturn(aoa) };
+    case "outsource":      return { type: t, rows: parseOutsourceReceipt(aoa) };
     default:               return { type: "unknown", rows: [] };
   }
 }
@@ -758,5 +945,9 @@ export const REPORT_LABEL: Record<DingxinReportType, string> = {
   product_usage: "CSTR11 製令用料分析",
   shipment: "EPSR13 出貨通知明細",
   purchase: "IPSR02 採購進貨明細",
+  wo_progress: "MOCR10 製令明細表（進度）",
+  mat_issue: "MOCR11 領料明細表",
+  mat_return: "MOCR12 退料明細表",
+  outsource: "MOCR14 託外進貨明細表",
   unknown: "未知格式",
 };

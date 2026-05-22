@@ -138,6 +138,10 @@ export default function DingxinSyncPage() {
             {parsed.type === "shipment" && <ShipmentPreview rows={parsed.rows} />}
             {parsed.type === "purchase" && <PurchasePreview rows={parsed.rows} />}
             {parsed.type === "product_usage" && <ProductUsagePreview rows={parsed.rows} />}
+            {parsed.type === "wo_progress" && <WoProgressPreview rows={parsed.rows} />}
+            {parsed.type === "mat_issue" && <MaterialMovePreview rows={parsed.rows} dir="領料" />}
+            {parsed.type === "mat_return" && <MaterialMovePreview rows={parsed.rows} dir="退料" />}
+            {parsed.type === "outsource" && <OutsourcePreview rows={parsed.rows} />}
           </section>
 
           <section className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-900">
@@ -546,6 +550,144 @@ function ProductUsagePreview({ rows }: { rows: import("@/lib/erp/dingxin-parser"
       </div>
       {rows.length > 25 && <p className="text-[11px] text-slate-400 mt-2">… 共 {rows.length} 個產品，僅顯示前 25</p>}
       <p className="text-[11px] text-cyan-700 mt-2">✓ CSTR11 實際用料 → 可對比標準 BOM 用量，抓異常耗損</p>
+    </>
+  );
+}
+
+function WoProgressPreview({ rows }: { rows: import("@/lib/erp/dingxin-parser").DxWoProgress[] }) {
+  const urgent = rows.filter((r) => r.urgent && r.urgent !== "N" && r.urgent !== "").length;
+  const inProgress = rows.filter((r) => r.unproducedQty > 0).length;
+  return (
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm">
+        <Stat label="製令數" value={`${rows.length}`} />
+        <Stat label="未完工" value={`${inProgress}`} hint="未生產量>0" />
+        <Stat label="急料製令" value={`${urgent}`} hint="標急料" />
+        <Stat label="總預計產量" value={rows.reduce((s, r) => s + r.plannedQty, 0).toLocaleString()} />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="text-left px-2 py-1.5">製令編號</th>
+              <th className="text-left px-2 py-1.5">產品 / 狀態</th>
+              <th className="text-right px-2 py-1.5">預計 / 已生產 / 未生產</th>
+              <th className="text-left px-2 py-1.5">預計開工 / 完工</th>
+              <th className="text-center px-2 py-1.5">急料</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 30).map((r, i) => {
+              const isUrgent = r.urgent && r.urgent !== "N" && r.urgent !== "";
+              return (
+                <tr key={i} className={`border-t border-slate-100 ${isUrgent ? "bg-rose-50/40" : ""}`}>
+                  <td className="px-2 py-1.5 font-mono text-cyan-700">{r.woNo}</td>
+                  <td className="px-2 py-1.5">
+                    <span className="font-mono">{r.productCode}</span> {r.productName}
+                    <span className="ml-1 text-[10px] px-1 py-0.5 rounded bg-slate-100">{r.statusCode}</span>
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{r.plannedQty} / {r.producedQty} / {r.unproducedQty}</td>
+                  <td className="px-2 py-1.5 text-slate-500">{r.plannedStart} / {r.plannedFinish}</td>
+                  <td className="px-2 py-1.5 text-center">{isUrgent ? <span className="text-rose-600 font-bold">急</span> : "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 30 && <p className="text-[11px] text-slate-400 mt-2">… 共 {rows.length} 筆，僅顯示前 30</p>}
+      <p className="text-[11px] text-cyan-700 mt-2">✓ MOCR10 製令進度 → 戰情室八階段追蹤變真實（狀態/急料/預計開完工）</p>
+    </>
+  );
+}
+
+function MaterialMovePreview({ rows, dir }: { rows: import("@/lib/erp/dingxin-parser").DxMaterialMove[]; dir: string }) {
+  const withBatch = rows.filter((r) => r.batchNo).length;
+  return (
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm">
+        <Stat label={`${dir}明細筆數`} value={`${rows.length}`} />
+        <Stat label="有批號" value={`${withBatch}`} hint="可追溯" />
+        <Stat label={`${dir}單數`} value={`${new Set(rows.map((r) => r.docNo)).size}`} />
+        <Stat label="涉及製令" value={`${new Set(rows.map((r) => r.woNo).filter(Boolean)).size}`} />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="text-left px-2 py-1.5">{dir}日期</th>
+              <th className="text-left px-2 py-1.5">{dir}單號</th>
+              <th className="text-left px-2 py-1.5">材料品號 / 品名</th>
+              <th className="text-right px-2 py-1.5">{dir}數量</th>
+              <th className="text-left px-2 py-1.5">製令單號</th>
+              <th className="text-left px-2 py-1.5">批號 / 儲位</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 30).map((r, i) => (
+              <tr key={i} className="border-t border-slate-100">
+                <td className="px-2 py-1.5 text-slate-500">{r.date}</td>
+                <td className="px-2 py-1.5 font-mono text-cyan-700">{r.docNo}</td>
+                <td className="px-2 py-1.5"><span className="font-mono">{r.materialCode}</span> {r.materialName}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums">{r.qty} {r.unit}</td>
+                <td className="px-2 py-1.5 font-mono text-slate-500">{r.woNo || "—"}</td>
+                <td className="px-2 py-1.5 text-slate-500">{r.batchNo || "—"}{r.location ? ` · ${r.location}` : ""}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 30 && <p className="text-[11px] text-slate-400 mt-2">… 共 {rows.length} 筆，僅顯示前 30</p>}
+      <p className="text-[11px] text-cyan-700 mt-2">✓ {dir}明細含批號 → 批號追溯基礎</p>
+    </>
+  );
+}
+
+function OutsourcePreview({ rows }: { rows: import("@/lib/erp/dingxin-parser").DxOutsourceReceipt[] }) {
+  const overdue = rows.filter((r) => r.overdue && r.overdue !== "N" && r.overdue !== "").length;
+  const rejected = rows.reduce((s, r) => s + r.rejectedQty + r.scrapQty, 0);
+  const processors = new Set(rows.map((r) => r.processorName).filter(Boolean));
+  return (
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm">
+        <Stat label="託外進貨筆數" value={`${rows.length}`} />
+        <Stat label="加工廠商數" value={`${processors.size}`} />
+        <Stat label="逾期筆數" value={`${overdue}`} hint="委外逾期" />
+        <Stat label="驗退+報廢量" value={rejected.toLocaleString()} hint="委外不良" />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="text-left px-2 py-1.5">進貨日 / 單號</th>
+              <th className="text-left px-2 py-1.5">加工廠商</th>
+              <th className="text-left px-2 py-1.5">品號 / 製程</th>
+              <th className="text-right px-2 py-1.5">進貨 / 驗收</th>
+              <th className="text-right px-2 py-1.5">驗退+報廢</th>
+              <th className="text-center px-2 py-1.5">逾期</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 30).map((r, i) => {
+              const isOverdue = r.overdue && r.overdue !== "N" && r.overdue !== "";
+              return (
+                <tr key={i} className={`border-t border-slate-100 ${isOverdue ? "bg-rose-50/40" : ""}`}>
+                  <td className="px-2 py-1.5 text-slate-500">{r.receiptDate}<br /><span className="font-mono text-cyan-700">{r.receiptNo}</span></td>
+                  <td className="px-2 py-1.5">{r.processorName}</td>
+                  <td className="px-2 py-1.5"><span className="font-mono">{r.itemCode}</span><br /><span className="text-slate-500">{r.process}</span></td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{r.receivedQty} / {r.inspectedQty}</td>
+                  <td className={`px-2 py-1.5 text-right tabular-nums ${r.rejectedQty + r.scrapQty > 0 ? "text-rose-600 font-bold" : "text-slate-400"}`}>
+                    {r.rejectedQty + r.scrapQty || "—"}
+                  </td>
+                  <td className="px-2 py-1.5 text-center">{isOverdue ? <span className="text-rose-600 font-bold">逾期</span> : "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 30 && <p className="text-[11px] text-slate-400 mt-2">… 共 {rows.length} 筆，僅顯示前 30</p>}
+      <p className="text-[11px] text-cyan-700 mt-2">✓ MOCR14 託外進貨 → 委外倉管理（在外加工/逾期/驗退追蹤）</p>
     </>
   );
 }
