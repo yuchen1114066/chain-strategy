@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 // 主功能：貨件追蹤 + 卡點 AI 解方
 const primaryLinks = [
   { href: "/erp", label: "戰情室", icon: "🎯", primary: true },
+  { href: "/erp/wms", label: "WMS 戰情 Dashboard", icon: "⚡" },
   { href: "/erp/flow", label: "流程綜觀", icon: "🌊" },
   { href: "/erp/viz", label: "可視化儀表板", icon: "📈" },
   { href: "/erp/alerts", label: "異常警訊 + AI 解方", icon: "🚨" },
@@ -34,6 +35,9 @@ export default function Sidebar() {
   const pathname = usePathname() ?? "";
   const inAdvanced = advancedLinks.some((l) => pathname.startsWith(l.href));
   const [showAdvanced, setShowAdvanced] = useState(inAdvanced);
+
+  // WMS Dashboard 為全螢幕暗色旗艦頁，自帶 sidebar
+  if (pathname.startsWith("/erp/wms")) return null;
 
   return (
     <aside className="w-60 shrink-0 border-r border-slate-800 bg-slate-950 text-slate-100 min-h-screen">
