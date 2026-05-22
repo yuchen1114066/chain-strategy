@@ -11,6 +11,7 @@ const primaryLinks = [
   { href: "/erp/flow", label: "流程綜觀", icon: "🌊" },
   { href: "/erp/viz", label: "可視化儀表板", icon: "📈" },
   { href: "/erp/alerts", label: "異常警訊 + AI 解方", icon: "🚨" },
+  { href: "/erp/shortage-wall", label: "缺料牆", icon: "🧱" },
   { href: "/erp/work-orders", label: "工單追蹤", icon: "📋" },
 ];
 
