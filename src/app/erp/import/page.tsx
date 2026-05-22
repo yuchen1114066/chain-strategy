@@ -142,6 +142,9 @@ export default function DingxinSyncPage() {
             {parsed.type === "mat_issue" && <MaterialMovePreview rows={parsed.rows} dir="領料" />}
             {parsed.type === "mat_return" && <MaterialMovePreview rows={parsed.rows} dir="退料" />}
             {parsed.type === "outsource" && <OutsourcePreview rows={parsed.rows} />}
+            {parsed.type === "wo_hours" && <WoHoursPreview rows={parsed.rows} />}
+            {parsed.type === "wo_demand" && <WoDemandPreview rows={parsed.rows} />}
+            {parsed.type === "wo_unissued" && <WoUnissuedPreview rows={parsed.rows} />}
           </section>
 
           <section className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-900">
@@ -688,6 +691,139 @@ function OutsourcePreview({ rows }: { rows: import("@/lib/erp/dingxin-parser").D
       </div>
       {rows.length > 30 && <p className="text-[11px] text-slate-400 mt-2">… 共 {rows.length} 筆，僅顯示前 30</p>}
       <p className="text-[11px] text-cyan-700 mt-2">✓ MOCR14 託外進貨 → 委外倉管理（在外加工/逾期/驗退追蹤）</p>
+    </>
+  );
+}
+
+function WoHoursPreview({ rows }: { rows: import("@/lib/erp/dingxin-parser").DxWoHours[] }) {
+  const totalLabor = rows.reduce((s, r) => s + r.laborHours, 0);
+  const totalMachine = rows.reduce((s, r) => s + r.machineHours, 0);
+  return (
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm">
+        <Stat label="工時筆數" value={`${rows.length}`} />
+        <Stat label="製令數" value={`${new Set(rows.map((r) => r.woNo)).size}`} />
+        <Stat label="總人時" value={totalLabor.toLocaleString(undefined, { maximumFractionDigits: 0 })} />
+        <Stat label="總機時" value={totalMachine.toLocaleString(undefined, { maximumFractionDigits: 0 })} />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="text-left px-2 py-1.5">製令單號</th>
+              <th className="text-left px-2 py-1.5">產品 / 線別</th>
+              <th className="text-left px-2 py-1.5">日期</th>
+              <th className="text-right px-2 py-1.5">人時</th>
+              <th className="text-right px-2 py-1.5">機時</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 30).map((r, i) => (
+              <tr key={i} className="border-t border-slate-100">
+                <td className="px-2 py-1.5 font-mono text-cyan-700">{r.woNo}</td>
+                <td className="px-2 py-1.5"><span className="font-mono">{r.productCode}</span> · {r.lineName}</td>
+                <td className="px-2 py-1.5 text-slate-500">{r.date}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums">{r.laborHours.toFixed(2)}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums">{r.machineHours.toFixed(2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 30 && <p className="text-[11px] text-slate-400 mt-2">… 共 {rows.length} 筆，僅顯示前 30</p>}
+      <p className="text-[11px] text-cyan-700 mt-2">✓ CSTR02 工時 → 產能分析 / 工時負荷</p>
+    </>
+  );
+}
+
+function WoDemandPreview({ rows }: { rows: import("@/lib/erp/dingxin-parser").DxWoDemand[] }) {
+  const shortage = rows.filter((r) => r.stockBalance < 0);
+  return (
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm">
+        <Stat label="需求明細筆數" value={`${rows.length}`} />
+        <Stat label="缺料筆數" value={`${shortage.length}`} hint="庫存結餘<0" />
+        <Stat label="涉及製令" value={`${new Set(rows.map((r) => r.woNo).filter(Boolean)).size}`} />
+        <Stat label="急料筆數" value={`${rows.filter((r) => r.urgent && r.urgent !== "N" && r.urgent !== "").length}`} />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="text-left px-2 py-1.5">料件品號 / 品名</th>
+              <th className="text-left px-2 py-1.5">製令編號</th>
+              <th className="text-right px-2 py-1.5">現有庫存</th>
+              <th className="text-right px-2 py-1.5">預計用量</th>
+              <th className="text-right px-2 py-1.5">庫存結餘</th>
+              <th className="text-left px-2 py-1.5">預計領用日</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 30).map((r, i) => (
+              <tr key={i} className={`border-t border-slate-100 ${r.stockBalance < 0 ? "bg-rose-50/50" : ""}`}>
+                <td className="px-2 py-1.5"><span className="font-mono">{r.materialCode}</span> {r.materialName}</td>
+                <td className="px-2 py-1.5 font-mono text-cyan-700">{r.woNo}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums">{r.onHand}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums">{r.expectedQty}</td>
+                <td className={`px-2 py-1.5 text-right tabular-nums font-bold ${r.stockBalance < 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                  {r.stockBalance}
+                </td>
+                <td className="px-2 py-1.5 text-slate-500">{r.expectedUseDate || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 30 && <p className="text-[11px] text-slate-400 mt-2">… 共 {rows.length} 筆，僅顯示前 30</p>}
+      <p className="text-[11px] text-cyan-700 mt-2">✓ MOCR25 製令需求 → 缺料牆（庫存結餘 &lt; 0 即缺料，紅底標示）</p>
+    </>
+  );
+}
+
+function WoUnissuedPreview({ rows }: { rows: import("@/lib/erp/dingxin-parser").DxWoUnissued[] }) {
+  const open = rows.filter((r) => r.unissuedQty > 0);
+  const cantCover = open.filter((r) => r.stockQty < r.unissuedQty);
+  return (
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm">
+        <Stat label="未領料明細" value={`${rows.length}`} />
+        <Stat label="尚有未領" value={`${open.length}`} hint="未領料量>0" />
+        <Stat label="庫存不足以領" value={`${cantCover.length}`} hint="庫存<未領料" />
+        <Stat label="急料" value={`${rows.filter((r) => r.urgent && r.urgent !== "N" && r.urgent !== "").length}`} />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="text-left px-2 py-1.5">品號 / 品名</th>
+              <th className="text-left px-2 py-1.5">製令單號</th>
+              <th className="text-right px-2 py-1.5">應領 / 未領</th>
+              <th className="text-right px-2 py-1.5">庫存數量</th>
+              <th className="text-center px-2 py-1.5">可否足領</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 30).map((r, i) => {
+              const cant = r.unissuedQty > 0 && r.stockQty < r.unissuedQty;
+              return (
+                <tr key={i} className={`border-t border-slate-100 ${cant ? "bg-rose-50/50" : ""}`}>
+                  <td className="px-2 py-1.5"><span className="font-mono">{r.itemCode}</span> {r.itemName}</td>
+                  <td className="px-2 py-1.5 font-mono text-cyan-700">{r.woNo}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{r.needQty} / {r.unissuedQty}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{r.stockQty}</td>
+                  <td className="px-2 py-1.5 text-center">
+                    {r.unissuedQty <= 0 ? <span className="text-slate-400">已領</span>
+                      : cant ? <span className="text-rose-600 font-bold">不足</span>
+                      : <span className="text-emerald-600">足</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 30 && <p className="text-[11px] text-slate-400 mt-2">… 共 {rows.length} 筆，僅顯示前 30</p>}
+      <p className="text-[11px] text-cyan-700 mt-2">✓ MOCR43 未領料 → 欠料牆（庫存 &lt; 未領料量即停線風險，紅底）</p>
     </>
   );
 }

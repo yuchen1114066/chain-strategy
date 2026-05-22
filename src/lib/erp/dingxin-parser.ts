@@ -25,6 +25,9 @@ export type DingxinReportType =
   | "mat_issue"     // MOCR11 領料明細表
   | "mat_return"    // MOCR12 退料明細表
   | "outsource"     // MOCR14 託外進貨單明細表
+  | "wo_hours"      // CSTR02 製令工時表
+  | "wo_demand"     // MOCR25 製令需求檢視表
+  | "wo_unissued"   // MOCR43 製令未領料明細表
   | "unknown";
 
 type Cell = string | number | null | undefined;
@@ -68,6 +71,9 @@ export function detectReportType(aoa: Aoa): DingxinReportType {
   if (has("製令編號") && has("狀態碼") && has("預計產量")) return "wo_progress"; // MOCR10
   if (has("領料單號") && has("領料數量") && has("製令單號")) return "mat_issue"; // MOCR11
   if (has("退料單號") && has("退料數量")) return "mat_return";         // MOCR12
+  if (has("製令單號") && has("使用人時") && has("使用機時")) return "wo_hours"; // CSTR02
+  if (has("料件品號") && has("庫存結餘") && has("預計領用日")) return "wo_demand"; // MOCR25
+  if (has("製令單號") && has("應領料量") && has("未領料量")) return "wo_unissued"; // MOCR43
   // CSTR08 須先判（領料明細欄）— 它是 CSTR07 的超集
   if (has("製令編號") && has("領料編號") && has("材料品號")) return "wo_cost_detail";
   if (has("製令編號") && has("產品品號") && has("材料成本")) return "wo_cost";
@@ -895,6 +901,144 @@ export function parseOutsourceReceipt(aoa: Aoa): DxOutsourceReceipt[] {
   return out;
 }
 
+// ===================================================================
+// CSTR02 製令工時表 → DxWoHours[]
+// 製令 / 線別 / 人時 / 機時 → 產能、工時分析
+// ===================================================================
+export type DxWoHours = {
+  woNo: string;
+  productCode: string;
+  productName: string;
+  spec: string;
+  lineCode: string;
+  lineName: string;
+  date: string;
+  laborHours: number;     // 使用人時
+  machineHours: number;   // 使用機時
+};
+
+export function parseWoHours(aoa: Aoa): DxWoHours[] {
+  const h = (aoa[0] ?? []).map((c) => norm(c));
+  const idx = (n: string) => h.findIndex((x) => x === n);
+  const i = {
+    wo: idx("製令單號"), prod: idx("產品品號"), name: idx("品名"),
+    spec: idx("規格"), lineCode: idx("線別代號"), lineName: idx("線別名稱"),
+    date: idx("日期"), labor: idx("使用人時"), machine: idx("使用機時"),
+  };
+  const out: DxWoHours[] = [];
+  for (let r = 1; r < aoa.length; r++) {
+    const row = aoa[r] ?? [];
+    const wo = cell(row[i.wo]);
+    if (!wo) continue;
+    out.push({
+      woNo: wo, productCode: cell(row[i.prod]), productName: cell(row[i.name]),
+      spec: cell(row[i.spec]), lineCode: cell(row[i.lineCode]),
+      lineName: cell(row[i.lineName]), date: cell(row[i.date]),
+      laborHours: numCell(row[i.labor]), machineHours: numCell(row[i.machine]),
+    });
+  }
+  return out;
+}
+
+// ===================================================================
+// MOCR25 製令需求檢視表 → DxWoDemand[]
+// 料件需求 vs 庫存結餘（負 = 缺料）→ 缺料牆
+// ===================================================================
+export type DxWoDemand = {
+  materialCode: string;
+  materialName: string;
+  spec: string;
+  unit: string;
+  onHand: number;         // 現有庫存
+  plannedIn: number;      // 預計入庫
+  expectedUseDate: string;// 預計領用日
+  expectedQty: number;    // 預計用量
+  accumQty: number;       // 累計用量
+  stockBalance: number;   // 庫存結餘（負=缺料）
+  woNo: string;           // 製令編號
+  productCode: string;
+  urgent: string;
+  orderNo: string;
+  warehouseName: string;
+};
+
+export function parseWoDemand(aoa: Aoa): DxWoDemand[] {
+  const h = (aoa[0] ?? []).map((c) => norm(c));
+  const idx = (n: string) => h.findIndex((x) => x === n);
+  const i = {
+    mat: idx("料件品號"), unit: idx("單位"), name: idx("品名"), spec: idx("規格"),
+    onHand: idx("現有庫存"), plannedIn: idx("預計入庫"),
+    useDate: idx("預計領用日"), expQty: idx("預計用量"), accumQty: idx("累計用量"),
+    balance: idx("庫存結餘"), wo: idx("製令編號"), prod: idx("產品品號"),
+    urgent: idx("急料"), order: idx("訂單單號"), whName: idx("庫別名稱"),
+  };
+  const out: DxWoDemand[] = [];
+  for (let r = 1; r < aoa.length; r++) {
+    const row = aoa[r] ?? [];
+    const mat = cell(row[i.mat]);
+    if (!mat) continue;
+    out.push({
+      materialCode: mat, materialName: cell(row[i.name]), spec: cell(row[i.spec]),
+      unit: cell(row[i.unit]) || "PCS",
+      onHand: numCell(row[i.onHand]), plannedIn: numCell(row[i.plannedIn]),
+      expectedUseDate: cell(row[i.useDate]), expectedQty: numCell(row[i.expQty]),
+      accumQty: numCell(row[i.accumQty]), stockBalance: numCell(row[i.balance]),
+      woNo: cell(row[i.wo]), productCode: cell(row[i.prod]),
+      urgent: cell(row[i.urgent]), orderNo: cell(row[i.order]),
+      warehouseName: cell(row[i.whName]),
+    });
+  }
+  return out;
+}
+
+// ===================================================================
+// MOCR43 製令未領料明細表 → DxWoUnissued[]
+// 應領 vs 未領料量 + 庫存數量 → 欠料牆
+// ===================================================================
+export type DxWoUnissued = {
+  itemCode: string;
+  itemName: string;
+  spec: string;
+  unit: string;
+  woNo: string;           // 製令單號
+  urgent: string;
+  needQty: number;        // 應領料量
+  unissuedQty: number;    // 未領料量
+  process: string;        // 製程代號
+  warehouse: string;
+  location: string;       // 儲存位置
+  materialType: string;   // 材料型態
+  stockQty: number;       // 庫存數量
+};
+
+export function parseWoUnissued(aoa: Aoa): DxWoUnissued[] {
+  const h = (aoa[0] ?? []).map((c) => norm(c));
+  const idx = (n: string) => h.findIndex((x) => x === n);
+  const i = {
+    item: idx("品號"), unit: idx("單位"), name: idx("品名"), spec: idx("規格"),
+    wo: idx("製令單號"), urgent: idx("急料"),
+    need: idx("應領料量"), unissued: idx("未領料量"),
+    proc: idx("製程代號"), wh: idx("庫別"), loc: idx("儲存位置"),
+    matType: idx("材料型態"), stock: idx("庫存數量"),
+  };
+  const out: DxWoUnissued[] = [];
+  for (let r = 1; r < aoa.length; r++) {
+    const row = aoa[r] ?? [];
+    const item = cell(row[i.item]);
+    if (!item) continue;
+    out.push({
+      itemCode: item, itemName: cell(row[i.name]), spec: cell(row[i.spec]),
+      unit: cell(row[i.unit]) || "PCS",
+      woNo: cell(row[i.wo]), urgent: cell(row[i.urgent]),
+      needQty: numCell(row[i.need]), unissuedQty: numCell(row[i.unissued]),
+      process: cell(row[i.proc]), warehouse: cell(row[i.wh]),
+      location: cell(row[i.loc]), materialType: cell(row[i.matType]),
+      stockQty: numCell(row[i.stock]),
+    });
+  }
+  return out;
+}
+
 // ── 統一入口：給 AOA 自動判型 + 解析 ──
 export type ParsedDingxin =
   | { type: "item_master"; rows: DxItem[] }
@@ -911,6 +1055,9 @@ export type ParsedDingxin =
   | { type: "mat_issue"; rows: DxMaterialMove[] }
   | { type: "mat_return"; rows: DxMaterialMove[] }
   | { type: "outsource"; rows: DxOutsourceReceipt[] }
+  | { type: "wo_hours"; rows: DxWoHours[] }
+  | { type: "wo_demand"; rows: DxWoDemand[] }
+  | { type: "wo_unissued"; rows: DxWoUnissued[] }
   | { type: "unknown"; rows: never[] };
 
 export function parseDingxinReport(aoa: Aoa): ParsedDingxin {
@@ -930,6 +1077,9 @@ export function parseDingxinReport(aoa: Aoa): ParsedDingxin {
     case "mat_issue":      return { type: t, rows: parseMaterialIssue(aoa) };
     case "mat_return":     return { type: t, rows: parseMaterialReturn(aoa) };
     case "outsource":      return { type: t, rows: parseOutsourceReceipt(aoa) };
+    case "wo_hours":       return { type: t, rows: parseWoHours(aoa) };
+    case "wo_demand":      return { type: t, rows: parseWoDemand(aoa) };
+    case "wo_unissued":    return { type: t, rows: parseWoUnissued(aoa) };
     default:               return { type: "unknown", rows: [] };
   }
 }
@@ -949,5 +1099,8 @@ export const REPORT_LABEL: Record<DingxinReportType, string> = {
   mat_issue: "MOCR11 領料明細表",
   mat_return: "MOCR12 退料明細表",
   outsource: "MOCR14 託外進貨明細表",
+  wo_hours: "CSTR02 製令工時表",
+  wo_demand: "MOCR25 製令需求檢視表",
+  wo_unissued: "MOCR43 製令未領料明細表",
   unknown: "未知格式",
 };
