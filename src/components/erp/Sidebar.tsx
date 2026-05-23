@@ -4,9 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// Phase 1「先活」5 頁 — 主軸（震撼公司的核心）
+// Phase 1「先活」核心 — 真正的痛點（震撼公司的核心）
 const primaryLinks = [
-  { href: "/erp", label: "戰情室", icon: "🎯", primary: true },
+  { href: "/erp/order-impact", label: "訂單衝擊模擬器", icon: "⚡", primary: true },
+  { href: "/erp", label: "戰情室", icon: "🎯" },
   { href: "/erp/shortage-wall", label: "缺料牆", icon: "🧱" },
   { href: "/erp/work-orders", label: "工單追蹤", icon: "📋" },
   { href: "/erp/wms", label: "WMS Dashboard", icon: "⚡" },
