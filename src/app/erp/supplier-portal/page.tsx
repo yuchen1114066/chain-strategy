@@ -3,6 +3,8 @@ import {
   unconfirmedPOs,
   missingASNs,
   supplierStageAverages,
+  supplierDigitalTwins,
+  earlyWarningSignals,
   qualityCards,
   portalKpis,
 } from "@/lib/erp/supplier-portal";
@@ -28,15 +30,17 @@ export default function SupplierPortalPage() {
   const unconf = unconfirmedPOs();
   const missing = missingASNs();
   const stages = supplierStageAverages();
+  const twins = supplierDigitalTwins();
+  const signals = earlyWarningSignals();
   const cards = qualityCards();
 
   return (
     <div className="p-6 space-y-6">
       <header className="flex items-end justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">🤝 供應商協作入口 — Supplier Portal</h1>
+          <h1 className="text-2xl font-bold">🤝 供應商協作入口 — Supplier Digital Twin</h1>
           <p className="text-sm text-slate-500 mt-1">
-            真正的第一步 — 把跟供應商的所有互動「數位化」，否則上層所有決策引擎都是空中樓閣
+            供應鏈神經系統的核心：<b>即時知道問題將發生</b>，而不是「問題發生後看報表」
           </p>
         </div>
         <div className="text-right text-xs text-slate-500">
@@ -45,13 +49,127 @@ export default function SupplierPortalPage() {
       </header>
 
       {/* KPI 帶 — 全部 actionable */}
-      <section className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-xl p-5 border border-slate-700">
-        <div className="text-xs font-bold tracking-widest uppercase text-cyan-400 mb-3">Supplier Portal · KPI</div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Kpi label="PO 未回應（48hr+）" value={`${kpis.unconfirmedOverdue}`} sub={`共 ${kpis.unconfirmedCount} 張待回`} tone={kpis.unconfirmedOverdue > 0 ? "rose" : "emerald"} actionNow="採購立即催單 / 換備援" />
-          <Kpi label="缺 ASN（已逾出貨日）" value={`${kpis.missingAsnCritical}`} sub="預防性預警" tone={kpis.missingAsnCritical > 0 ? "amber" : "emerald"} actionNow="副總提前 48hr 知道延誤" />
+      <section className="bg-gradient-to-br from-slate-900 via-slate-900 to-rose-900/40 text-white rounded-xl p-5 border-2 border-cyan-500/40">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div>
+            <div className="text-xs font-bold tracking-widest uppercase text-cyan-400">🧬 Supply Chain Nervous System</div>
+            <div className="text-lg font-extrabold mt-0.5">事前知道問題將發生，不是事後看報表</div>
+          </div>
+          <div className="text-[11px] text-slate-300">數位分身對照當前 PO → 偵測預警前兆</div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <Kpi label="🚨 預警前兆（重大）" value={`${kpis.earlySignalsCritical}`} sub="問題將爆發 — 立即介入" tone={kpis.earlySignalsCritical > 0 ? "rose" : "emerald"} actionNow="電話確認 + 啟動備援" />
+          <Kpi label="⚠ 預警前兆（警示）" value={`${kpis.earlySignalsWarn}`} sub="偏離 baseline 2σ+" tone={kpis.earlySignalsWarn > 0 ? "amber" : "emerald"} actionNow="採購主動追蹤" />
+          <Kpi label="PO 未回應（48hr+）" value={`${kpis.unconfirmedOverdue}`} sub={`共 ${kpis.unconfirmedCount} 張待回`} tone={kpis.unconfirmedOverdue > 0 ? "rose" : "emerald"} actionNow="採購立即催單" />
+          <Kpi label="缺 ASN（已逾出貨）" value={`${kpis.missingAsnCritical}`} sub="副總提前 48hr 知道" tone={kpis.missingAsnCritical > 0 ? "amber" : "emerald"} actionNow="啟動備援方案" />
           <Kpi label="近期品質異常" value={`${kpis.qualityIssueLast90d}`} sub="進料不良 / 退貨" tone={kpis.qualityIssueLast90d > 3 ? "rose" : "amber"} actionNow="議價時拿出記錄卡" />
-          <Kpi label="數位化供應商" value={`${kpis.totalSuppliersDigitized} 家`} sub="平台覆蓋率" tone="cyan" actionNow="持續把更多供應商搬上來" />
+        </div>
+      </section>
+
+      {/* ============ 🚨 AI 預警前兆 — 供應鏈神經系統的核心 ============ */}
+      <section className="bg-white rounded-xl border-2 border-rose-300 p-5">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div>
+            <h2 className="font-bold text-lg">🚨 AI 預警前兆 — 問題還沒爆但即將爆</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              對照每家供應商的數位分身（行為基線），偵測當前 PO 是否偏離 → 在問題真正發生前提早 24-72hr 預警
+            </p>
+          </div>
+          <div className="text-[11px] text-slate-500">
+            觸發規則：當前耗時 &gt; baseline + 2σ → 警示　·　&gt; 3σ → 重大
+          </div>
+        </div>
+        {signals.length === 0 ? (
+          <div className="text-emerald-700 bg-emerald-50 rounded p-4 text-sm">
+            ✅ 所有進行中 PO 都在各供應商歷史 baseline 之內 — 神經系統無預警
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {signals.map((s) => {
+              const tone = s.severity === "critical"
+                ? { bd: "border-rose-500", bg: "bg-rose-50", chip: "bg-rose-600", label: "🚨 重大預警" }
+                : s.severity === "warn"
+                ? { bd: "border-amber-400", bg: "bg-amber-50", chip: "bg-amber-500", label: "⚠ 警示" }
+                : { bd: "border-slate-300", bg: "bg-white", chip: "bg-slate-500", label: "👁 觀察" };
+              return (
+                <div key={s.poId} className={`rounded-lg border-2 ${tone.bd} ${tone.bg} p-3`}>
+                  <div className="flex items-start gap-3 flex-wrap">
+                    <div className="shrink-0">
+                      <span className={`inline-block text-[10px] px-2 py-0.5 rounded text-white font-bold ${tone.chip}`}>{tone.label}</span>
+                      <div className="font-mono text-xs mt-1 text-cyan-700">{s.poNo}</div>
+                    </div>
+                    <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                      <div>
+                        <div className="text-[9px] tracking-widest text-slate-500 uppercase">當前階段</div>
+                        <div className="text-sm font-bold">{s.stageLabel}</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">{s.supplierName} · {s.partName}</div>
+                      </div>
+                      <div>
+                        <div className="text-[9px] tracking-widest text-slate-500 uppercase">已耗時 vs Baseline</div>
+                        <div className="text-sm font-bold text-rose-700 tabular-nums">
+                          {(s.hoursInStage / 24).toFixed(1)}d
+                          <span className="text-slate-400 text-[10px] mx-1">vs</span>
+                          {(s.baselineHours / 24).toFixed(1)}d
+                        </div>
+                        <div className="text-[10px] text-rose-600 mt-0.5 font-bold">偏離 {s.deviationSigma.toFixed(1)}σ</div>
+                      </div>
+                      <div>
+                        <div className="text-[9px] tracking-widest text-slate-500 uppercase">AI 預測</div>
+                        <div className="text-sm text-slate-800 leading-tight">{s.predictedImpact}</div>
+                      </div>
+                      <div>
+                        <div className="text-[9px] tracking-widest text-slate-500 uppercase">建議動作</div>
+                        <div className="text-sm font-bold text-cyan-700 leading-tight">{s.recommendedAction}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ============ 🧬 Supplier Digital Twin — 行為履歷數位分身 ============ */}
+      <section className="bg-white rounded-xl border border-slate-200 p-5">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div>
+            <h2 className="font-bold text-lg">🧬 Supplier Digital Twin — 供應商數位分身</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              系統真正累積的資產 = 供應商行為履歷。每階段平均耗時 + 變異 = 行為基線，AI 拿來偵測前兆。
+            </p>
+          </div>
+          <div className="text-[11px] text-slate-500">Confidence：依累積樣本量自動評等</div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {twins.map((t) => (
+            <div key={t.supplierId} className="rounded-xl border-2 border-slate-200 bg-white p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <div className="font-bold text-base">{t.supplierName}</div>
+                  <div className="text-[10px] text-slate-500">{t.sampleSize} 張 PO 累積 · Confidence {t.confidence === "high" ? "高" : t.confidence === "med" ? "中" : "低"}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] text-slate-500">行為可靠度</div>
+                  <div className={`text-2xl font-extrabold tabular-nums ${
+                    t.reliability >= 80 ? "text-emerald-600" :
+                    t.reliability >= 60 ? "text-cyan-600" :
+                    t.reliability >= 40 ? "text-amber-600" : "text-rose-600"
+                  }`}>{t.reliability.toFixed(0)}</div>
+                </div>
+              </div>
+              <div className="space-y-1.5 mt-3">
+                <TwinStage label="PO 確認" avg={t.baseline.ackHours.avg} stdev={t.baseline.ackHours.stdev} unit="hr" />
+                <TwinStage label="備料"     avg={t.baseline.materialReadyDays.avg} stdev={t.baseline.materialReadyDays.stdev} unit="d" />
+                <TwinStage label="生產"     avg={t.baseline.productionDays.avg} stdev={t.baseline.productionDays.stdev} unit="d" />
+                <TwinStage label="包裝→出貨" avg={t.baseline.packToShipDays.avg} stdev={t.baseline.packToShipDays.stdev} unit="d" />
+                <TwinStage label="運輸"     avg={t.baseline.transitDays.avg} stdev={t.baseline.transitDays.stdev} unit="d" />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="text-[11px] text-slate-500 mt-3 bg-slate-50 p-2 rounded">
+          ↑ 變異越小（標準差低）→ 行為越穩定、可靠度越高　·　AI 用這個 baseline 對照當前 PO 是否偏離 → 「事前知道問題將發生」
         </div>
       </section>
 
@@ -299,6 +417,27 @@ export default function SupplierPortalPage() {
         所有狀態更新會 push 到 <Link className="text-cyan-700 underline" href="/erp">戰情室 Decision Engine</Link>，
         缺 ASN 等預防性預警會在副總拍板前 48hr 顯示。
       </p>
+    </div>
+  );
+}
+
+function TwinStage({ label, avg, stdev, unit }: { label: string; avg: number; stdev: number; unit: string }) {
+  if (avg <= 0) return (
+    <div className="flex items-center justify-between text-xs">
+      <span className="text-slate-500">{label}</span>
+      <span className="text-slate-300">— 樣本不足</span>
+    </div>
+  );
+  const cv = avg > 0 ? stdev / avg : 0;
+  const stable = cv < 0.2;
+  return (
+    <div className="flex items-center justify-between text-xs">
+      <span className="text-slate-600">{label}</span>
+      <span className="font-mono tabular-nums">
+        <b>{avg.toFixed(1)}</b><span className="text-slate-400">{unit}</span>
+        <span className="text-slate-400 mx-1">±</span>
+        <span className={stable ? "text-emerald-600" : "text-amber-600"}>{stdev.toFixed(1)}{unit}</span>
+      </span>
     </div>
   );
 }

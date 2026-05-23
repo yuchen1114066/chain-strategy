@@ -499,13 +499,240 @@ export function qualityCards(): QualityCard[] {
 }
 
 // ============================================================
+// Supplier Digital Twin — 供應商數位分身
+//
+// 每家供應商累積的「行為履歷」變成數位分身：
+//   備料 2.1d / 生產 4.3d / 包裝 0.8d / 出貨 1.2d（含標準差）
+//
+// 把當前 in-flight PO 對照分身 → 偵測「預警前兆」
+//   ► 不是「事後看報表」，而是「事前知道問題將發生」
+//   ► 這才是供應鏈神經系統的核心
+// ============================================================
+export type SupplierTwin = {
+  supplierId: string;
+  supplierName: string;
+  sampleSize: number;
+  baseline: {
+    ackHours: { avg: number; stdev: number };
+    materialReadyDays: { avg: number; stdev: number };
+    productionDays: { avg: number; stdev: number };
+    packToShipDays: { avg: number; stdev: number };
+    transitDays: { avg: number; stdev: number };
+  };
+  reliability: number;   // 0-100，行為一致性（變異越小越高）
+  confidence: "high" | "med" | "low";  // 樣本量是否夠
+};
+
+function stats(arr: number[]): { avg: number; stdev: number } {
+  if (arr.length === 0) return { avg: 0, stdev: 0 };
+  const avg = arr.reduce((s, x) => s + x, 0) / arr.length;
+  const v = arr.reduce((s, x) => s + (x - avg) ** 2, 0) / arr.length;
+  return { avg, stdev: Math.sqrt(v) };
+}
+
+export function supplierDigitalTwins(): SupplierTwin[] {
+  const groups = new Map<string, DigitalPO[]>();
+  for (const po of digitalPOs) {
+    const arr = groups.get(po.supplierId) ?? [];
+    arr.push(po);
+    groups.set(po.supplierId, arr);
+  }
+  return [...groups.entries()].map(([supplierId, list]) => {
+    const supplier = suppliers.find((s) => s.id === supplierId);
+    const ack = list.filter((p) => p.ackedAt).map((p) => hoursBetween(p.sentAt, p.ackedAt!));
+    const mat: number[] = [];
+    const prod: number[] = [];
+    const pack: number[] = [];
+    const trans: number[] = [];
+    for (const p of list) {
+      const matT = p.productionLog.find((l) => l.stage === "material_ready")?.timestamp;
+      const packT = p.productionLog.find((l) => l.stage === "packed")?.timestamp;
+      const shipT = p.productionLog.find((l) => l.stage === "shipped")?.timestamp;
+      const arrT = p.productionLog.find((l) => l.stage === "arrived")?.timestamp;
+      if (p.ackedAt && matT) mat.push(daysBetween(p.ackedAt, matT));
+      if (matT && (packT || shipT)) prod.push(daysBetween(matT, (packT ?? shipT)!));
+      if (packT && shipT) pack.push(daysBetween(packT, shipT));
+      if (shipT && arrT) trans.push(daysBetween(shipT, arrT));
+    }
+    const ackS = stats(ack);
+    const matS = stats(mat);
+    const prodS = stats(prod);
+    const packS = stats(pack);
+    const transS = stats(trans);
+    // reliability：把各階段變異係數（CV = stdev/avg）反向換算
+    const cv = [ackS, matS, prodS, packS, transS]
+      .filter((s) => s.avg > 0)
+      .map((s) => s.stdev / s.avg);
+    const avgCv = cv.length > 0 ? cv.reduce((s, x) => s + x, 0) / cv.length : 0;
+    const reliability = Math.max(0, Math.min(100, 100 - avgCv * 100));
+    const confidence: SupplierTwin["confidence"] = list.length >= 3 ? "high" : list.length >= 2 ? "med" : "low";
+    return {
+      supplierId,
+      supplierName: supplier?.name ?? supplierId,
+      sampleSize: list.length,
+      baseline: {
+        ackHours: ackS,
+        materialReadyDays: matS,
+        productionDays: prodS,
+        packToShipDays: packS,
+        transitDays: transS,
+      },
+      reliability,
+      confidence,
+    };
+  }).filter((x) => x.sampleSize > 0)
+    .sort((a, b) => b.reliability - a.reliability);
+}
+
+// ============================================================
+// AI 預警前兆 — 事前知道問題將發生（供應鏈神經系統核心）
+//
+// 對每張進行中的 PO，比對它在當前階段已耗時間 vs 該供應商歷史平均；
+// 若超過 baseline + 1.5σ → 「預警前兆」，問題還沒爆但即將爆。
+// ============================================================
+export type EarlySignal = {
+  poId: string;
+  poNo: string;
+  supplierName: string;
+  partName: string;
+  currentStage: ProductionStage | "awaiting_ack" | "in_transit_no_arrival";
+  stageLabel: string;
+  hoursInStage: number;
+  baselineHours: number;
+  deviationSigma: number;     // 偏離幾個標準差
+  severity: "critical" | "warn" | "watch";
+  predictedImpact: string;     // 一句話：問題將發生
+  recommendedAction: string;
+};
+
+export function earlyWarningSignals(nowIso: string = new Date().toISOString()): EarlySignal[] {
+  const twins = new Map(supplierDigitalTwins().map((t) => [t.supplierId, t]));
+  const now = new Date(nowIso).getTime();
+  const signals: EarlySignal[] = [];
+
+  for (const po of digitalPOs) {
+    if (po.status === "received" || po.status === "closed" || po.status === "rejected") continue;
+    const twin = twins.get(po.supplierId);
+    if (!twin) continue;
+    const supplier = suppliers.find((s) => s.id === po.supplierId);
+    const part = parts.find((p) => p.id === po.partId);
+
+    // 1) 未確認 PO — 比對 ack baseline
+    if (!po.ackedAt) {
+      const hoursSinceSent = (now - new Date(po.sentAt).getTime()) / 3_600_000;
+      const baseHours = twin.baseline.ackHours.avg;
+      const sigma = twin.baseline.ackHours.stdev || 8;  // 預設 8hr 變異
+      if (baseHours > 0 && hoursSinceSent > baseHours + sigma) {
+        const dev = (hoursSinceSent - baseHours) / sigma;
+        signals.push({
+          poId: po.id, poNo: po.poNo,
+          supplierName: supplier?.name ?? po.supplierId,
+          partName: part?.name ?? po.partId,
+          currentStage: "awaiting_ack",
+          stageLabel: "等待確認",
+          hoursInStage: hoursSinceSent,
+          baselineHours: baseHours,
+          deviationSigma: dev,
+          severity: dev >= 3 ? "critical" : dev >= 2 ? "warn" : "watch",
+          predictedImpact: `${supplier?.name} 通常 ${baseHours.toFixed(0)}hr 內回覆，現已 ${hoursSinceSent.toFixed(0)}hr — 可能不接單 / 漏看 / 或產能滿了`,
+          recommendedAction: "📞 採購電話確認；同時準備備援供應商",
+        });
+      }
+      continue;
+    }
+
+    // 2) ack 後但無 material_ready — 比對備料 baseline
+    const matLog = po.productionLog.find((l) => l.stage === "material_ready");
+    if (po.ackedAt && !matLog) {
+      const daysSinceAck = (now - new Date(po.ackedAt).getTime()) / 86_400_000;
+      const base = twin.baseline.materialReadyDays.avg;
+      const sigma = twin.baseline.materialReadyDays.stdev || 1;
+      if (base > 0 && daysSinceAck > base + sigma) {
+        const dev = (daysSinceAck - base) / sigma;
+        signals.push({
+          poId: po.id, poNo: po.poNo,
+          supplierName: supplier?.name ?? po.supplierId,
+          partName: part?.name ?? po.partId,
+          currentStage: "pending",
+          stageLabel: "備料未開始",
+          hoursInStage: daysSinceAck * 24,
+          baselineHours: base * 24,
+          deviationSigma: dev,
+          severity: dev >= 3 ? "critical" : dev >= 2 ? "warn" : "watch",
+          predictedImpact: `${supplier?.name} 通常 ${base.toFixed(1)} 天內備料完成，已過 ${daysSinceAck.toFixed(1)} 天 — 原料可能也缺、或供應商擱置`,
+          recommendedAction: "📞 確認原料供應狀況；視情況啟動備援",
+        });
+      }
+    }
+
+    // 3) in_production 階段停滯 — 比對生產 baseline
+    const prodLog = po.productionLog.find((l) => l.stage === "in_production");
+    const packLog = po.productionLog.find((l) => l.stage === "packed" || l.stage === "shipped");
+    if (prodLog && !packLog) {
+      const daysInProd = (now - new Date(prodLog.timestamp).getTime()) / 86_400_000;
+      const base = twin.baseline.productionDays.avg;
+      const sigma = twin.baseline.productionDays.stdev || 2;
+      if (base > 0 && daysInProd > base + sigma) {
+        const dev = (daysInProd - base) / sigma;
+        signals.push({
+          poId: po.id, poNo: po.poNo,
+          supplierName: supplier?.name ?? po.supplierId,
+          partName: part?.name ?? po.partId,
+          currentStage: "in_production",
+          stageLabel: "生產中（停滯）",
+          hoursInStage: daysInProd * 24,
+          baselineHours: base * 24,
+          deviationSigma: dev,
+          severity: dev >= 3 ? "critical" : dev >= 2 ? "warn" : "watch",
+          predictedImpact: `${supplier?.name} 通常生產 ${base.toFixed(1)} 天，已過 ${daysInProd.toFixed(1)} 天 — 機台異常 / 缺工 / 品質返工的可能性高`,
+          recommendedAction: "📞 派品保駐廠或視訊查看；準備分流到二供",
+        });
+      }
+    }
+
+    // 4) shipped 後無 arrived — 比對運輸 baseline
+    const shipLog = po.productionLog.find((l) => l.stage === "shipped");
+    const arrLog = po.productionLog.find((l) => l.stage === "arrived");
+    if (shipLog && !arrLog) {
+      const daysInTransit = (now - new Date(shipLog.timestamp).getTime()) / 86_400_000;
+      const base = twin.baseline.transitDays.avg;
+      const sigma = twin.baseline.transitDays.stdev || 1;
+      if (base > 0 && daysInTransit > base + sigma) {
+        const dev = (daysInTransit - base) / sigma;
+        signals.push({
+          poId: po.id, poNo: po.poNo,
+          supplierName: supplier?.name ?? po.supplierId,
+          partName: part?.name ?? po.partId,
+          currentStage: "in_transit_no_arrival",
+          stageLabel: "運輸超時",
+          hoursInStage: daysInTransit * 24,
+          baselineHours: base * 24,
+          deviationSigma: dev,
+          severity: dev >= 3 ? "critical" : dev >= 2 ? "warn" : "watch",
+          predictedImpact: `${supplier?.name} 通常運輸 ${base.toFixed(1)} 天，已過 ${daysInTransit.toFixed(1)} 天 — 海關卡件 / 船期延誤 / 物流商失誤`,
+          recommendedAction: "📞 查詢追蹤單號；安排空運補單以防生產線停線",
+        });
+      }
+    }
+  }
+
+  return signals.sort((a, b) => {
+    const sevOrd = { critical: 0, warn: 1, watch: 2 };
+    if (sevOrd[a.severity] !== sevOrd[b.severity]) return sevOrd[a.severity] - sevOrd[b.severity];
+    return b.deviationSigma - a.deviationSigma;
+  });
+}
+
+// ============================================================
 // 整體 KPI（給主頁頂部用）
 // ============================================================
 export type PortalKpis = {
   totalPOs: number;
   unconfirmedCount: number;
-  unconfirmedOverdue: number;       // 超過 48hr
-  missingAsnCritical: number;       // 已逾預定出貨日
+  unconfirmedOverdue: number;
+  missingAsnCritical: number;
+  earlySignalsCritical: number;
+  earlySignalsWarn: number;
   qualityIssueLast90d: number;
   totalSuppliersDigitized: number;
 };
@@ -513,6 +740,7 @@ export type PortalKpis = {
 export function portalKpis(): PortalKpis {
   const unconf = unconfirmedPOs();
   const missing = missingASNs();
+  const signals = earlyWarningSignals();
   const qIssues = digitalPOs.reduce((s, po) =>
     s + po.qualityReports.filter((r) => r.result !== "pass").length, 0);
   const digitizedSuppliers = new Set(digitalPOs.map((p) => p.supplierId)).size;
@@ -521,6 +749,8 @@ export function portalKpis(): PortalKpis {
     unconfirmedCount: unconf.length,
     unconfirmedOverdue: unconf.filter((x) => x.hoursOverdue > 0).length,
     missingAsnCritical: missing.filter((x) => x.severity === "critical").length,
+    earlySignalsCritical: signals.filter((s) => s.severity === "critical").length,
+    earlySignalsWarn: signals.filter((s) => s.severity === "warn").length,
     qualityIssueLast90d: qIssues,
     totalSuppliersDigitized: digitizedSuppliers,
   };

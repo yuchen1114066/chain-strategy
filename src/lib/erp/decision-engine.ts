@@ -14,6 +14,7 @@ import { forecastAll } from "./otif";
 import { computeShortageWall } from "./shortage-ai";
 import { equipmentUtilization, criticalPathsAll } from "./critical-path";
 import { computeInventoryKpis, partHealth } from "./inventory-health";
+import { earlyWarningSignals } from "./supplier-portal";
 
 export type DecisionAction = {
   id: string;
@@ -148,6 +149,29 @@ export function topDecisions(): DecisionAction[] {
     }
   }
 
+  // ---- 5) 供應商 AI 預警前兆（事前知道問題將發生 — 供應鏈神經系統）----
+  for (const sig of earlyWarningSignals().filter((s) => s.severity === "critical" || s.severity === "warn")) {
+    out.push({
+      id: `signal-${sig.poId}`,
+      category: "supplier",
+      urgency: sig.severity === "critical" ? "now" : "today",
+      whatToDoNow: sig.recommendedAction,
+      costImpact: 0,
+      revenueAtRisk: 2_000_000,
+      bestPlanCode: "A",
+      bestPlanTitle: "電話確認 + 啟動備援",
+      alternativePlans: [
+        { code: "B", title: "切換二供應商", tradeoff: "需驗證、單價可能高" },
+        { code: "C", title: "繼續觀察 + 通知客戶可能延誤", tradeoff: "OTD 受損" },
+      ],
+      risk: sig.severity === "critical" ? "high" : "med",
+      riskNote: `偏離 baseline ${sig.deviationSigma.toFixed(1)}σ`,
+      sourceLabel: sig.poNo,
+      sourceLink: `/erp/supplier-portal`,
+      contextLine: `${sig.supplierName} · ${sig.partName} · ${sig.stageLabel} — ${sig.predictedImpact}`,
+    });
+  }
+
   // ---- 排序：urgency now > today > week，再按 revenueAtRisk 降冪 ----
   const urgencyRank: Record<DecisionAction["urgency"], number> = { now: 0, today: 1, this_week: 2 };
   out.sort((a, b) => {
@@ -176,9 +200,18 @@ export function engineKpis(): EngineKpi[] {
   const sCount = wall.filter((x) => x.grade === "S").length;
   const equip = equipmentUtilization();
   const critEquip = equip.filter((x) => x.riskLevel === "critical").length;
-  const kpis = computeInventoryKpis();
+  void computeInventoryKpis;
+  const signals = earlyWarningSignals();
+  const sigCrit = signals.filter((s) => s.severity === "critical").length;
 
   return [
+    {
+      label: "🧬 預警前兆（供應商）",
+      value: `${sigCrit}`,
+      sub: sigCrit > 0 ? "問題還沒爆但即將爆" : "神經系統綠燈",
+      actionNow: sigCrit > 0 ? "電話確認 + 啟動備援" : "—",
+      link: "/erp/supplier-portal",
+    },
     {
       label: "🔴 必延誤工單",
       value: `${red} 張`,
@@ -199,13 +232,6 @@ export function engineKpis(): EngineKpi[] {
       sub: critEquip > 0 ? "≥ 92% 塞車風險高" : "稼動率健康",
       actionNow: critEquip > 0 ? "加班 / 分流 / 評估擴產" : "—",
       link: "/erp/work-orders",
-    },
-    {
-      label: "📦 DOH < 7d 料件",
-      value: `${kpis.dohRiskCount} 件`,
-      sub: kpis.dohRiskCount > 0 ? "庫存撐不過一週" : "庫存充足",
-      actionNow: kpis.dohRiskCount > 0 ? "提前下單補貨" : "—",
-      link: "/erp/wms",
     },
   ];
 }
