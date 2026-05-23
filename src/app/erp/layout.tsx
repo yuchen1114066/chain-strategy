@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Sidebar from "@/components/erp/Sidebar";
 
 export const metadata: Metadata = {
-  title: "祺驊 CHI HUA — 業務 / 採購協調追蹤系統",
-  description: "BOM 連結、八階段工單、瓶頸即時解方、異常預警一站式",
+  title: "祺驊 CHI HUA — Global AI Supply Chain Command Center",
+  description: "OTIF/OTD · 客戶交期燈號 · 缺料風險分級 · Critical Path · AI 自動推薦方案",
 };
 
 export default function ErpLayout({ children }: { children: React.ReactNode }) {

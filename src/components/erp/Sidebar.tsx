@@ -56,8 +56,11 @@ export default function Sidebar() {
               <div className="text-base font-bold text-white tracking-wide leading-tight">
                 祺驊 CHI HUA
               </div>
-              <div className="text-[10px] text-slate-400 leading-tight">
-                貨件流程監控
+              <div className="text-[10px] text-cyan-300 leading-tight font-semibold">
+                Global AI Supply Chain
+              </div>
+              <div className="text-[9px] text-slate-400 leading-tight">
+                Command Center · GASCC
               </div>
             </div>
           </div>

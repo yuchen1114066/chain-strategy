@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { workOrders, models, today, currentStageLabel } from "@/lib/erp/seed";
 import { computeAlerts } from "@/lib/erp/alerts";
+import { criticalPathsAll, equipmentUtilization } from "@/lib/erp/critical-path";
 import StageBar from "@/components/erp/StageBar";
 import CsvExportButton from "@/components/erp/CsvExportButton";
 
@@ -26,6 +27,10 @@ export default function WorkOrdersPage() {
     if (a.severity === "red") c.red += 1; else c.yellow += 1;
     alertCountByWo.set(a.woId, c);
   }
+  const cpAll = criticalPathsAll();
+  const cpByWo = new Map(cpAll.map((c) => [c.woId, c]));
+  const equip = equipmentUtilization();
+  const equipCritical = equip.filter((e) => e.riskLevel === "critical");
 
   const csvRows = workOrders.map((w) => {
     const m = models.find((m) => m.id === w.modelId);
@@ -66,6 +71,42 @@ export default function WorkOrdersPage() {
           ]}
         />
       </header>
+
+      {/* ===== 瓶頸設備稼動率 ===== */}
+      <section className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-xl p-5 border border-slate-700 mb-5">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div>
+            <div className="text-xs font-bold tracking-widest uppercase text-cyan-400">Bottleneck Equipment Utilization</div>
+            <div className="text-lg font-bold mt-0.5">瓶頸設備稼動率 — AI 14 天塞車預測</div>
+          </div>
+          <div className="text-[11px] text-slate-400">
+            {equipCritical.length > 0 ? <span className="text-rose-400 font-bold">{equipCritical.length} 台設備超過 92% — 塞車風險高</span> : "全部設備運轉正常"}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+          {equip.map((e) => {
+            const tone = e.riskLevel === "critical" ? "text-rose-400 border-rose-500/40 bg-rose-500/10"
+              : e.riskLevel === "warn" ? "text-amber-400 border-amber-500/40 bg-amber-500/10"
+              : "text-emerald-400 border-emerald-500/40 bg-emerald-500/10";
+            return (
+              <div key={e.id} className={`rounded-lg border px-3 py-2 ${tone}`}>
+                <div className="text-[11px] font-bold">{e.name}</div>
+                <div className="text-[9px] opacity-70">{e.stage}</div>
+                <div className="text-2xl font-extrabold tabular-nums mt-1">{e.utilizationPct}%</div>
+                <div className="h-1 rounded-full bg-slate-700/60 overflow-hidden mt-1">
+                  <div className="h-full rounded-full"
+                    style={{ width: `${e.utilizationPct}%`,
+                      background: e.riskLevel === "critical" ? "#f43f5e" : e.riskLevel === "warn" ? "#f59e0b" : "#10b981" }} />
+                </div>
+                <div className="text-[9px] mt-1 leading-tight">AI：{e.aiVerdict}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="text-[10px] text-slate-500 mt-3">
+          🤖 規則：稼動率 ≥ 92% → AI 判定未來 14 天塞車風險高　·　≥ 85% → 中度警示
+        </div>
+      </section>
 
       {/* Compact table — exact match to screenshot columns */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden mb-6">
@@ -133,12 +174,16 @@ export default function WorkOrdersPage() {
         </table>
       </div>
 
-      {/* Visual stage bars — for at-a-glance scanning */}
-      <h2 className="text-sm font-semibold text-slate-600 mb-3">八階段視覺化</h2>
+      {/* ===== Critical Path（關鍵路徑）===== */}
+      <h2 className="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+        🎯 Critical Path — 關鍵路徑（哪個工序 delay 會直接影響出貨）
+        <span className="text-[10px] text-slate-400 font-normal">紅色 = 在 critical path 上，無緩衝</span>
+      </h2>
       <div className="space-y-3">
         {workOrders.filter((w) => w.status !== "done").map((w) => {
           const m = models.find((m) => m.id === w.modelId);
           const dleft = daysUntil(w.shipDate);
+          const cp = cpByWo.get(w.id);
           return (
             <Link
               key={w.id}
@@ -151,15 +196,48 @@ export default function WorkOrdersPage() {
                   <span className="font-mono text-slate-500">{m?.code}</span>
                   <span className="text-slate-700">× {w.qty}　·　{w.customer}</span>
                 </div>
-                <span className={`tabular-nums font-bold ${dleft < 7 ? "text-rose-600" : dleft < 21 ? "text-amber-600" : "text-slate-500"}`}>
-                  船期 {w.shipDate}（{dleft >= 0 ? `T-${dleft}` : `已逾 ${-dleft}d`}）
-                </span>
+                <div className="flex items-center gap-3 text-[11px]">
+                  {cp && (
+                    <>
+                      <span className="text-slate-500">AI 預測出貨 <b className={`${cp.totalSlack < 0 ? "text-rose-600" : cp.totalSlack <= 3 ? "text-amber-600" : "text-emerald-600"}`}>{cp.predictedEnd}</b></span>
+                      <span className={`px-1.5 py-0.5 rounded font-bold ${
+                        cp.totalSlack < 0 ? "bg-rose-100 text-rose-700" :
+                        cp.totalSlack <= 3 ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
+                      }`}>
+                        緩衝 {cp.totalSlack >= 0 ? `+${cp.totalSlack}` : cp.totalSlack}d
+                      </span>
+                    </>
+                  )}
+                  <span className={`tabular-nums font-bold ${dleft < 7 ? "text-rose-600" : dleft < 21 ? "text-amber-600" : "text-slate-500"}`}>
+                    船期 {w.shipDate}（{dleft >= 0 ? `T-${dleft}` : `已逾 ${-dleft}d`}）
+                  </span>
+                </div>
               </div>
               <StageBar stages={w.stages} today={today} />
+              {cp && (
+                <div className="mt-2 flex gap-1 text-[10px]">
+                  {cp.stages.map((s) => (
+                    <div key={s.stage}
+                      className={`flex-1 text-center py-0.5 rounded ${
+                        s.status === "done" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                        s.onCriticalPath ? "bg-rose-50 text-rose-700 border border-rose-300 font-bold" :
+                        "bg-slate-50 text-slate-500 border border-slate-200"
+                      }`}>
+                      {s.onCriticalPath && s.status !== "done" && "🎯 "}{s.label}
+                    </div>
+                  ))}
+                </div>
+              )}
             </Link>
           );
         })}
       </div>
+
+      <p className="text-[11px] text-slate-500 bg-slate-50 rounded p-3 mt-4 leading-relaxed">
+        <b>🎯 Critical Path</b> — 在關鍵路徑上的工序，每延 1 天 → 出貨延 1 天，必須優先處理。
+        非關鍵路徑工序有 slack（緩衝），稍 delay 不會影響船期。
+        <b>瓶頸設備稼動率</b> &gt; 92% → AI 判定 14 天內塞車風險高，建議分流或擴產。
+      </p>
     </div>
   );
 }

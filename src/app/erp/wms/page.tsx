@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { workOrders, models, today, parts } from "@/lib/erp/seed";
 import { computeAlerts, computePartDemand } from "@/lib/erp/alerts";
+import { computeInventoryKpis } from "@/lib/erp/inventory-health";
 import LiveClock from "@/components/erp/LiveClock";
 
 // CHI HUA Pulse — WMS 智慧倉儲戰情 Dashboard
@@ -26,6 +27,7 @@ export default function WmsDashboardPage() {
   const onTimePct = done.length ? (onTime.length / done.length) * 100 : 92.3;
   const totalStockValue = parts.reduce((s, p) => s + p.stockOnHand * p.unitCost, 0);
   const shortageParts = demand.filter((d) => d.shortage > 0);
+  const invKpis = computeInventoryKpis();
 
   const stockHealth = [
     { label: "健康庫存", n: parts.filter((p) => p.stockOnHand >= p.safetyStock).length, color: "#16a34a" },
@@ -185,6 +187,58 @@ export default function WmsDashboardPage() {
             </div>
           </div>
 
+          {/* ===== 庫存健康 5 大指標（DOH / Turnover / Excess / Aging / Safety Stock）===== */}
+          <section className="rounded-xl p-5 mb-5"
+            style={{ background: "linear-gradient(135deg, #281715 0%, #3a2520 100%)", color: "#fff" }}>
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <div>
+                <div className="text-[11px] font-bold tracking-widest uppercase" style={{ color: "#ffb4ab" }}>Inventory Health KPIs</div>
+                <h3 className="text-lg font-extrabold mt-0.5">庫存健康度 5 大指標 — Global AI 必加</h3>
+              </div>
+              <div className="text-[11px] opacity-70">基準日 {today}　·　料件總數 {invKpis.totalParts}</div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              <InvKpi
+                code="DOH"
+                label="庫存可撐天數"
+                value={invKpis.dohMedian >= 999 ? "∞" : invKpis.dohMedian.toFixed(0) + " 天"}
+                sub={`${invKpis.dohRiskCount} 件 < 7 天`}
+                tone={invKpis.dohRiskCount > 5 ? "rose" : invKpis.dohRiskCount > 0 ? "amber" : "emerald"}
+              />
+              <InvKpi
+                code="Turnover"
+                label="周轉率（年）"
+                value={invKpis.turnoverAvg.toFixed(1) + "×"}
+                sub="健康 ≥ 6×"
+                tone={invKpis.turnoverAvg >= 6 ? "emerald" : invKpis.turnoverAvg >= 3 ? "amber" : "rose"}
+              />
+              <InvKpi
+                code="Excess"
+                label="過剩庫存"
+                value={`${invKpis.excessCount} 件`}
+                sub={`$${(invKpis.excessValue / 10000).toFixed(0)}萬`}
+                tone={invKpis.excessCount > 10 ? "rose" : invKpis.excessCount > 0 ? "amber" : "emerald"}
+              />
+              <InvKpi
+                code="Aging"
+                label="呆滯天數 > 180"
+                value={`${invKpis.agingCount} 件`}
+                sub={`$${(invKpis.agingValue / 10000).toFixed(0)}萬`}
+                tone={invKpis.agingCount > 5 ? "rose" : invKpis.agingCount > 0 ? "amber" : "emerald"}
+              />
+              <InvKpi
+                code="Safety Stock"
+                label="安全庫存達成率"
+                value={`${invKpis.safetyCompliance.toFixed(0)}%`}
+                sub={`${invKpis.belowSafetyCount} 件低於安全`}
+                tone={invKpis.safetyCompliance >= 95 ? "emerald" : invKpis.safetyCompliance >= 80 ? "amber" : "rose"}
+              />
+            </div>
+            <div className="text-[10px] mt-3 opacity-70">
+              🤖 AI 規則：DOH &lt; 7 天 → 缺料風險　·　Turnover &lt; 3 → 庫存積壓　·　Aging &gt; 180 天 → 呆滯料　·　Safety &lt; 95% → 缺料警示
+            </div>
+          </section>
+
           {/* End-to-End 流程追蹤 */}
           <section className="rounded-xl overflow-hidden mb-5"
             style={{ background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.4)" }}>
@@ -320,6 +374,19 @@ function HealthCard({ icon, label, value, tag, accent }: { icon: string; label: 
         <p className="text-sm text-[#5c403c]">{label}</p>
         <h2 className="text-3xl font-extrabold tabular-nums mt-0.5">{value}</h2>
       </div>
+    </div>
+  );
+}
+
+function InvKpi({ code, label, value, sub, tone }: { code: string; label: string; value: string; sub: string; tone: "emerald" | "amber" | "rose" }) {
+  const accent = tone === "emerald" ? "#34d399" : tone === "amber" ? "#fbbf24" : "#fb7185";
+  return (
+    <div className="rounded-lg px-3 py-3"
+      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
+      <div className="text-[10px] font-bold tracking-widest uppercase" style={{ color: accent }}>{code}</div>
+      <div className="text-[10px] opacity-70">{label}</div>
+      <div className="text-2xl font-extrabold tabular-nums mt-1" style={{ color: accent }}>{value}</div>
+      <div className="text-[10px] opacity-60 mt-0.5">{sub}</div>
     </div>
   );
 }
