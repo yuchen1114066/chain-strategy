@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { simulateOrderImpact, type ImpactResult, type Plan } from "@/lib/erp/order-impact";
+import { createDecision, saveDecision } from "@/lib/erp/decision-loop";
 
 type ModelOption = { code: string; name: string; price: number };
 
@@ -12,12 +14,20 @@ function addDays(iso: string, n: number): string {
 }
 
 export default function OrderImpactClient({ modelOptions, today }: { modelOptions: ModelOption[]; today: string }) {
+  const router = useRouter();
   const [modelCode, setModelCode] = useState(modelOptions[0]?.code ?? "");
   const [qty, setQty] = useState(50);
   const [newShipDate, setNewShipDate] = useState(addDays(today, 21));
   const [customer, setCustomer] = useState("");
+  const [decisionMaker, setDecisionMaker] = useState("副總");
   const [isRush, setIsRush] = useState(true);
   const [submitted, setSubmitted] = useState(false);
+
+  function commitDecision(planCode: "A" | "B" | "C") {
+    const d = createDecision({ modelCode, qty, newShipDate, customer, isRush }, planCode, decisionMaker);
+    saveDecision(d);
+    router.push(`/erp/decisions/${d.id}`);
+  }
 
   const result: ImpactResult | null = useMemo(() => {
     if (!submitted || !modelCode || qty <= 0 || !newShipDate) return null;
@@ -89,6 +99,14 @@ export default function OrderImpactClient({ modelOptions, today }: { modelOption
           <label className="flex items-end gap-2 pb-1">
             <input type="checkbox" checked={isRush} onChange={(e) => { setIsRush(e.target.checked); setSubmitted(false); }} />
             <span className="text-xs text-slate-600">急件（會優先排）</span>
+          </label>
+        </div>
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <label className="block">
+            <span className="text-xs text-slate-500">🔓 拍板人（公開記錄，閉環後納入個人決策準確度）</span>
+            <input type="text" value={decisionMaker}
+              onChange={(e) => setDecisionMaker(e.target.value)}
+              className="mt-1 w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
           </label>
         </div>
         <div className="mt-4 flex items-center gap-3">
@@ -221,8 +239,12 @@ export default function OrderImpactClient({ modelOptions, today }: { modelOption
           <section>
             <h2 className="font-bold text-lg mb-3">③ AI 三方案 — 推副總拍板（30 秒下決策）</h2>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-              {result.plans.map((p) => <PlanCard key={p.code} plan={p} />)}
+              {result.plans.map((p) => <PlanCard key={p.code} plan={p} onCommit={() => commitDecision(p.code)} />)}
             </div>
+            <p className="text-xs text-slate-500 mt-3 bg-cyan-50 border border-cyan-200 rounded p-3">
+              <b>🔁 閉環機制</b> — 副總點「✅ 拍板執行」後，系統自動展開該方案的 4-6 個 Actions（採購 / 業務 / PM / 倉管），
+              進入「決策閉環中心」追蹤進度、自動偵測風險、自動回報結果。不再丟著就忘。
+            </p>
           </section>
 
           <p className="text-[11px] text-slate-500 bg-slate-50 rounded p-3 leading-relaxed">
@@ -255,7 +277,7 @@ function Big({ label, value, sub, tone }: { label: string; value: string; sub: s
   );
 }
 
-function PlanCard({ plan }: { plan: Plan }) {
+function PlanCard({ plan, onCommit }: { plan: Plan; onCommit: () => void }) {
   const riskColor =
     plan.risk === "low" ? "border-emerald-300 bg-emerald-50/40" :
     plan.risk === "med" ? "border-amber-300 bg-amber-50/40" :
@@ -297,6 +319,15 @@ function PlanCard({ plan }: { plan: Plan }) {
       }`}>
         {riskLabel} · {plan.riskNote}
       </div>
+      <button
+        onClick={onCommit}
+        className={`mt-3 w-full px-3 py-2 rounded-md text-sm font-bold transition-colors ${
+          plan.recommended
+            ? "bg-cyan-600 text-white hover:bg-cyan-700"
+            : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300"
+        }`}>
+        ✅ 副總拍板 — 進入閉環
+      </button>
     </div>
   );
 }

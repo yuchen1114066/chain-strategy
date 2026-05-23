@@ -7,6 +7,8 @@ import { usePathname } from "next/navigation";
 // Phase 1「先活」核心 — 真正的痛點（震撼公司的核心）
 const primaryLinks = [
   { href: "/erp/order-impact", label: "訂單衝擊模擬器", icon: "⚡", primary: true },
+  { href: "/erp/decisions", label: "決策閉環中心", icon: "🔁" },
+  { href: "/erp/performance", label: "決策績效 + 案例庫", icon: "📈" },
   { href: "/erp", label: "戰情室", icon: "🎯" },
   { href: "/erp/shortage-wall", label: "缺料牆", icon: "🧱" },
   { href: "/erp/work-orders", label: "工單追蹤", icon: "📋" },
@@ -58,10 +60,10 @@ export default function Sidebar() {
                 祺驊 CHI HUA
               </div>
               <div className="text-[10px] text-cyan-300 leading-tight font-semibold">
-                Global AI Supply Chain
+                Global AI Decision Engine
               </div>
               <div className="text-[9px] text-slate-400 leading-tight">
-                Command Center · GASCC
+                Not Dashboard · 該做什麼
               </div>
             </div>
           </div>

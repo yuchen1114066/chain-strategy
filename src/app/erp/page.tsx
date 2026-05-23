@@ -5,6 +5,7 @@ import { analyzeBottlenecks } from "@/lib/erp/flow-advisor";
 import { STAGES } from "@/lib/erp/types";
 import BottleneckAdvisor from "@/components/erp/BottleneckAdvisor";
 import { forecastAll, computeOTD, computeForwardOTD, blamingSuppliers, type WoForecast } from "@/lib/erp/otif";
+import { topDecisions, engineKpis, type DecisionAction } from "@/lib/erp/decision-engine";
 
 function daysUntil(iso: string): number {
   const ms = new Date(iso + "T00:00:00Z").getTime() - new Date(today + "T00:00:00Z").getTime();
@@ -35,6 +36,8 @@ export default function CockpitPage() {
   const otd = computeOTD();
   const fwd = computeForwardOTD(forecasts);
   const blamers = blamingSuppliers(forecasts);
+  const decisions = topDecisions();
+  const kpis = engineKpis();
 
   const wosByStage = new Map<number, typeof workOrders>();
   for (const w of activeWos) {
@@ -60,9 +63,9 @@ export default function CockpitPage() {
     <div className="p-6 space-y-6">
       <header className="flex items-end justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">🎯 戰情室 — Supply Chain Command Center</h1>
+          <h1 className="text-2xl font-bold">🎯 戰情室 — Decision Engine</h1>
           <p className="text-sm text-slate-500 mt-1">
-            訂單卡在哪 · 哪張工單會延誤 · 哪個供應商造成停線 · AI 自動給解法
+            不只告訴你「發生什麼事」，直接告訴你「現在該做什麼 / 成本多少 / 哪方案最好 / 風險多少」
           </p>
         </div>
         <div className="text-right text-xs text-slate-500">
@@ -75,6 +78,58 @@ export default function CockpitPage() {
           </div>
         </div>
       </header>
+
+      {/* ============ Decision Engine Top Feed — 直接告訴你該怎麼做 ============ */}
+      <section className="bg-gradient-to-br from-slate-900 via-slate-900 to-rose-900/40 text-white rounded-xl p-5 border-2 border-cyan-500/40">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div>
+            <div className="text-xs font-bold tracking-widest uppercase text-cyan-400">🤖 Decision Engine — 不是 Dashboard</div>
+            <div className="text-lg font-extrabold mt-0.5">系統現在告訴你該做什麼（按緊急度排序）</div>
+          </div>
+          <div className="text-[11px] text-slate-300">
+            {decisions.length > 0
+              ? <>共 <b className="text-cyan-300">{decisions.length}</b> 個待決策　·　守住營收 <b className="text-emerald-300">${(decisions.reduce((s, d) => s + d.revenueAtRisk, 0) / 10000).toFixed(0)}萬</b></>
+              : "目前無待決策 — 系統運轉正常"}
+          </div>
+        </div>
+
+        {/* 4 KPI 都是 actionable */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+          {kpis.map((k) => (
+            k.link ? (
+              <Link key={k.label} href={k.link} className="block bg-slate-800/60 rounded-lg p-3 border border-slate-700 hover:border-cyan-400 transition-colors">
+                <div className="text-[10px] text-slate-400">{k.label}</div>
+                <div className="text-xl font-extrabold tabular-nums mt-0.5">{k.value}</div>
+                <div className="text-[10px] text-slate-500">{k.sub}</div>
+                <div className="text-[10px] text-cyan-300 mt-1 font-semibold">→ {k.actionNow}</div>
+              </Link>
+            ) : (
+              <div key={k.label} className="bg-slate-800/60 rounded-lg p-3 border border-slate-700">
+                <div className="text-[10px] text-slate-400">{k.label}</div>
+                <div className="text-xl font-extrabold tabular-nums mt-0.5">{k.value}</div>
+                <div className="text-[10px] text-slate-500">{k.sub}</div>
+                <div className="text-[10px] text-slate-500 mt-1">{k.actionNow}</div>
+              </div>
+            )
+          ))}
+        </div>
+
+        {/* Top Decisions — 每張卡回答 4 問題 */}
+        {decisions.length > 0 ? (
+          <div className="space-y-2">
+            {decisions.slice(0, 5).map((d) => <DecisionCard key={d.id} d={d} />)}
+            {decisions.length > 5 && (
+              <div className="text-center text-[11px] text-slate-400">
+                還有 {decisions.length - 5} 個次要決策 — 進對應分頁查看
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="bg-emerald-900/30 border border-emerald-500/30 rounded-lg p-4 text-center text-emerald-300">
+            ✅ 系統當下無待決策事項 — 所有信號綠燈
+          </div>
+        )}
+      </section>
 
       {/* ============ 必加 KPI：OTIF / OTD（世界級供應鏈核心指標）============ */}
       <section className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-xl p-5 border border-slate-700">
@@ -327,4 +382,65 @@ function Kpi({ label, value, sub, tone }: { label: string; value: string; sub: s
 
 function Legend({ c, t }: { c: string; t: string }) {
   return <span className="inline-flex items-center gap-1"><span className={`w-3 h-3 rounded-full ${c}`} />{t}</span>;
+}
+
+function DecisionCard({ d }: { d: DecisionAction }) {
+  const urgencyTone = d.urgency === "now"
+    ? { bd: "border-rose-500", chip: "bg-rose-500", label: "NOW" }
+    : d.urgency === "today"
+    ? { bd: "border-amber-500", chip: "bg-amber-500", label: "TODAY" }
+    : { bd: "border-cyan-500", chip: "bg-cyan-500", label: "THIS WEEK" };
+  const riskTone =
+    d.risk === "low" ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" :
+    d.risk === "med" ? "bg-amber-500/20 text-amber-300 border-amber-500/40" :
+    "bg-rose-500/20 text-rose-300 border-rose-500/40";
+  const riskLabel = d.risk === "low" ? "風險低" : d.risk === "med" ? "中風險" : "高風險";
+  const card = (
+    <div className={`bg-slate-800/80 rounded-lg border-l-4 ${urgencyTone.bd} p-3`}>
+      <div className="flex items-start gap-3 flex-wrap">
+        {/* 來源 + urgency chip */}
+        <div className="shrink-0">
+          <span className={`inline-block text-[10px] px-2 py-0.5 rounded text-white font-bold ${urgencyTone.chip}`}>{urgencyTone.label}</span>
+          <div className="font-mono text-xs mt-1 text-cyan-300">{d.sourceLabel}</div>
+        </div>
+        {/* 4 問題 — Decision Engine 核心 */}
+        <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div>
+            <div className="text-[9px] tracking-widest text-slate-500 uppercase">① 該怎麼做</div>
+            <div className="text-sm font-bold leading-tight">{d.whatToDoNow}</div>
+          </div>
+          <div>
+            <div className="text-[9px] tracking-widest text-slate-500 uppercase">② 成本影響</div>
+            <div className="text-sm font-bold leading-tight">
+              <span className="text-rose-300">+${(d.costImpact / 10000).toFixed(1)}萬</span>
+              <span className="text-slate-400 text-[10px] mx-1">vs</span>
+              <span className="text-emerald-300">守 ${(d.revenueAtRisk / 10000).toFixed(0)}萬</span>
+            </div>
+            <div className="text-[10px] text-slate-400 mt-0.5">
+              ROI {d.costImpact > 0 ? `${(d.revenueAtRisk / d.costImpact).toFixed(1)}×` : "∞"}
+            </div>
+          </div>
+          <div>
+            <div className="text-[9px] tracking-widest text-slate-500 uppercase">③ 最佳方案</div>
+            <div className="text-sm font-bold leading-tight">
+              <span className="inline-block px-1.5 py-0.5 rounded bg-cyan-600 text-white text-[10px] mr-1">{d.bestPlanCode}</span>
+              {d.bestPlanTitle}
+            </div>
+            <div className="text-[10px] text-slate-400 mt-0.5">
+              替代：{d.alternativePlans.map((p) => `${p.code} ${p.title}`).join(" / ")}
+            </div>
+          </div>
+          <div>
+            <div className="text-[9px] tracking-widest text-slate-500 uppercase">④ 風險多少</div>
+            <div className={`text-sm font-bold leading-tight inline-block px-2 py-0.5 rounded border ${riskTone}`}>{riskLabel}</div>
+            <div className="text-[10px] text-slate-400 mt-0.5">{d.riskNote}</div>
+          </div>
+        </div>
+      </div>
+      <div className="text-[10px] text-slate-500 mt-2 ml-1">{d.contextLine}</div>
+    </div>
+  );
+  return d.sourceLink ? (
+    <Link href={d.sourceLink} className="block hover:scale-[1.005] transition-transform">{card}</Link>
+  ) : card;
 }
