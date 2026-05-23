@@ -4,25 +4,25 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// 主功能：貨件追蹤 + 卡點 AI 解方
+// Phase 1「先活」5 頁 — 主軸（震撼公司的核心）
 const primaryLinks = [
   { href: "/erp", label: "戰情室", icon: "🎯", primary: true },
-  { href: "/erp/wms", label: "WMS 戰情 Dashboard", icon: "⚡" },
+  { href: "/erp/shortage-wall", label: "缺料牆", icon: "🧱" },
+  { href: "/erp/work-orders", label: "工單追蹤", icon: "📋" },
+  { href: "/erp/wms", label: "WMS Dashboard", icon: "⚡" },
+  { href: "/erp/materials", label: "原物料 AI 戰情室", icon: "🌐" },
+];
+
+// Phase 2+ 進階：分析 / 規劃 / 參照
+const advancedLinks = [
   { href: "/erp/flow", label: "流程綜觀", icon: "🌊" },
   { href: "/erp/viz", label: "可視化儀表板", icon: "📈" },
   { href: "/erp/alerts", label: "異常警訊 + AI 解方", icon: "🚨" },
-  { href: "/erp/shortage-wall", label: "缺料牆", icon: "🧱" },
-  { href: "/erp/work-orders", label: "工單追蹤", icon: "📋" },
-];
-
-// 進階工具：分析 / 規劃 / 參照（資料源仍以鼎新為準）
-const advancedLinks = [
+  { href: "/erp/negotiation", label: "AI 議價引擎", icon: "🤝" },
   { href: "/erp/calendar", label: "排程日曆", icon: "📅" },
   { href: "/erp/customers", label: "客戶分析", icon: "👥" },
   { href: "/erp/simulator", label: "缺料模擬器", icon: "🔮" },
   { href: "/erp/analytics", label: "零件分析", icon: "📊" },
-  { href: "/erp/materials", label: "原物料 AI 戰情室", icon: "🌐" },
-  { href: "/erp/negotiation", label: "AI 議價引擎", icon: "🤝" },
   { href: "/erp/reorder", label: "再下單時點", icon: "📦" },
   { href: "/erp/dead-stock", label: "呆料預警", icon: "🗑️" },
   { href: "/erp/outsource", label: "委外倉管理", icon: "🏭" },
@@ -67,7 +67,7 @@ export default function Sidebar() {
       {/* 主功能 */}
       <nav className="py-3">
         <div className="px-5 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-          ⚡ 核心功能
+          🔥 PHASE 1 先活
         </div>
         {primaryLinks.map((l) => {
           const active = l.href === "/erp" ? pathname === "/erp" : pathname.startsWith(l.href);
@@ -93,7 +93,7 @@ export default function Sidebar() {
           className="w-full mt-3 px-5 py-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-slate-300 flex items-center gap-1"
         >
           <span>{showAdvanced ? "▾" : "▸"}</span>
-          <span>🛠️ 進階工具（資料以鼎新為準）</span>
+          <span>🚀 PHASE 2+ 進階功能</span>
         </button>
         {showAdvanced && (
           <div>
