@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 
 // Phase 1「先活」核心 — 真正的痛點（震撼公司的核心）
 const primaryLinks = [
-  { href: "/erp/order-impact", label: "訂單衝擊模擬器", icon: "⚡", primary: true },
+  { href: "/erp/supplier-portal", label: "供應商協作入口", icon: "🤝", primary: true },
+  { href: "/erp/order-impact", label: "訂單衝擊模擬器", icon: "⚡" },
   { href: "/erp/decisions", label: "決策閉環中心", icon: "🔁" },
   { href: "/erp/performance", label: "決策績效 + 案例庫", icon: "📈" },
   { href: "/erp", label: "戰情室", icon: "🎯" },
