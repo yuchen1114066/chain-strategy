@@ -43,8 +43,14 @@ export default function SupplierPortalPage() {
             供應鏈神經系統的核心：<b>即時知道問題將發生</b>，而不是「問題發生後看報表」
           </p>
         </div>
-        <div className="text-right text-xs text-slate-500">
-          <div>已數位化 {kpis.totalSuppliersDigitized} 家供應商 · {kpis.totalPOs} 張 PO</div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link href="/erp/supplier-portal/vendor" className="px-3 py-2 text-xs rounded-md font-semibold text-white shadow-md"
+            style={{ background: "linear-gradient(135deg,#0056B3,#1A7ABF)" }}>
+            🌐 開啟供應商提交入口 →
+          </Link>
+          <div className="text-right text-xs text-slate-500">
+            <div>已數位化 {kpis.totalSuppliersDigitized} 家供應商 · {kpis.totalPOs} 張 PO</div>
+          </div>
         </div>
       </header>
 
