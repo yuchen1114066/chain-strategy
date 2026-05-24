@@ -138,6 +138,35 @@ WHERE   TH013 >= DATEADD(MONTH, -12, GETDATE())`} />
         </div>
       </section>
 
+      {/* 鼎新 iGP 客戶端安裝補充 */}
+      <section className="bg-white rounded-xl border border-slate-200 p-5">
+        <h2 className="font-bold text-lg mb-2">💻 鼎新 iGP 客戶端 PC 安裝補充說明</h2>
+        <p className="text-xs text-slate-500 mb-3">
+          <b>此節不影響本系統運作</b>（我們的 GASCC 是 server-side、唯讀串接）。
+          但 PM / 採購本機要使用鼎新 iGP 操作扣帳時，Windows PC 上常遇到的 UAC 攔截問題，IT 一併處理。
+        </p>
+        <div className="rounded-lg border-2 border-amber-300 bg-amber-50/60 p-4 text-sm">
+          <div className="font-bold text-amber-900 mb-2">🔧 解除 Windows UAC（鼎新客戶端常見需求）</div>
+          <p className="text-slate-700 mb-2 text-xs leading-relaxed">
+            鼎新 ERP iGP 客戶端使用 ActiveX/COM 元件，UAC 開啟時會反覆攔截元件註冊、設定檔寫入等動作，
+            導致登入失敗或單據介面異常。標準排除步驟：
+          </p>
+          <pre className="bg-slate-900 text-slate-100 rounded p-3 text-xs font-mono overflow-x-auto leading-relaxed">
+{`HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System
+EnableLUA = 1  →  改成 0
+（修改後重新開機）`}
+          </pre>
+          <div className="text-[11px] text-rose-700 mt-2 leading-relaxed">
+            <b>⚠ 安全提醒</b>　關閉 UAC 會降低 Windows 防護層級。建議僅在內網 + 已加入網域 + 有 EPP/EDR 的 PC 上執行；
+            並搭配 Group Policy 限制此設定僅套用在執行鼎新客戶端的 PC，避免擴散。
+          </div>
+          <div className="text-[11px] text-slate-500 mt-2">
+            <b>替代方案（更安全）</b>：保持 UAC 開啟，改以「相容性模式 / 系統管理員身分執行」啟動鼎新客戶端；
+            或要求鼎新原廠提供新版簽章 ActiveX 元件。
+          </div>
+        </div>
+      </section>
+
       {/* 連線設定範本 */}
       <section className="bg-white rounded-xl border border-slate-200 p-5">
         <h2 className="font-bold text-lg mb-3">⚙️ 本系統 .env 連線設定（IT 填這個）</h2>
