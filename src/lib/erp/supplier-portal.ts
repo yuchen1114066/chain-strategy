@@ -75,7 +75,8 @@ function isoOffsetHours(h: number): string {
   return d.toISOString();
 }
 function isoOffsetDays(d: number): string {
-  return isoOffsetHours(d * 24);
+  // 為 date-only 欄位（expectedShipDate / expectedArrival 等）回傳 YYYY-MM-DD
+  return isoOffsetHours(d * 24).slice(0, 10);
 }
 
 export const digitalPOs: DigitalPO[] = [
