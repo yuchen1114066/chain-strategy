@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { computeNegotiation, type NegotiationStrategy } from "@/lib/erp/negotiation";
 import { commodities } from "@/lib/erp/commodities";
 
@@ -25,11 +26,17 @@ export default function NegotiationPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold">🤝 AI 議價引擎</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          世界級採購核心　·　歷史成交價 / 國際行情 / 匯率 / 供應商毛利 / 市場缺料 / 競爭供應商 六維分析
-        </p>
+      <header className="flex items-end justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">🤝 AI 議價引擎</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            世界級採購核心　·　歷史成交價 / 國際行情 / 匯率 / 供應商毛利 / 市場缺料 / 競爭供應商 六維分析
+          </p>
+        </div>
+        <Link href="/erp/should-cost" className="px-4 py-2 text-sm rounded-md font-bold text-white shadow-md"
+          style={{ background: "linear-gradient(135deg,#0891b2,#0e7490)" }}>
+          💎 開啟 Should-Cost 拆解 →
+        </Link>
       </header>
 
       {/* KPI */}

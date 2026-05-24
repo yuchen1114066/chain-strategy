@@ -1,16 +1,17 @@
-import { commodities, spc, type Commodity, type SpcStat } from "@/lib/erp/commodities";
+import { commodities, spc, priceZone, procurementAdvice, type Commodity, type SpcStat } from "@/lib/erp/commodities";
 import { parts } from "@/lib/erp/seed";
 
 // 全球原物料 AI 採購戰情室
 // 對應「Global AI Procurement Command Center」藍圖
-//   · 4 大原物料 SPC 管制圖（Mean ± 3σ）
-//   · 異常偵測（超 UCL/LCL = AI 風險線）
-//   · 90 天成本衝擊 + 未來預測區間
+//   · 6 大原物料即時市場資料（銅/鋁/鋼/塑料/稀土/IC）
+//   · AI 4 區判斷（低檔 / 危險 / 追高 / 囤貨 / 觀望）
+//   · 採購建議模型（事實 → 但有 → AI 判定 → 具體建議）
 
 export default function MaterialsRadarPage() {
-  const data = commodities.map((c) => ({ c, s: spc(c) }));
+  const data = commodities.map((c) => ({ c, s: spc(c), z: priceZone(c), a: procurementAdvice(c) }));
   const alertCount = data.filter((d) => d.s.status === "alert").length;
-  const highRisk = data.filter((d) => d.s.latest > d.s.mean + 2 * d.s.sigma).length;
+  const dangerZone = data.filter((d) => d.z.zone === "危險").length;
+  const buyZone = data.filter((d) => d.z.zone === "低檔" || d.z.zone === "囤貨").length;
 
   // 90 天成本衝擊估算：最新價 vs 平均價的偏離 × 影響料件數
   const costImpact = data.reduce((acc, d) => {
@@ -25,19 +26,48 @@ export default function MaterialsRadarPage() {
       <header>
         <h1 className="text-2xl font-bold">🌐 全球原物料 AI 採購戰情室</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Global AI Procurement Command Center　·　銅 / 鋁 / 鋼 / 生鐵 SPC 管制 + 異常偵測 + 成本衝擊
+          AI 不只看漲跌 — 直接判斷現在進入哪一區（低檔/危險/追高/囤貨），給具體採購建議
         </p>
       </header>
 
       {/* KPI */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi label="監控原物料" value={`${commodities.length}`} sub="全球行情" tone="cyan" />
-        <Kpi label="🔴 異常警示" value={`${alertCount}`} sub="超過 AI 風險線" tone={alertCount > 0 ? "rose" : "emerald"} />
-        <Kpi label="🟡 高風險材料" value={`${highRisk}`} sub="逼近 UCL（>2σ）" tone={highRisk > 0 ? "amber" : "emerald"} />
-        <Kpi label="預估成本衝擊" value={`${costImpact >= 0 ? "+" : ""}$${(costImpact / 10000).toFixed(0)}萬`} sub="未來 90 天（依現價偏離）" tone={costImpact > 0 ? "rose" : "emerald"} />
+        <Kpi label="監控原物料" value={`${commodities.length}`} sub="銅/鋁/鋼/塑料/稀土/IC" tone="cyan" />
+        <Kpi label="🟢 低檔 / 囤貨機會" value={`${buyZone}`} sub="可進場備料" tone={buyZone > 0 ? "emerald" : undefined} />
+        <Kpi label="🔴 危險區" value={`${dangerZone}`} sub="暫停加單" tone={dangerZone > 0 ? "rose" : "emerald"} />
+        <Kpi label="預估成本衝擊（90 天）" value={`${costImpact >= 0 ? "+" : ""}$${(costImpact / 10000).toFixed(0)}萬`} sub={`SPC alert ${alertCount} 項`} tone={costImpact > 0 ? "rose" : "emerald"} />
       </section>
 
-      {/* 4 大 SPC 管制圖 */}
+      {/* AI 4 區判斷 + 即時市場資料 */}
+      <section className="bg-white rounded-xl border border-slate-200 p-5">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h2 className="font-bold text-lg">🎯 AI 4 區判斷 — 現在進入哪一區</h2>
+          <div className="flex gap-2 text-[10px] flex-wrap">
+            <ZoneChip tone="emerald" label="低檔 — 適合囤貨" />
+            <ZoneChip tone="cyan" label="囤貨 — 即將反彈" />
+            <ZoneChip tone="amber" label="追高 — 風險中" />
+            <ZoneChip tone="rose" label="危險 — 過熱" />
+            <ZoneChip tone="slate" label="觀望" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {data.map(({ c, s, z }) => (
+            <ZoneCard key={c.code} c={c} s={s} z={z} />
+          ))}
+        </div>
+      </section>
+
+      {/* 採購建議模型（AI 推理鏈） */}
+      <section className="bg-white rounded-xl border border-slate-200 p-5">
+        <h2 className="font-bold text-lg mb-3">🤖 採購建議模型 — AI 推理鏈</h2>
+        <div className="space-y-3">
+          {data.map(({ c, a }) => (
+            <AdviceCard key={c.code} c={c} a={a} />
+          ))}
+        </div>
+      </section>
+
+      {/* 6 大 SPC 管制圖 */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {data.map(({ c, s }) => (
           <SpcChart key={c.code} c={c} s={s} />
@@ -153,6 +183,91 @@ function SpcChart({ c, s }: { c: Commodity; s: SpcStat }) {
       <div className="flex justify-between text-[10px] text-slate-500 mt-1">
         <span>異常點 {s.anomalies.length} 個</span>
         <span>未來 12 月預測：${c.forecast.low.toLocaleString()} ~ ${c.forecast.high.toLocaleString()}</span>
+      </div>
+    </div>
+  );
+}
+
+function ZoneChip({ tone, label }: { tone: "emerald" | "cyan" | "amber" | "rose" | "slate"; label: string }) {
+  const map = {
+    emerald: "bg-emerald-100 text-emerald-700",
+    cyan: "bg-cyan-100 text-cyan-700",
+    amber: "bg-amber-100 text-amber-700",
+    rose: "bg-rose-100 text-rose-700",
+    slate: "bg-slate-100 text-slate-600",
+  } as const;
+  return <span className={`px-2 py-0.5 rounded font-semibold ${map[tone]}`}>{label}</span>;
+}
+
+function ZoneCard({ c, s, z }: { c: Commodity; s: SpcStat; z: { zone: string; tone: "emerald" | "cyan" | "amber" | "rose" | "slate"; oneLiner: string; action: string } }) {
+  const toneMap = {
+    emerald: "border-emerald-400 bg-emerald-50/50",
+    cyan: "border-cyan-400 bg-cyan-50/50",
+    amber: "border-amber-400 bg-amber-50/50",
+    rose: "border-rose-400 bg-rose-50/50",
+    slate: "border-slate-300 bg-slate-50",
+  } as const;
+  const chipMap = {
+    emerald: "bg-emerald-600 text-white",
+    cyan: "bg-cyan-600 text-white",
+    amber: "bg-amber-500 text-white",
+    rose: "bg-rose-600 text-white",
+    slate: "bg-slate-500 text-white",
+  } as const;
+  return (
+    <div className={`rounded-xl border-2 p-4 ${toneMap[z.tone]}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${chipMap[z.tone]}`}>{z.zone}區</span>
+            <span className="font-mono text-[10px] text-slate-500">{c.code}</span>
+          </div>
+          <div className="font-bold text-base">{c.name}</div>
+          <div className="text-[10px] text-slate-500">{c.nameEn} · {c.source}</div>
+        </div>
+        <div className="text-right">
+          <div className="text-[10px] text-slate-500">當前</div>
+          <div className="text-xl font-extrabold tabular-nums">{s.latest.toLocaleString()}</div>
+          <div className="text-[10px] text-slate-500">{c.unit}</div>
+        </div>
+      </div>
+      <div className="mt-3 text-xs text-slate-700">{z.oneLiner}</div>
+      <div className="mt-2 text-[11px] bg-white/70 rounded p-2 border border-slate-200">
+        <span className="font-bold text-slate-700">建議：</span>{z.action}
+      </div>
+      <div className="mt-2 text-[10px] text-slate-500">
+        Mean {s.mean.toFixed(0)} ± σ {s.sigma.toFixed(0)}　·　最新 {s.latestMonth}
+      </div>
+    </div>
+  );
+}
+
+function AdviceCard({ c, a }: { c: Commodity; a: { facts: string[]; butFactors: string[]; aiVerdict: string; recommendation: string; confidence: "high" | "med" | "low" } }) {
+  const confLabel = a.confidence === "high" ? "高信心" : a.confidence === "med" ? "中等" : "低信心";
+  const confTone = a.confidence === "high" ? "bg-cyan-600" : a.confidence === "med" ? "bg-slate-500" : "bg-slate-400";
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50/40 p-4">
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-bold">{c.name}（{c.code}）採購建議</div>
+        <span className={`text-[10px] px-2 py-0.5 rounded text-white font-bold ${confTone}`}>{confLabel}</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1.2fr_1.5fr] gap-3 text-xs">
+        <div>
+          <div className="text-[10px] tracking-widest text-slate-500 font-bold uppercase mb-1">📊 事實</div>
+          <ul className="space-y-0.5">{a.facts.map((f, i) => <li key={i} className="text-slate-700">· {f}</li>)}</ul>
+        </div>
+        <div>
+          <div className="text-[10px] tracking-widest text-amber-700 font-bold uppercase mb-1">⚠ 但有相反信號</div>
+          <ul className="space-y-0.5">{a.butFactors.map((f, i) => <li key={i} className="text-slate-700">· {f}</li>)}</ul>
+        </div>
+        <div>
+          <div className="text-[10px] tracking-widest text-cyan-700 font-bold uppercase mb-1">🤖 AI 判定</div>
+          <div className="text-slate-800 font-semibold">{a.aiVerdict}</div>
+        </div>
+        <div>
+          <div className="text-[10px] tracking-widest text-emerald-700 font-bold uppercase mb-1">✅ 具體建議</div>
+          <div className="text-slate-900 font-bold">{a.recommendation}</div>
+        </div>
       </div>
     </div>
   );

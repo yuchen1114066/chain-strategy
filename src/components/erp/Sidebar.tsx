@@ -16,6 +16,8 @@ const primaryLinks = [
   { href: "/erp/work-orders", label: "工單追蹤", icon: "📋" },
   { href: "/erp/wms", label: "WMS Dashboard", icon: "⚡" },
   { href: "/erp/materials", label: "原物料 AI 戰情室", icon: "🌐" },
+  { href: "/erp/eta-forecast", label: "AI ETA 預測引擎", icon: "🔮" },
+  { href: "/erp/global-map", label: "全球供應鏈地圖", icon: "🌍" },
 ];
 
 // Phase 2+ 進階：分析 / 規劃 / 參照
@@ -24,6 +26,7 @@ const advancedLinks = [
   { href: "/erp/viz", label: "可視化儀表板", icon: "📈" },
   { href: "/erp/alerts", label: "異常警訊 + AI 解方", icon: "🚨" },
   { href: "/erp/negotiation", label: "AI 議價引擎", icon: "🤝" },
+  { href: "/erp/should-cost", label: "Should-Cost 拆解", icon: "💎" },
   { href: "/erp/calendar", label: "排程日曆", icon: "📅" },
   { href: "/erp/customers", label: "客戶分析", icon: "👥" },
   { href: "/erp/simulator", label: "缺料模擬器", icon: "🔮" },
