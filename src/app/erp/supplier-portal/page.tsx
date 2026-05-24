@@ -44,6 +44,9 @@ export default function SupplierPortalPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Link href="/erp/supplier-portal/audit" className="px-3 py-2 text-xs rounded-md font-semibold text-white shadow-sm bg-slate-800 hover:bg-slate-900">
+            🔍 PO / 廠商查詢評核
+          </Link>
           <Link href="/erp/supplier-portal/vendor" className="px-3 py-2 text-xs rounded-md font-semibold text-white shadow-md"
             style={{ background: "linear-gradient(135deg,#0056B3,#1A7ABF)" }}>
             🌐 開啟供應商提交入口 →
