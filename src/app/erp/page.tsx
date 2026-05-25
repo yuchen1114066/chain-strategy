@@ -1,446 +1,383 @@
 import Link from "next/link";
-import { workOrders, models, today } from "@/lib/erp/seed";
-import { computeAlerts } from "@/lib/erp/alerts";
-import { analyzeBottlenecks } from "@/lib/erp/flow-advisor";
-import { STAGES } from "@/lib/erp/types";
-import BottleneckAdvisor from "@/components/erp/BottleneckAdvisor";
-import { forecastAll, computeOTD, computeForwardOTD, blamingSuppliers, type WoForecast } from "@/lib/erp/otif";
-import { topDecisions, engineKpis, type DecisionAction } from "@/lib/erp/decision-engine";
+import { today } from "@/lib/erp/seed";
+import { forecastAll, computeOTD, computeForwardOTD, blamingSuppliers } from "@/lib/erp/otif";
+import { topDecisions, type DecisionAction } from "@/lib/erp/decision-engine";
+import { computeShortageWall } from "@/lib/erp/shortage-ai";
+import { equipmentUtilization } from "@/lib/erp/critical-path";
+import { commodities, priceZone } from "@/lib/erp/commodities";
+import { unconfirmedPOs, missingASNs, earlyWarningSignals, digitalPOs } from "@/lib/erp/supplier-portal";
+import { recentEvents, streamStats } from "@/lib/erp/event-bus";
+import { DAILY_INGEST_STREAMS } from "@/lib/erp/engine-timeline";
 
-function daysUntil(iso: string): number {
-  const ms = new Date(iso + "T00:00:00Z").getTime() - new Date(today + "T00:00:00Z").getTime();
-  return Math.round(ms / 86_400_000);
+// 首頁 — Autonomous Supply Chain Control Tower
+//
+// 目的：CEO / VP / 採購總監 3 秒知道公司是否安全
+// 不是 ERP Platform、不是 Dashboard，是 AI Supply Chain Operating System
+//
+// 8 大區塊：
+//   ① Global Risk Radar     — 全球風險雷達
+//   ② Live Event Stream     — 即時事件流
+//   ③ AI Decision Queue     — AI 決策佇列（真正核心）
+//   ④ Delivery Health       — 交付健康度
+//   ⑤ Supply Health         — 供應健康度
+//   ⑥ Positioning           — 系統定位
+//   ⑦ Event Density         — 供應鏈事件密度
+//   ⑧ World-Class KPIs      — 世界級 KPI
+
+type RiskColor = "red" | "orange" | "yellow" | "green";
+
+function riskLevel(count: number, thresholds: [number, number, number]): RiskColor {
+  // thresholds: [orangeMin, redMin, greenMax]  — higher = more risk
+  if (count >= thresholds[1]) return "red";
+  if (count >= thresholds[0]) return "orange";
+  if (count > thresholds[2]) return "yellow";
+  return "green";
 }
 
-function currentStageSeq(wo: typeof workOrders[number]): number {
-  const inprog = wo.stages.find((s) => s.status === "in_progress");
-  if (inprog) return inprog.seq;
-  const next = wo.stages.find((s) => s.status !== "done");
-  if (next) return next.seq;
-  return 8;
-}
-
-const REASON_LABEL = {
-  on_track: "正常",
-  material_short: "供料不足",
-  supplier_delay: "供應商延遲",
-  capacity: "產能不足",
-  bottleneck: "瓶頸工序",
-} as const;
+const RISK_DOT: Record<RiskColor, { color: string; label: string; emoji: string }> = {
+  red:    { color: "#dc2626", label: "嚴重",    emoji: "🔴" },
+  orange: { color: "#ea580c", label: "警示",    emoji: "🟠" },
+  yellow: { color: "#f59e0b", label: "注意",    emoji: "🟡" },
+  green:  { color: "#10b981", label: "安全",    emoji: "🟢" },
+};
 
 export default function CockpitPage() {
-  const activeWos = workOrders.filter((w) => w.status !== "done" && w.status !== "cancelled");
-  const alerts = computeAlerts();
-  const bottlenecks = analyzeBottlenecks();
   const forecasts = forecastAll();
   const otd = computeOTD();
   const fwd = computeForwardOTD(forecasts);
   const blamers = blamingSuppliers(forecasts);
   const decisions = topDecisions();
-  const kpis = engineKpis();
+  const wall = computeShortageWall();
+  const equip = equipmentUtilization();
+  const unconf = unconfirmedPOs();
+  const missAsn = missingASNs();
+  const earlySignals = earlyWarningSignals();
+  const stream = streamStats();
+  const events = recentEvents();
 
-  const wosByStage = new Map<number, typeof workOrders>();
-  for (const w of activeWos) {
-    const seq = currentStageSeq(w);
-    const arr = wosByStage.get(seq) ?? [];
-    arr.push(w);
-    wosByStage.set(seq, arr);
-  }
+  // 5 大風險指標
+  const shortageRed = wall.filter((w) => w.grade === "S" || w.grade === "A").length;
+  const deliveryRisk = forecasts.filter((f) => f.light !== "green").length;
+  const materialSurge = commodities.filter((c) => priceZone(c).zone === "危險").length;
+  const qualityIssues = digitalPOs.reduce((s, po) => s + po.qualityReports.filter((q) => q.result === "major_defect" || q.result === "rejected").length, 0);
+  const supplierOutOfControl = earlySignals.filter((s) => s.severity === "critical").length + blamers.length;
 
-  const forecastMap = new Map(forecasts.map((f) => [f.wo.id, f]));
-  const redLight = forecasts.filter((f) => f.light === "red");
-  const yellowLight = forecasts.filter((f) => f.light === "yellow");
-  const greenLight = forecasts.filter((f) => f.light === "green");
+  const risks = [
+    { label: "缺料風險",   value: shortageRed,         level: riskLevel(shortageRed, [1, 3, 0]),       href: "/erp/shortage-wall" },
+    { label: "準交風險",   value: deliveryRisk,        level: riskLevel(deliveryRisk, [2, 5, 0]),       href: "/erp/eta-forecast" },
+    { label: "原料暴漲",   value: materialSurge,       level: riskLevel(materialSurge, [1, 2, 0]),     href: "/erp/materials" },
+    { label: "品質異常",   value: qualityIssues,       level: riskLevel(qualityIssues, [1, 3, 0]),     href: "/erp/supplier-portal" },
+    { label: "供應商失控", value: supplierOutOfControl, level: riskLevel(supplierOutOfControl, [1, 3, 0]), href: "/erp/supplier-portal/audit" },
+  ];
 
-  const redCount = alerts.filter((a) => a.severity === "red").length;
-  const yellowCount = alerts.filter((a) => a.severity === "yellow").length;
-  const totalActiveValue = activeWos.reduce((s, w) => {
-    const m = models.find((m) => m.id === w.modelId);
-    return s + (m ? m.stdPrice * w.qty : 0);
-  }, 0);
+  // Delivery Health
+  const delayedWo = forecasts.filter((f) => f.light === "red").length;
+  const riskOrders = forecasts.filter((f) => f.light !== "green").length;
+
+  // Supply Health
+  const asnDelay = missAsn.filter((m) => m.severity === "critical" || m.severity === "warn").length;
+  const poUnconf = unconf.filter((u) => u.hoursOverdue > 0).length;
+  const supplierRisk = blamers.length;
+  const capacityAlert = equip.filter((e) => e.riskLevel === "critical").length;
+
+  // 8 大世界級 KPI（虛擬基準值；正式版接歷史資料）
+  const worldClassKpis = [
+    { kpi: "ETA Accuracy",            label: "預測準度",   value: "82%",  benchmark: "≥85%", trend: "↑+3%",  tone: "warn" as const },
+    { kpi: "Stockout Prevention",     label: "防停線",     value: "94%",  benchmark: "≥95%", trend: "↑+1%",  tone: "good" as const },
+    { kpi: "OTD Improvement",         label: "OTD 提升",   value: `${otd.otd.toFixed(1)}%`, benchmark: "≥95%", trend: "↑+0.5%", tone: otd.otd >= 95 ? "good" : "warn" as const },
+    { kpi: "Inventory Reduction",     label: "降庫存",     value: "-8%",  benchmark: "-10%", trend: "↑改善",  tone: "warn" as const },
+    { kpi: "Expedite Reduction",      label: "降空運",     value: "-15%", benchmark: "-20%", trend: "↑改善",  tone: "good" as const },
+    { kpi: "AI Adoption",             label: "AI 採用率",  value: "73%",  benchmark: "≥80%", trend: "↑+5%",  tone: "warn" as const },
+  ];
+
+  // 整體公司安全度（綜合）
+  const totalRedRisks = risks.filter((r) => r.level === "red").length;
+  const totalOrangeRisks = risks.filter((r) => r.level === "orange").length;
+  const overallSafe: RiskColor = totalRedRisks > 0 ? "red" : totalOrangeRisks > 0 ? "orange" : "green";
+  const overallLabel = overallSafe === "red" ? "🚨 需要立即介入" : overallSafe === "orange" ? "⚠ 需要關注" : "✅ 公司運轉正常";
+
+  // 取最關鍵 Critical 決策
+  const criticalDecisions = decisions.filter((d) => d.urgency === "now").slice(0, 4);
+  const todayDecisions = decisions.filter((d) => d.urgency === "today").slice(0, 3);
 
   return (
     <div className="p-6 space-y-6">
       <header className="flex items-end justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">🎯 戰情室 — Decision Engine</h1>
+          <h1 className="text-2xl font-bold">🎯 Autonomous Supply Chain Control Tower</h1>
           <p className="text-sm text-slate-500 mt-1">
-            不只告訴你「發生什麼事」，直接告訴你「現在該做什麼 / 成本多少 / 哪方案最好 / 風險多少」
+            CEO / VP / 採購總監　·　3 秒知道公司是否安全
           </p>
         </div>
         <div className="text-right text-xs text-slate-500">
-          <div>基準日 {today}　·　AI 每日自動計算</div>
-          <div className="mt-1">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-emerald-700 font-semibold">已連線鼎新 ERP（資料同步）</span>
-            </span>
+          <div>基準 {today}　·　Event Stream 即時運轉</div>
+          <div className="mt-1 flex items-center gap-1 justify-end">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-emerald-700 font-semibold">系統運轉中</span>
           </div>
         </div>
       </header>
 
-      {/* ============ Decision Engine Top Feed — 直接告訴你該怎麼做 ============ */}
-      <section className="bg-gradient-to-br from-slate-900 via-slate-900 to-rose-900/40 text-white rounded-xl p-5 border-2 border-cyan-500/40">
+      {/* ============ 整體安全度橫幅 ============ */}
+      <section className="rounded-xl text-white p-5"
+        style={{
+          background: overallSafe === "red"
+            ? "linear-gradient(135deg, #991b1b, #dc2626)"
+            : overallSafe === "orange"
+            ? "linear-gradient(135deg, #9a3412, #ea580c)"
+            : "linear-gradient(135deg, #065f46, #10b981)",
+        }}>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <div className="text-[10px] tracking-widest uppercase opacity-80">公司供應鏈總安全度</div>
+            <div className="text-3xl font-extrabold mt-1">{overallLabel}</div>
+            <div className="text-sm opacity-90 mt-1">
+              {totalRedRisks > 0 ? `${totalRedRisks} 個紅燈風險、` : ""}
+              {totalOrangeRisks > 0 ? `${totalOrangeRisks} 個警示風險、` : ""}
+              {stream.critical > 0 ? `${stream.critical} 件 Critical 事件待處理` : "無待處理 Critical 事件"}
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] opacity-80">真實事件流</div>
+            <div className="text-2xl font-extrabold tabular-nums">{stream.total}</div>
+            <div className="text-[11px] opacity-80">{stream.uniqueGroups} 個獨立事件鏈</div>
+          </div>
+        </div>
+      </section>
+
+      {/* ============ ① Global Risk Radar ============ */}
+      <section className="bg-white rounded-xl border border-slate-200 p-5">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <div>
-            <div className="text-xs font-bold tracking-widest uppercase text-cyan-400">🤖 Decision Engine — 不是 Dashboard</div>
-            <div className="text-lg font-extrabold mt-0.5">系統現在告訴你該做什麼（按緊急度排序）</div>
+            <h2 className="text-lg font-bold">🛰 ① Global Risk Radar — 全球風險雷達</h2>
+            <p className="text-xs text-slate-500 mt-0.5">5 大風險即時狀態，3 秒看完</p>
           </div>
-          <div className="text-[11px] text-slate-300">
-            {decisions.length > 0
-              ? <>共 <b className="text-cyan-300">{decisions.length}</b> 個待決策　·　守住營收 <b className="text-emerald-300">${(decisions.reduce((s, d) => s + d.revenueAtRisk, 0) / 10000).toFixed(0)}萬</b></>
-              : "目前無待決策 — 系統運轉正常"}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          {risks.map((r) => {
+            const dot = RISK_DOT[r.level];
+            return (
+              <Link key={r.label} href={r.href} className="block rounded-lg border-2 p-4 hover:shadow-md transition-shadow"
+                style={{ borderColor: dot.color + "55", background: dot.color + "0a" }}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-sm font-bold">{r.label}</div>
+                  <div className="w-5 h-5 rounded-full animate-pulse" style={{ background: dot.color }} />
+                </div>
+                <div className="text-3xl font-extrabold tabular-nums" style={{ color: dot.color }}>{r.value}</div>
+                <div className="text-[11px] font-bold mt-1" style={{ color: dot.color }}>{dot.emoji} {dot.label}</div>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ============ ② Live Event Stream ============ */}
+      <section className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-xl p-5 border border-slate-700">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div>
+            <div className="text-xs font-bold tracking-widest uppercase text-cyan-400">② Live Event Stream</div>
+            <h2 className="text-lg font-extrabold mt-0.5">即時事件流（最近 {events.length} 筆）</h2>
+          </div>
+          <Link href="/erp/admin/event-engine" className="text-[11px] text-cyan-300 hover:underline">→ Event Engine</Link>
+        </div>
+        <div className="space-y-2">
+          {events.slice(0, 5).map((e) => {
+            const color =
+              e.severity === "critical" ? "#f43f5e" :
+              e.severity === "high" ? "#f59e0b" :
+              e.severity === "medium" ? "#06b6d4" : "#94a3b8";
+            return (
+              <div key={e.id} className="flex items-center gap-3 bg-slate-800/60 rounded p-2.5 border border-slate-700">
+                <div className="w-2 h-2 rounded-full shrink-0 animate-pulse" style={{ background: color }} />
+                <code className="text-[10px] font-mono text-slate-400 shrink-0">{e.type}</code>
+                <div className="text-sm flex-1 min-w-0 truncate">
+                  {Object.entries(e.payload).map(([k, v]) => <span key={k} className="mr-2 text-xs"><span className="text-slate-500">{k}=</span>{String(v)}</span>)}
+                </div>
+                <span className="text-[10px] text-slate-500 shrink-0 tabular-nums">
+                  {new Date(e.occurredAt).toLocaleTimeString("zh-TW", { hour12: false })}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ============ ③ AI Decision Queue — 真正核心 ============ */}
+      <section className="rounded-xl p-5 border-2"
+        style={{ borderColor: criticalDecisions.length > 0 ? "#dc2626" : "#06b6d4", background: criticalDecisions.length > 0 ? "#fef2f2" : "#ecfeff" }}>
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div>
+            <h2 className="text-lg font-bold">
+              🤖 ③ AI Decision Queue
+              {criticalDecisions.length > 0 && (
+                <span className="ml-2 text-[10px] px-2 py-0.5 rounded bg-rose-600 text-white font-bold animate-pulse">
+                  {criticalDecisions.length} 個 Critical
+                </span>
+              )}
+            </h2>
+            <p className="text-xs text-slate-600 mt-0.5">真正核心 — AI 直接告訴你「該做什麼 + 影響多少」</p>
+          </div>
+          <Link href="/erp/decisions" className="text-[11px] text-cyan-700 hover:underline">→ 決策閉環中心</Link>
+        </div>
+        <div className="space-y-2">
+          {criticalDecisions.length === 0 && todayDecisions.length === 0 ? (
+            <div className="bg-emerald-50 border border-emerald-200 rounded p-3 text-center text-emerald-700">
+              ✅ 目前無待決策事項 — 所有信號綠燈
+            </div>
+          ) : (
+            <>
+              {criticalDecisions.map((d) => <DecisionRow key={d.id} d={d} urgent />)}
+              {todayDecisions.map((d) => <DecisionRow key={d.id} d={d} />)}
+            </>
+          )}
+        </div>
+      </section>
+
+      {/* ============ ④ Delivery Health + ⑤ Supply Health ============ */}
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <h2 className="font-bold mb-3">🚚 ④ Delivery Health — 交付健康度</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <HealthRow label="OTD"        value={`${otd.otd.toFixed(1)}%`}  tone={otd.otd >= 95 ? "good" : "warn"} target="≥95%" />
+            <HealthRow label="OTIF"       value={`${otd.otif.toFixed(1)}%`} tone={otd.otif >= 95 ? "good" : "warn"} target="≥95%" />
+            <HealthRow label="Delay WO"   value={`${delayedWo}`}             tone={delayedWo > 5 ? "bad" : delayedWo > 0 ? "warn" : "good"} target="0" />
+            <HealthRow label="Risk Orders" value={`${riskOrders}`}            tone={riskOrders > 5 ? "bad" : riskOrders > 0 ? "warn" : "good"} target="≤2" />
+          </div>
+          <div className="text-[10px] text-slate-500 mt-3">
+            🟢 {fwd.greenPct.toFixed(0)}%　·　🟡 {fwd.yellowPct.toFixed(0)}%　·　🔴 {fwd.redPct.toFixed(0)}% 預測
           </div>
         </div>
 
-        {/* 4 KPI 都是 actionable */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
-          {kpis.map((k) => (
-            k.link ? (
-              <Link key={k.label} href={k.link} className="block bg-slate-800/60 rounded-lg p-3 border border-slate-700 hover:border-cyan-400 transition-colors">
-                <div className="text-[10px] text-slate-400">{k.label}</div>
-                <div className="text-xl font-extrabold tabular-nums mt-0.5">{k.value}</div>
-                <div className="text-[10px] text-slate-500">{k.sub}</div>
-                <div className="text-[10px] text-cyan-300 mt-1 font-semibold">→ {k.actionNow}</div>
-              </Link>
-            ) : (
-              <div key={k.label} className="bg-slate-800/60 rounded-lg p-3 border border-slate-700">
-                <div className="text-[10px] text-slate-400">{k.label}</div>
-                <div className="text-xl font-extrabold tabular-nums mt-0.5">{k.value}</div>
-                <div className="text-[10px] text-slate-500">{k.sub}</div>
-                <div className="text-[10px] text-slate-500 mt-1">{k.actionNow}</div>
-              </div>
-            )
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <h2 className="font-bold mb-3">🏭 ⑤ Supply Health — 供應健康度</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <HealthRow label="ASN Delay"      value={`${asnDelay}`}     tone={asnDelay > 3 ? "bad" : asnDelay > 0 ? "warn" : "good"} target="0" />
+            <HealthRow label="PO Unconfirmed" value={`${poUnconf}`}     tone={poUnconf > 3 ? "bad" : poUnconf > 0 ? "warn" : "good"} target="0" />
+            <HealthRow label="Supplier Risk"  value={`${supplierRisk}`} tone={supplierRisk > 2 ? "bad" : supplierRisk > 0 ? "warn" : "good"} target="0" />
+            <HealthRow label="Capacity Alert" value={`${capacityAlert}`} tone={capacityAlert > 1 ? "bad" : capacityAlert > 0 ? "warn" : "good"} target="≤1" />
+          </div>
+          <div className="text-[10px] text-slate-500 mt-3">
+            🧬 Supplier Digital Twin × {[...new Set(digitalPOs.map((p) => p.supplierId))].length} 家供應商
+          </div>
+        </div>
+      </section>
+
+      {/* ============ ⑦ 供應鏈事件密度 ============ */}
+      <section className="bg-white rounded-xl border border-slate-200 p-5">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div>
+            <h2 className="font-bold text-lg">📡 ⑦ 供應鏈事件密度 — 真正世界級的關鍵</h2>
+            <p className="text-xs text-slate-500 mt-0.5">資料流動 → AI 才會越強。系統每天 ingest 8 個流。</p>
+          </div>
+          <Link href="/erp/admin/engines" className="text-[11px] text-cyan-700 hover:underline">→ Timeline Graph</Link>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {DAILY_INGEST_STREAMS.map((s) => (
+            <div key={s.name} className="bg-cyan-50/40 rounded border border-cyan-200 p-2.5">
+              <div className="font-bold text-sm text-cyan-700">{s.name}</div>
+              <div className="text-[10px] text-slate-500">{s.label}</div>
+              <div className="text-[10px] text-slate-600 mt-1 leading-snug">{s.desc}</div>
+            </div>
           ))}
         </div>
-
-        {/* Top Decisions — 每張卡回答 4 問題 */}
-        {decisions.length > 0 ? (
-          <div className="space-y-2">
-            {decisions.slice(0, 5).map((d) => <DecisionCard key={d.id} d={d} />)}
-            {decisions.length > 5 && (
-              <div className="text-center text-[11px] text-slate-400">
-                還有 {decisions.length - 5} 個次要決策 — 進對應分頁查看
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="bg-emerald-900/30 border border-emerald-500/30 rounded-lg p-4 text-center text-emerald-300">
-            ✅ 系統當下無待決策事項 — 所有信號綠燈
-          </div>
-        )}
       </section>
 
-      {/* ============ 必加 KPI：OTIF / OTD（世界級供應鏈核心指標）============ */}
-      <section className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-xl p-5 border border-slate-700">
-        <div className="flex items-center justify-between mb-3">
+      {/* ============ ⑧ 世界級 KPI（真正最重要） ============ */}
+      <section className="bg-gradient-to-br from-slate-50 to-cyan-50 rounded-xl border-2 border-cyan-200 p-5">
+        <div className="mb-3">
+          <h2 className="font-bold text-lg">🌍 ⑧ World-Class KPIs — 不是頁數，是成果</h2>
+          <p className="text-xs text-slate-500 mt-0.5">真正最重要的 KPI 不是「系統頁數」，而是「世界級基準點」</p>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {worldClassKpis.map((k) => (
+            <div key={k.kpi} className="bg-white rounded-lg border border-slate-200 p-3">
+              <div className="text-[10px] tracking-widest text-slate-500 font-bold uppercase">{k.kpi}</div>
+              <div className="text-[11px] text-slate-600">{k.label}</div>
+              <div className={`text-2xl font-extrabold tabular-nums mt-1 ${
+                k.tone === "good" ? "text-emerald-600" : k.tone === "warn" ? "text-amber-600" : "text-rose-600"
+              }`}>{k.value}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">目標 {k.benchmark}</div>
+              <div className="text-[10px] text-emerald-700 font-bold">{k.trend}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ============ ⑥ 真正定位 ============ */}
+      <section className="bg-slate-900 text-white rounded-xl p-5 border border-slate-700">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_320px] gap-4 items-center">
           <div>
-            <div className="text-xs font-bold tracking-widest uppercase text-cyan-400">World-Class Supply Chain KPI</div>
-            <div className="text-lg font-bold mt-0.5">OTIF / OTD — 準時且足量交貨率</div>
+            <div className="text-[10px] tracking-widest uppercase text-slate-400 font-bold">系統真正定位（重要）</div>
+            <div className="text-2xl font-extrabold mt-1">
+              <span className="line-through text-slate-500 text-base mr-2">ERP Platform / Dashboard</span>
+            </div>
+            <div className="text-3xl font-extrabold mt-2 text-cyan-300">
+              Autonomous Supply Chain Control Tower
+            </div>
+            <div className="text-sm text-slate-300 mt-2">
+              AI Supply Chain Operating System — 不是看現在，是預測未來 + 直接推薦最佳方案。
+              真正的價值不是頁面多，是<b>供應鏈事件密度</b>夠高、AI 持續學習、決策準確度持續提升。
+            </div>
           </div>
-          <div className="text-[10px] text-slate-400">沒有 OTIF/OTD，戰情室只是漂亮 Dashboard</div>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <BigKpi label="OTD（歷史）" value={`${otd.otd.toFixed(1)}%`} sub={`${otd.onTimeCount}/${otd.doneCount} 已交付`} tone={otd.otd >= 95 ? "emerald" : otd.otd >= 85 ? "amber" : "rose"} />
-          <BigKpi label="OTIF（歷史）" value={`${otd.otif.toFixed(1)}%`} sub="準時+足量" tone={otd.otif >= 95 ? "emerald" : otd.otif >= 85 ? "amber" : "rose"} />
-          <BigKpi label="🟢 預測可如期" value={`${fwd.greenPct.toFixed(0)}%`} sub={`${greenLight.length} 張在製`} tone="emerald" />
-          <BigKpi label="🟡 預測可能延誤" value={`${fwd.yellowPct.toFixed(0)}%`} sub={`${yellowLight.length} 張在製`} tone="amber" />
-          <BigKpi label="🔴 預測必延誤" value={`${fwd.redPct.toFixed(0)}%`} sub={`${redLight.length} 張在製`} tone="rose" />
-        </div>
-      </section>
-
-      {/* 整體 KPI */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi label="在製訂單" value={`${activeWos.length}`} sub="張單" tone="cyan" />
-        <Kpi label="在製金額" value={`$${(totalActiveValue / 10000).toFixed(0)}萬`} sub={`$${totalActiveValue.toLocaleString()}`} />
-        <Kpi label="未處理異常" value={`🔴 ${redCount}　🟡 ${yellowCount}`} sub={`${alerts.length} 條`} tone={redCount > 0 ? "rose" : undefined} />
-        <Kpi label="造成停線供應商" value={`${blamers.length}`} sub="家" tone={blamers.length > 0 ? "amber" : undefined} />
-      </section>
-
-      {/* ============ 哪張工單會延誤（客戶交期燈號）============ */}
-      <section className="bg-white rounded-xl border border-slate-200 p-5">
-        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <div>
-            <h2 className="font-bold text-lg">🚦 客戶交期燈號 — 哪張工單會延誤</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              AI 每日自動算：需求日 vs 供料日 vs 產能 vs 瓶頸工序　·　預測實際出貨日 vs 客戶要求
-            </p>
-          </div>
-          <div className="flex gap-2 text-[11px]">
-            <Legend c="bg-emerald-500" t={`可如期 ${greenLight.length}`} />
-            <Legend c="bg-amber-500" t={`可能延誤 ${yellowLight.length}`} />
-            <Legend c="bg-rose-500" t={`必延誤 ${redLight.length}`} />
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-600 text-xs">
-              <tr>
-                <th className="text-center px-2 py-2">燈號</th>
-                <th className="text-left px-3 py-2">工單 / 客戶</th>
-                <th className="text-left px-3 py-2">客戶要求日</th>
-                <th className="text-left px-3 py-2">AI 預測出貨日</th>
-                <th className="text-right px-3 py-2">緩衝天數</th>
-                <th className="text-left px-3 py-2">主因</th>
-                <th className="text-left px-3 py-2">責任供應商 / 瓶頸</th>
-              </tr>
-            </thead>
-            <tbody>
-              {forecasts.sort((a, b) => a.slackDays - b.slackDays).map((f) => (
-                <ForecastRow key={f.wo.id} f={f} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* ============ 哪個供應商造成停線 ============ */}
-      {blamers.length > 0 && (
-        <section className="bg-white rounded-xl border-2 border-rose-200 p-5">
-          <h2 className="font-bold text-lg mb-3">🏭 哪個供應商造成停線</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {blamers.map((s) => (
-              <div key={s.id} className="bg-rose-50 rounded-lg border border-rose-200 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="font-bold">{s.name}</div>
-                  <span className="text-xs px-2 py-0.5 rounded bg-rose-600 text-white font-bold">
-                    拖累 {s.affectedWos.length} 張單
-                  </span>
-                </div>
-                <div className="text-xs text-slate-700 mb-1">
-                  <span className="text-slate-500">關鍵料：</span>
-                  {s.parts.slice(0, 5).join(" / ")}{s.parts.length > 5 && " …"}
-                </div>
-                <div className="text-xs text-slate-600">
-                  <span className="text-slate-500">影響工單：</span>
-                  {s.affectedWos.map((wo) => (
-                    <span key={wo} className="inline-block mr-1 font-mono text-rose-700">{wo}</span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ============ 工單卡在哪一關（保留原 8 階段視覺）============ */}
-      <section className="bg-white rounded-xl border border-slate-200 p-5">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="font-bold text-lg">📍 訂單卡在哪一關</h2>
-            <p className="text-xs text-slate-500 mt-0.5">8 階段欄位看板 · 燈號與卡片左邊框對應</p>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <div className="flex gap-2 min-w-[920px]">
-            {STAGES.map((meta, i) => {
-              const seq = i + 1;
-              const stageWos = wosByStage.get(seq) ?? [];
-              const stageBottleneck = bottlenecks.find((b) => b.stage === meta.key);
-              return (
-                <div key={meta.key} className={`flex-1 min-w-[110px] rounded-lg border-2 ${
-                  stageBottleneck ? "border-rose-300 bg-rose-50/40"
-                  : stageWos.length > 0 ? "border-cyan-200 bg-cyan-50/30"
-                  : "border-slate-200 bg-slate-50"
-                }`}>
-                  <div className="px-2 py-2 border-b border-slate-200/60 text-center">
-                    <div className="text-lg">{meta.icon}</div>
-                    <div className="text-xs font-bold">{meta.label}</div>
-                    <div className="text-[10px] text-slate-500 mt-0.5">
-                      {stageWos.length > 0 ? `${stageWos.length} 張` : "—"}
-                    </div>
-                    {stageBottleneck && (
-                      <div className="mt-1 text-[9px] px-1 py-0.5 rounded bg-rose-500 text-white font-bold inline-block">⚠ 瓶頸</div>
-                    )}
-                  </div>
-                  <div className="p-1.5 space-y-1.5 min-h-[120px]">
-                    {stageWos.map((w) => {
-                      const f = forecastMap.get(w.id);
-                      const m = models.find((m) => m.id === w.modelId);
-                      const d = daysUntil(w.shipDate);
-                      const lightBorder =
-                        f?.light === "red" ? "border-l-4 border-l-rose-500" :
-                        f?.light === "yellow" ? "border-l-4 border-l-amber-500" :
-                        "border-l-4 border-l-emerald-500";
-                      return (
-                        <Link key={w.id} href={`/erp/work-orders/${w.id}`}
-                          className={`block rounded border ${lightBorder} bg-white p-1.5 hover:border-cyan-400 transition-colors`}>
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="font-mono text-[10px] font-bold text-cyan-700 truncate">{w.woNo}</span>
-                          </div>
-                          <div className="text-[10px] text-slate-700 truncate">{w.customer}</div>
-                          <div className="text-[9px] text-slate-500 truncate">{m?.code} × {w.qty}</div>
-                          <div className={`text-[9px] font-bold tabular-nums mt-0.5 ${
-                            d < 0 ? "text-slate-400" : d < 7 ? "text-rose-600" : d < 21 ? "text-amber-600" : "text-slate-500"
-                          }`}>
-                            {d >= 0 ? `T-${d}d` : `已逾 ${-d}d`}
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <Link href="/erp/admin/engines" className="bg-slate-800/60 rounded p-3 border border-slate-700 hover:border-cyan-500">
+              <div className="text-2xl">🧠</div>
+              <div className="font-bold mt-1">4 大 Engine</div>
+              <div className="text-[10px] text-slate-400">Event / Twin / Predict / Time</div>
+            </Link>
+            <Link href="/erp/admin/observability" className="bg-slate-800/60 rounded p-3 border border-slate-700 hover:border-cyan-500">
+              <div className="text-2xl">🔭</div>
+              <div className="font-bold mt-1">Observability</div>
+              <div className="text-[10px] text-slate-400">Trace + Explain + Lineage</div>
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* AI 解方 */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="font-bold text-lg flex items-center gap-2">
-              🤖 AI 卡點解方
-              {bottlenecks.length > 0 && <span className="text-xs px-2 py-0.5 rounded bg-rose-500 text-white">{bottlenecks.length} 個瓶頸</span>}
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">偵測到塞車 → 自動生成根因 + 可執行解方</p>
-          </div>
-        </div>
-        <BottleneckAdvisor analyses={bottlenecks} />
-      </section>
-
-      <section className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-700">
-        <div className="flex items-start gap-3">
-          <span className="text-2xl">🔗</span>
-          <div>
-            <div className="font-bold text-slate-900 mb-1">系統定位：Global AI Supply Chain Command Center</div>
-            <p>
-              鼎新 ERP iGP = 系統 of record（單據/庫存/BOM/採購數量以鼎新為準）。
-              本系統 = <b>跨模組供應鏈戰情 + AI 解方 + 預測性</b>。對鼎新唯讀不回寫，
-              扣帳一律回 ERP 操作。
-            </p>
-          </div>
-        </div>
-      </section>
+      <p className="text-[11px] text-slate-500 text-center">
+        對鼎新 ERP 唯讀不回寫　·　扣帳一律回 ERP 操作　·　所有預警 / 決策 / 評分由本系統自治
+      </p>
     </div>
   );
 }
 
-function ForecastRow({ f }: { f: WoForecast }) {
-  const tone =
-    f.light === "red" ? { bg: "bg-rose-50/50", chip: "bg-rose-600" } :
-    f.light === "yellow" ? { bg: "bg-amber-50/50", chip: "bg-amber-500" } :
-    { bg: "", chip: "bg-emerald-500" };
-  const label = f.light === "red" ? "必延誤" : f.light === "yellow" ? "可能延誤" : "可如期";
+function DecisionRow({ d, urgent }: { d: DecisionAction; urgent?: boolean }) {
   return (
-    <tr className={`border-t border-slate-100 ${tone.bg}`}>
-      <td className="px-2 py-2 text-center">
-        <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded text-white font-bold ${tone.chip}`}>{label}</span>
-      </td>
-      <td className="px-3 py-2">
-        <Link href={`/erp/work-orders/${f.wo.id}`} className="font-mono text-xs text-cyan-700 hover:underline font-semibold">
-          {f.wo.woNo}
-        </Link>
-        <div className="text-[10px] text-slate-500">{f.wo.customer} × {f.wo.qty}</div>
-      </td>
-      <td className="px-3 py-2 text-sm">{f.customerRequestDate}</td>
-      <td className={`px-3 py-2 text-sm font-bold tabular-nums ${
-        f.light === "red" ? "text-rose-600" : f.light === "yellow" ? "text-amber-600" : "text-emerald-600"
-      }`}>{f.predictedShipDate}</td>
-      <td className={`px-3 py-2 text-right tabular-nums font-bold ${
-        f.slackDays < 0 ? "text-rose-600" : f.slackDays <= 3 ? "text-amber-600" : "text-emerald-600"
-      }`}>
-        {f.slackDays >= 0 ? `+${f.slackDays}d` : `${f.slackDays}d`}
-      </td>
-      <td className="px-3 py-2 text-xs">{REASON_LABEL[f.reason]}</td>
-      <td className="px-3 py-2 text-xs text-slate-600">
-        {f.responsibleSuppliers.length > 0
-          ? f.responsibleSuppliers.map((s) => s.name).join(" / ")
-          : f.bottleneckStage ? `瓶頸：${f.bottleneckStage}` : "—"}
-      </td>
-    </tr>
-  );
-}
-
-function BigKpi({ label, value, sub, tone }: { label: string; value: string; sub: string; tone: "emerald" | "amber" | "rose" }) {
-  const accent = tone === "emerald" ? "text-emerald-400" : tone === "amber" ? "text-amber-400" : "text-rose-400";
-  return (
-    <div className="bg-slate-800/60 rounded-lg px-4 py-3 border border-slate-700">
-      <div className="text-[11px] text-slate-400">{label}</div>
-      <div className={`text-2xl font-extrabold tabular-nums mt-0.5 ${accent}`}>{value}</div>
-      <div className="text-[10px] text-slate-500 mt-0.5">{sub}</div>
-    </div>
-  );
-}
-
-function Kpi({ label, value, sub, tone }: { label: string; value: string; sub: string; tone?: "cyan" | "amber" | "rose" }) {
-  const cls = {
-    cyan: "border-cyan-200 bg-cyan-50/40",
-    amber: "border-amber-200 bg-amber-50/40",
-    rose: "border-rose-200 bg-rose-50/40",
-  }[tone ?? "cyan"] ?? "border-slate-200 bg-white";
-  const c = tone ? cls : "border-slate-200 bg-white";
-  return (
-    <div className={`rounded-xl border px-4 py-3 ${c}`}>
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="mt-1 text-2xl font-bold tabular-nums">{value}</div>
-      <div className="text-[11px] text-slate-500 mt-0.5">{sub}</div>
-    </div>
-  );
-}
-
-function Legend({ c, t }: { c: string; t: string }) {
-  return <span className="inline-flex items-center gap-1"><span className={`w-3 h-3 rounded-full ${c}`} />{t}</span>;
-}
-
-function DecisionCard({ d }: { d: DecisionAction }) {
-  const urgencyTone = d.urgency === "now"
-    ? { bd: "border-rose-500", chip: "bg-rose-500", label: "NOW" }
-    : d.urgency === "today"
-    ? { bd: "border-amber-500", chip: "bg-amber-500", label: "TODAY" }
-    : { bd: "border-cyan-500", chip: "bg-cyan-500", label: "THIS WEEK" };
-  const riskTone =
-    d.risk === "low" ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" :
-    d.risk === "med" ? "bg-amber-500/20 text-amber-300 border-amber-500/40" :
-    "bg-rose-500/20 text-rose-300 border-rose-500/40";
-  const riskLabel = d.risk === "low" ? "風險低" : d.risk === "med" ? "中風險" : "高風險";
-  const card = (
-    <div className={`bg-slate-800/80 rounded-lg border-l-4 ${urgencyTone.bd} p-3`}>
+    <Link href={d.sourceLink ?? "#"} className={`block rounded-lg border-2 p-3 transition-shadow hover:shadow-md ${
+      urgent ? "border-rose-400 bg-white" : "border-amber-300 bg-white"
+    }`}>
       <div className="flex items-start gap-3 flex-wrap">
-        {/* 來源 + urgency chip */}
-        <div className="shrink-0">
-          <span className={`inline-block text-[10px] px-2 py-0.5 rounded text-white font-bold ${urgencyTone.chip}`}>{urgencyTone.label}</span>
-          <div className="font-mono text-xs mt-1 text-cyan-300">{d.sourceLabel}</div>
-        </div>
-        {/* 4 問題 — Decision Engine 核心 */}
-        <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-4 gap-3">
-          <div>
-            <div className="text-[9px] tracking-widest text-slate-500 uppercase">① 該怎麼做</div>
-            <div className="text-sm font-bold leading-tight">{d.whatToDoNow}</div>
+        <span className={`text-[10px] px-2 py-0.5 rounded text-white font-bold shrink-0 ${
+          urgent ? "bg-rose-600" : "bg-amber-500"
+        }`}>{urgent ? "[Critical]" : "[Today]"}</span>
+        <div className="flex-1 min-w-0">
+          <div className="font-bold text-sm">{d.contextLine.split("·")[0].trim()}</div>
+          <div className="text-xs text-slate-700 mt-1">
+            <b className="text-slate-900">建議：</b>{d.whatToDoNow}
           </div>
-          <div>
-            <div className="text-[9px] tracking-widest text-slate-500 uppercase">② 成本影響</div>
-            <div className="text-sm font-bold leading-tight">
-              <span className="text-rose-300">+${(d.costImpact / 10000).toFixed(1)}萬</span>
-              <span className="text-slate-400 text-[10px] mx-1">vs</span>
-              <span className="text-emerald-300">守 ${(d.revenueAtRisk / 10000).toFixed(0)}萬</span>
-            </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">
-              ROI {d.costImpact > 0 ? `${(d.revenueAtRisk / d.costImpact).toFixed(1)}×` : "∞"}
-            </div>
-          </div>
-          <div>
-            <div className="text-[9px] tracking-widest text-slate-500 uppercase">③ 最佳方案</div>
-            <div className="text-sm font-bold leading-tight">
-              <span className="inline-block px-1.5 py-0.5 rounded bg-cyan-600 text-white text-[10px] mr-1">{d.bestPlanCode}</span>
-              {d.bestPlanTitle}
-            </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">
-              替代：{d.alternativePlans.map((p) => `${p.code} ${p.title}`).join(" / ")}
-            </div>
-          </div>
-          <div>
-            <div className="text-[9px] tracking-widest text-slate-500 uppercase">④ 風險多少</div>
-            <div className={`text-sm font-bold leading-tight inline-block px-2 py-0.5 rounded border ${riskTone}`}>{riskLabel}</div>
-            <div className="text-[10px] text-slate-400 mt-0.5">{d.riskNote}</div>
+          <div className="text-xs text-slate-600 mt-0.5">
+            <b>影響：</b>避免 ${(d.revenueAtRisk / 10000).toFixed(0)} 萬損失
+            <span className="text-slate-400 mx-1">·</span>
+            成本 ${(d.costImpact / 10000).toFixed(1)} 萬
           </div>
         </div>
+        <span className="font-mono text-xs text-cyan-700 font-bold shrink-0">{d.sourceLabel}</span>
       </div>
-      <div className="text-[10px] text-slate-500 mt-2 ml-1">{d.contextLine}</div>
+    </Link>
+  );
+}
+
+function HealthRow({ label, value, tone, target }: { label: string; value: string; tone: "good" | "warn" | "bad"; target: string }) {
+  const colors = {
+    good: "border-emerald-300 bg-emerald-50/30 text-emerald-700",
+    warn: "border-amber-300 bg-amber-50/30 text-amber-700",
+    bad:  "border-rose-400 bg-rose-50/30 text-rose-700",
+  };
+  return (
+    <div className={`rounded-lg border-2 p-3 ${colors[tone]}`}>
+      <div className="text-[10px] tracking-widest text-slate-600 font-bold uppercase">{label}</div>
+      <div className="text-2xl font-extrabold tabular-nums mt-1">{value}</div>
+      <div className="text-[10px] text-slate-500 mt-0.5">目標 {target}</div>
     </div>
   );
-  return d.sourceLink ? (
-    <Link href={d.sourceLink} className="block hover:scale-[1.005] transition-transform">{card}</Link>
-  ) : card;
 }
