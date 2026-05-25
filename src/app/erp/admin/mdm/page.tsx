@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MDM_REGISTRY, summarizeMdm } from "@/lib/erp/mdm";
+import { OWNERSHIP_REGISTRY, OWNER_META, ownerStats } from "@/lib/erp/data-ownership";
 
 // MDM (Master Data Management) — 致命缺口 2 補上
 //   「誰才是唯一真實來源 (Source of Truth)」
@@ -15,6 +16,7 @@ const SOT_TONE: Record<string, { bg: string; chip: string; label: string }> = {
 
 export default function MdmPage() {
   const sum = summarizeMdm();
+  const own = ownerStats();
   return (
     <div className="p-6 space-y-6">
       <header className="flex items-end justify-between flex-wrap gap-3">
@@ -48,23 +50,28 @@ export default function MdmPage() {
         </div>
       </section>
 
-      {/* SoT 對照表 */}
+      {/* SoT + Ownership 對照表 */}
       <section className="bg-white rounded-xl border border-slate-200 p-5">
-        <h2 className="font-bold text-lg mb-3">📋 主資料 ↔ Source of Truth 對照表</h2>
+        <h2 className="font-bold text-lg mb-1">📋 主資料 ↔ Source of Truth + Data Owner 對照表</h2>
+        <p className="text-xs text-slate-500 mb-3">
+          <b>SoT</b> = 系統來源（誰是真實版本）　·　<b>Owner</b> = 人類擁有者（誰負責這份資料、出事找誰）
+        </p>
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-slate-600 text-xs">
             <tr>
               <th className="text-left px-3 py-2">Entity</th>
               <th className="text-left px-3 py-2">中文名稱</th>
               <th className="text-center px-3 py-2">Source of Truth</th>
+              <th className="text-center px-3 py-2">Data Owner（人類擁有者）</th>
               <th className="text-left px-3 py-2">同步方向</th>
-              <th className="text-left px-3 py-2">同步頻率</th>
-              <th className="text-left px-3 py-2">寫入權限</th>
+              <th className="text-left px-3 py-2">升級對象</th>
             </tr>
           </thead>
           <tbody>
             {MDM_REGISTRY.map((m) => {
               const t = SOT_TONE[m.sourceOfTruth];
+              const own = OWNERSHIP_REGISTRY.find((o) => o.entity === m.entity);
+              const ownerMeta = own ? OWNER_META[own.primary] : undefined;
               return (
                 <tr key={m.entity} className="border-t border-slate-100">
                   <td className="px-3 py-2 font-mono text-xs font-bold">{m.entity}</td>
@@ -72,14 +79,32 @@ export default function MdmPage() {
                   <td className="px-3 py-2 text-center">
                     <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${t.chip}`}>{t.label}</span>
                   </td>
+                  <td className="px-3 py-2 text-center">
+                    {ownerMeta && (
+                      <span className="text-[10px] px-2 py-0.5 rounded font-bold text-white" style={{ background: ownerMeta.color }}>
+                        {ownerMeta.emoji} {ownerMeta.label}
+                      </span>
+                    )}
+                    {own?.secondary && own.secondary.length > 0 && (
+                      <div className="text-[9px] text-slate-500 mt-0.5">+ {own.secondary.map(s => OWNER_META[s].label).join("、")}</div>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-xs text-slate-700">{m.syncDirection}</td>
-                  <td className="px-3 py-2 text-xs text-slate-700">{m.syncFrequency}</td>
-                  <td className="px-3 py-2 text-xs text-slate-700">{m.writeAccess.join(" / ")}</td>
+                  <td className="px-3 py-2 text-xs text-slate-700">{own?.escalation ?? "—"}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+        <div className="text-[11px] text-slate-500 mt-3 bg-cyan-50 border border-cyan-200 rounded p-2">
+          📊 共 <b>{own.totalEntities}</b> 個 Entity，分屬 <b>{own.distinctOwners}</b> 個部門：
+          {own.byDept.map(([dept, count]) => (
+            <span key={dept} className="ml-2">
+              <span className="text-base">{OWNER_META[dept].emoji}</span>
+              <b>{OWNER_META[dept].label}</b> {count}
+            </span>
+          ))}
+        </div>
       </section>
 
       {/* 各 Entity 詳細 */}

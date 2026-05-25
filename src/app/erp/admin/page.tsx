@@ -42,6 +42,14 @@ export default function AdminHomePage() {
             desc="角色 + 動態條件雙層 — 供應商不能看到彼此資料"
             tag="致命缺口 3"
           />
+          <AdminCard
+            href="/erp/admin/observability"
+            icon="🔭"
+            tone="rose"
+            title="Observability 觀測能力"
+            desc="Event Trace / AI Explain / Data Lineage / Workflow Log / Decision Replay 5 合 1"
+            tag="共通能力"
+          />
         </div>
       </section>
 
