@@ -106,6 +106,10 @@ export default function WmsDashboardPage() {
               <p className="text-[#5c403c] mt-1 text-sm">倉儲與製造流程一站式監控　·　基準日 {today}　·　資料同步鼎新 ERP</p>
             </div>
             <div className="flex gap-2">
+              <Link href="/erp/wms/receiving" className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-semibold shadow-lg hover:scale-105 active:scale-95 transition-transform"
+                style={{ background: "linear-gradient(135deg,#0891b2,#0e7490)", boxShadow: "0 8px 24px rgba(8,145,178,.25)" }}>
+                📥 收貨 Checklist
+              </Link>
               <Link href="/erp/import" className="flex items-center gap-2 px-5 py-2.5 bg-white/80 border border-rose-200/50 rounded-xl text-sm font-semibold hover:bg-white transition-colors">
                 📊 報表匯入
               </Link>
