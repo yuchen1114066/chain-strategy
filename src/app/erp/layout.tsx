@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Sidebar from "@/components/erp/Sidebar";
 
 export const metadata: Metadata = {
-  title: "祺驊 CHI HUA — Global AI Decision Engine (not Dashboard)",
-  description: "直接告訴你：現在該做什麼 / 成本影響多少 / 哪個方案最好 / 風險多少 — 這才是世界級",
+  title: "祺驊 CHI HUA — 供應鏈作戰系統 Supply Chain War Room",
+  description: "5-Layer 軍事架構：Command Center / Operational Centers / Expert Workbench / AI Engine / Data Layer",
 };
 
 export default function ErpLayout({ children }: { children: React.ReactNode }) {

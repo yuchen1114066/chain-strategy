@@ -3,13 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import LangSwitcher from "./LangSwitcher";
 
-// L1 戰情室 + L2 六大作戰中心
+// L1 軍事指揮中心 + L2 六大作戰中心
 const primaryLinks = [
-  { href: "/erp", label: "🎯 Control Tower（首頁）", icon: "🎯", primary: true },
-  { href: "/os", label: "📋 6 大作戰中心索引", icon: "📋" },
-  { href: "/os/supplier", label: "1. 供應商 Operations", icon: "🤝" },
-  { href: "/os/delivery", label: "2. 交付 Control", icon: "🚚" },
+  { href: "/erp", label: "🎯 軍事指揮中心（L1）", icon: "🎯", primary: true },
+  { href: "/architecture", label: "🏛 5-Layer 架構", icon: "🏛" },
+  { href: "/os", label: "📋 6 大作戰中心（L2）", icon: "📋" },
+  { href: "/os/supplier", label: "1. 供應商作戰", icon: "🤝" },
+  { href: "/os/delivery", label: "2. 交付指揮", icon: "🚚" },
   { href: "/os/manufacturing", label: "3. 生產指揮塔", icon: "🏭" },
   { href: "/os/inventory", label: "4. 庫存倉儲", icon: "📦" },
   { href: "/os/procurement", label: "5. 採購情報", icon: "💎" },
@@ -76,10 +78,10 @@ export default function Sidebar() {
                 祺驊 CHI HUA
               </div>
               <div className="text-[10px] text-cyan-300 leading-tight font-semibold">
-                Global AI Decision Engine
+                供應鏈作戰系統
               </div>
               <div className="text-[9px] text-slate-400 leading-tight">
-                Not Dashboard · 該做什麼
+                Supply Chain War Room
               </div>
             </div>
           </div>
@@ -166,6 +168,7 @@ export default function Sidebar() {
       </nav>
 
       <div className="px-5 py-4 mt-4 text-[11px] text-slate-500 border-t border-slate-800 leading-relaxed">
+        <div className="mb-3"><LangSwitcher /></div>
         <div className="font-semibold text-slate-400 mb-1">資料來源</div>
         <div className="flex items-center gap-1 mb-2">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
