@@ -50,6 +50,14 @@ export default function AdminHomePage() {
             desc="Event Trace / AI Explain / Data Lineage / Workflow Log / Decision Replay 5 合 1"
             tag="共通能力"
           />
+          <AdminCard
+            href="/erp/admin/engines"
+            icon="🧠"
+            tone="rose"
+            title="4 大核心 Engine"
+            desc="Event Intelligence / Digital Twin / Prediction / Time Coordination — 系統大腦"
+            tag="AI 大腦"
+          />
         </div>
       </section>
 
