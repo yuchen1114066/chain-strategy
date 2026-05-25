@@ -51,10 +51,11 @@ export default function IntegrationPage() {
             tone="amber"
             time="1-3 天"
             steps={[
-              "在鼎新 ERP 設定排程任務（每日 06:00 / 12:00 / 18:00）匯出 17 種報表到共享資料夾",
-              "在共享資料夾上架 file watcher（Node.js 或 Python 腳本）",
-              "新檔案進入 → 自動 POST 到本系統 /api/import 端點",
-              "適合：先半自動跑，視效果再升級到方式 A",
+              "✨ 推薦：使用鼎新原廠工具 C:\\ConductorX64\\Tools\\SQLTOEXCEL.exe（64-bit Release，已內建在貴司鼎新環境）",
+              "建立 .sql 檔（內容 = 對應 6 個 VIEW 的 SELECT 查詢）",
+              "Windows Task Scheduler 排程任務（每日 06:00 / 12:00 / 18:00）→ 呼叫 SQLTOEXCEL.exe 把 SQL 結果輸出 .xlsx 到共享資料夾（例：\\\\fileserver\\dingxin_exports）",
+              "本系統 file watcher（Node.js 或 Python）偵測新檔案 → 自動 POST 到本系統 /api/import 端點",
+              "適合：先半自動跑、視效果再升級到方式 A；不用 DBA 動到 SQL Server",
             ]} />
 
           <Tier level="A"
@@ -167,6 +168,107 @@ EnableLUA = 1  →  改成 0
         </div>
       </section>
 
+      {/* SQLTOEXCEL 配方 — 方式 B 推薦做法 */}
+      <section className="bg-gradient-to-br from-cyan-50 to-emerald-50 rounded-xl border-2 border-cyan-300 p-5">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div>
+            <div className="text-[10px] tracking-widest text-cyan-700 font-bold uppercase">🛠 Recommended Setup for Tier B</div>
+            <h2 className="text-lg font-extrabold">使用鼎新原廠 SQLTOEXCEL 工具的最佳配方</h2>
+          </div>
+          <code className="text-[11px] font-mono bg-white px-2 py-1 rounded border border-cyan-200 text-cyan-700">
+            C:\ConductorX64\Tools\SQLTOEXCEL.exe
+          </code>
+        </div>
+        <p className="text-xs text-slate-700 mb-3 leading-relaxed">
+          這個工具是鼎新原廠 64-bit 版（已在貴司 ConductorX64 安裝目錄），可執行任意 SQL 查詢直接輸出 .xlsx 檔。
+          搭配 Windows 工作排程器 = <b>方式 B「排程匯出資料夾」的最省工做法</b>，IT 不用寫程式、DBA 不用動到 SQL Server。
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+          <Step n="1" title="準備 6 個 .sql 檔" desc="放在 C:\dingxin_jobs\ 內：query_po.sql / query_inv.sql / query_bom.sql / query_wo.sql / query_ship.sql / query_iqc.sql（內容 = 對應 SELECT 查詢）" />
+          <Step n="2" title="設 Windows Task Scheduler" desc="6 個任務、每日 06:00 / 12:00 / 18:00 觸發。命令：SQLTOEXCEL.exe -sql query_po.sql -out \\fileserver\dingxin\po_YYYYMMDD_HHMM.xlsx" />
+          <Step n="3" title="本系統開 File Watcher" desc="watch \\fileserver\dingxin\ → 新 .xlsx 進入 → 自動 POST 到 /api/import → 解析器辨識報表類型 → 寫入內部資料表" />
+        </div>
+
+        <div className="bg-slate-900 text-slate-100 rounded p-3 text-xs font-mono overflow-x-auto leading-relaxed">
+{`# Windows Task Scheduler 範例命令
+C:\\ConductorX64\\Tools\\SQLTOEXCEL.exe ^
+  -conn "Server=192.168.16.202;Database=ChiHuaERP_PROD;Trusted_Connection=True;" ^
+  -sql  "C:\\dingxin_jobs\\query_po.sql" ^
+  -out  "\\\\fileserver\\dingxin\\po_%date:~0,4%%date:~5,2%%date:~8,2%_%time:~0,2%%time:~3,2%.xlsx"
+
+# query_po.sql 內容範例（即上方 v_chihua_purchase_order VIEW 的 SELECT）：
+SELECT  c.TC008 AS po_no, c.TC011 AS supplier_id, s.MA002 AS supplier_name,
+        c.TC013 AS sent_date, c.TC016 AS expected_arrival,
+        d.TD004 AS part_no, d.TD008 AS qty, d.TD009 AS unit_price
+FROM    PURTC c
+JOIN    PURTD d ON c.TC001 = d.TD001 AND c.TC002 = d.TD002
+LEFT JOIN SUPPL s ON c.TC011 = s.MA001
+WHERE   c.TC013 >= DATEADD(MONTH, -3, GETDATE());`}
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+          <div className="bg-white rounded p-2 border border-cyan-200">
+            <div className="font-bold text-emerald-700 mb-1">✅ 優點</div>
+            <ul className="space-y-0.5 text-slate-700">
+              <li>· 鼎新原廠工具、已有授權</li>
+              <li>· 64-bit 穩定版（2019）</li>
+              <li>· DBA 不用授權 Linked Server</li>
+              <li>· 直接出 .xlsx，與我們解析器相容</li>
+              <li>· 1 天內可佈署完成</li>
+            </ul>
+          </div>
+          <div className="bg-white rounded p-2 border border-amber-200">
+            <div className="font-bold text-amber-700 mb-1">⚠ 注意</div>
+            <ul className="space-y-0.5 text-slate-700">
+              <li>· 排程間隔最短建議 1 小時（避免 SQL 負載）</li>
+              <li>· SQL 查詢只 SELECT，禁用 EXEC/INSERT/UPDATE/DELETE</li>
+              <li>· 共享資料夾權限：鼎新主機可寫、本系統可讀</li>
+              <li>· 大批次（&gt; 65,536 列）改用 .xlsx 而非 .xls</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* 鼎新作業代號 → SQL Table 對照 */}
+      <section className="bg-white rounded-xl border border-slate-200 p-5">
+        <h2 className="font-bold text-lg mb-2">📂 鼎新作業代號 → SQL Table 對照表（給 DBA 精準授權）</h2>
+        <p className="text-xs text-slate-500 mb-3">
+          鼎新作業代號（如 <code className="font-mono bg-slate-100 px-1 rounded">ACRI07</code> 客戶廠商關係建立）的 prefix 對應到 SQL Server 表的 schema。
+          DBA 授權唯讀時，依此表選擇要開的 schema 範圍即可。確認鼎新版本：
+          <b>iGP / ConductorX64（64-bit）</b>，標準路徑 <code className="font-mono">C:\ConductorX64\</code>。
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          {[
+            { mod: "PUR* / ACR*", name: "採購 + AR 應收", tables: ["PURTC（PO 主檔）", "PURTD（PO 明細）", "PURTB（託外進貨）", "ACRMA（客戶主檔）"], for: "供應商協作入口 / ETA 預測 / 議價" },
+            { mod: "INV* / IMP*", name: "庫存（含進耗存）", tables: ["INVMB（料件主檔）", "INVMC（倉別）", "INVTB（庫存量）", "IMPMI（料件異動）"], for: "缺料牆 / WMS / 收貨 Checklist" },
+            { mod: "BOM*", name: "BOM 結構（多階）", tables: ["BOMMA（成品）", "BOMMB（子件）"], for: "訂單衝擊模擬 / 缺料展開" },
+            { mod: "MOC*", name: "製令（含工序）", tables: ["MOCTH（製令主檔）", "MOCTI（工序）", "MOCTJ（領退料）"], for: "工單追蹤 / Critical Path / 8 階段" },
+            { mod: "DELI* / EPS*", name: "出貨", tables: ["DELIH（出貨單）", "DELIB（出貨明細）", "EPSTH（出貨通知）"], for: "OTIF/OTD / 客戶交期燈號" },
+            { mod: "QUA* / IQC*", name: "品質（IQC/IPQC/OQC）", tables: ["QUATH（IQC 主檔）", "QUATI（IQC 明細）", "QUATJ（不合格處理）"], for: "品質卡 / SPC / 收貨第 6 步" },
+            { mod: "AP* / APR*", name: "AP 應付", tables: ["APRMA（廠商主檔）", "APRTH（應付主檔）"], for: "供應商主檔 + 付款條件" },
+            { mod: "CST*", name: "成本", tables: ["CSTH（標準成本）", "CSTL（成本卡）"], for: "Should-Cost 對照 / 議價" },
+          ].map((row) => (
+            <div key={row.mod} className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <div className="flex items-center gap-2 mb-1">
+                <code className="font-mono text-xs px-2 py-0.5 rounded bg-cyan-100 text-cyan-700 font-bold">{row.mod}</code>
+                <span className="font-bold text-sm">{row.name}</span>
+              </div>
+              <div className="text-[11px] text-slate-600 mb-1">
+                {row.tables.map((t) => <span key={t} className="inline-block mr-2 font-mono">{t}</span>)}
+              </div>
+              <div className="text-[10px] text-emerald-700">本系統用於：{row.for}</div>
+            </div>
+          ))}
+        </div>
+        <div className="text-[11px] text-slate-500 mt-3 bg-amber-50 border border-amber-200 rounded p-2">
+          💡 <b>給 DBA 的最小授權範例</b>：
+          <code className="font-mono bg-white px-1 rounded mx-1">GRANT SELECT ON SCHEMA::dbo TO chihua_readonly</code>
+          後，再把 INSERT/UPDATE/DELETE 一律 DENY（雙保險）。
+          或更精細：對 PURTC/PURTD/INVMB/INVMC/INVTB/BOMMA/BOMMB/MOCTH/DELIH/DELIB/QUATH/QUATI 12 張表逐張 GRANT SELECT。
+        </div>
+      </section>
+
       {/* 連線設定範本 */}
       <section className="bg-white rounded-xl border border-slate-200 p-5">
         <h2 className="font-bold text-lg mb-3">⚙️ 本系統 .env 連線設定（IT 填這個）</h2>
@@ -231,6 +333,18 @@ DINGXIN_POLL_INTERVAL=300
           🔗 開啟鼎新 ERP iGP 設定頁
         </a>
       </div>
+    </div>
+  );
+}
+
+function Step({ n, title, desc }: { n: string; title: string; desc: string }) {
+  return (
+    <div className="bg-white rounded p-3 border border-cyan-200">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="w-6 h-6 rounded-full bg-cyan-600 text-white text-xs font-bold flex items-center justify-center shrink-0">{n}</span>
+        <div className="font-bold text-sm">{title}</div>
+      </div>
+      <div className="text-[11px] text-slate-600 leading-relaxed">{desc}</div>
     </div>
   );
 }
