@@ -4,28 +4,27 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// Phase 1「先活」核心 — 真正的痛點（震撼公司的核心）
+// L1 戰情室 + L2 六大作戰中心
 const primaryLinks = [
-  { href: "/erp/supplier-portal", label: "供應商協作入口", icon: "🤝", primary: true },
-  { href: "/erp/supplier-portal/audit", label: "供應商風險雷達", icon: "🛰" },
-  { href: "/erp/order-impact", label: "訂單衝擊模擬器", icon: "⚡" },
-  { href: "/erp/decisions", label: "決策閉環中心", icon: "🔁" },
-  { href: "/erp/performance", label: "決策績效 + 案例庫", icon: "📈" },
-  { href: "/erp", label: "戰情室", icon: "🎯" },
-  { href: "/erp/shortage-wall", label: "缺料牆", icon: "🧱" },
-  { href: "/erp/work-orders", label: "工單追蹤", icon: "📋" },
-  { href: "/erp/wms", label: "WMS Dashboard", icon: "⚡" },
-  { href: "/erp/wms/receiving", label: "收貨 Checklist", icon: "📥" },
-  { href: "/erp/wms/spc-shaft", label: "軸心 SPC（鉞泰）", icon: "🎯" },
+  { href: "/erp", label: "🎯 Control Tower（首頁）", icon: "🎯", primary: true },
+  { href: "/os", label: "📋 6 大作戰中心索引", icon: "📋" },
+  { href: "/os/supplier", label: "1. 供應商 Operations", icon: "🤝" },
+  { href: "/os/delivery", label: "2. 交付 Control", icon: "🚚" },
+  { href: "/os/manufacturing", label: "3. 生產指揮塔", icon: "🏭" },
+  { href: "/os/inventory", label: "4. 庫存倉儲", icon: "📦" },
+  { href: "/os/procurement", label: "5. 採購情報", icon: "💎" },
+  { href: "/os/decision", label: "6. AI 決策中心 ⭐", icon: "🧠" },
+];
+
+// 系統管理 + 底層架構
+const systemLinks = [
   { href: "/erp/admin", label: "⚙️ 管理後台", icon: "⚙️" },
+  { href: "/erp/admin/engines", label: "🧠 4 大核心 Engine", icon: "🧠" },
+  { href: "/erp/admin/observability", label: "🔭 Observability", icon: "🔭" },
   { href: "/erp/admin/event-engine", label: "⚡ Event Engine", icon: "⚡" },
   { href: "/erp/admin/mdm", label: "📚 MDM 主資料", icon: "📚" },
   { href: "/erp/admin/access-control", label: "🔐 RBAC + ABAC", icon: "🔐" },
-  { href: "/erp/admin/observability", label: "🔭 Observability", icon: "🔭" },
-  { href: "/erp/admin/engines", label: "🧠 4 大核心 Engine", icon: "🧠" },
-  { href: "/erp/materials", label: "原物料 AI 戰情室", icon: "🌐" },
-  { href: "/erp/eta-forecast", label: "AI ETA 預測引擎", icon: "🔮" },
-  { href: "/erp/global-map", label: "全球供應鏈地圖", icon: "🌍" },
+  { href: "/erp/integration", label: "🔌 鼎新整合說明", icon: "🔌" },
 ];
 
 // Phase 2+ 進階：分析 / 規劃 / 參照
@@ -58,6 +57,9 @@ export default function Sidebar() {
   const inAdvanced = advancedLinks.some((l) => pathname.startsWith(l.href));
   const [showAdvanced, setShowAdvanced] = useState(inAdvanced);
 
+  const inSystem = systemLinks.some((l) => pathname.startsWith(l.href));
+  const [showSystem, setShowSystem] = useState(inSystem);
+
   // WMS Dashboard 為全螢幕暗色旗艦頁，自帶 sidebar
   if (pathname.startsWith("/erp/wms")) return null;
 
@@ -87,7 +89,7 @@ export default function Sidebar() {
       {/* 主功能 */}
       <nav className="py-3">
         <div className="px-5 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-          🔥 PHASE 1 先活
+          🎯 L1 + L2 主導覽
         </div>
         {primaryLinks.map((l) => {
           const active = l.href === "/erp" ? pathname === "/erp" : pathname.startsWith(l.href);
@@ -107,13 +109,38 @@ export default function Sidebar() {
           );
         })}
 
+        {/* 系統架構與管理（可折疊） */}
+        <button
+          onClick={() => setShowSystem((v) => !v)}
+          className="w-full mt-3 px-5 py-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-slate-300 flex items-center gap-1"
+        >
+          <span>{showSystem ? "▾" : "▸"}</span>
+          <span>⚙️ 系統管理 + 4 大底層</span>
+        </button>
+        {showSystem && (
+          <div>
+            {systemLinks.map((l) => {
+              const active = pathname.startsWith(l.href);
+              return (
+                <Link key={l.href} href={l.href}
+                  className={`flex items-center gap-2 px-5 py-2 text-xs transition-colors border-l-2 ${
+                    active ? "bg-slate-800/60 border-cyan-400 text-white" : "border-transparent text-slate-400 hover:bg-slate-800/40 hover:text-slate-200"
+                  }`}>
+                  <span>{l.icon}</span>
+                  <span>{l.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
         {/* 進階工具（可折疊） */}
         <button
           onClick={() => setShowAdvanced((v) => !v)}
           className="w-full mt-3 px-5 py-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-slate-300 flex items-center gap-1"
         >
           <span>{showAdvanced ? "▾" : "▸"}</span>
-          <span>🚀 PHASE 2+ 進階功能</span>
+          <span>🔧 L3 所有工具頁（{advancedLinks.length}）</span>
         </button>
         {showAdvanced && (
           <div>
