@@ -13,7 +13,39 @@ export default function AdminHomePage() {
         </p>
       </header>
 
-      {/* 6 大區塊 */}
+      {/* 🚨 3 大底層（致命缺口補上） */}
+      <section className="rounded-xl border-2 border-rose-300 bg-rose-50/40 p-4">
+        <div className="font-bold text-rose-900 mb-2">🚨 3 大底層架構 — 大型企業系統的核心</div>
+        <div className="text-xs text-slate-700 mb-3">沒有這 3 層 = 上面所有功能會崩，是「致命缺口」必須補上。</div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <AdminCard
+            href="/erp/admin/event-engine"
+            icon="⚡"
+            tone="rose"
+            title="Event & Workflow Engine"
+            desc="一事件 → 自動 fan-out 給所有相關模組（ASN delay → 7 個模組同步反應）"
+            tag="致命缺口 1"
+          />
+          <AdminCard
+            href="/erp/admin/mdm"
+            icon="📚"
+            tone="rose"
+            title="MDM — 主資料管理"
+            desc="定義「誰才是唯一真實來源」(Supplier/Inventory/PO/ASN/Cost/BOM)"
+            tag="致命缺口 2"
+          />
+          <AdminCard
+            href="/erp/admin/access-control"
+            icon="🔐"
+            tone="rose"
+            title="RBAC + ABAC 權限"
+            desc="角色 + 動態條件雙層 — 供應商不能看到彼此資料"
+            tag="致命缺口 3"
+          />
+        </div>
+      </section>
+
+      {/* 一般管理區塊 */}
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <AdminCard
           href="/erp/admin/qr-generator"
