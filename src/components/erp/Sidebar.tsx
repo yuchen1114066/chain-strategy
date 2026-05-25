@@ -17,6 +17,7 @@ const primaryLinks = [
   { href: "/erp/wms", label: "WMS Dashboard", icon: "⚡" },
   { href: "/erp/wms/receiving", label: "收貨 Checklist", icon: "📥" },
   { href: "/erp/wms/spc-shaft", label: "軸心 SPC（鉞泰）", icon: "🎯" },
+  { href: "/erp/admin", label: "⚙️ 管理後台", icon: "⚙️" },
   { href: "/erp/materials", label: "原物料 AI 戰情室", icon: "🌐" },
   { href: "/erp/eta-forecast", label: "AI ETA 預測引擎", icon: "🔮" },
   { href: "/erp/global-map", label: "全球供應鏈地圖", icon: "🌍" },
