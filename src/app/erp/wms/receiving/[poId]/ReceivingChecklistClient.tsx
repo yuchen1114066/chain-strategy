@@ -150,6 +150,11 @@ export default function ReceivingChecklistClient({ po }: { po: IncomingPO }) {
                     {v.status === "fail" && <span className="text-[10px] px-2 py-0.5 rounded bg-rose-600 text-white font-bold">✗ 失敗</span>}
                   </div>
                   <div className="font-bold text-lg">{it.label}</div>
+                  {it.key === "qty_sample" && (
+                    <Link href="/erp/wms/spc-shaft" className="text-[11px] text-cyan-700 hover:underline">
+                      🎯 軸心類零件 → 開啟 SPC 量測表（依規格自動判合格）
+                    </Link>
+                  )}
                   {v.status === "fail" && (
                     <div className="text-[11px] text-rose-700 mt-1">
                       ⚠ 失敗處理：{it.failHandling}
