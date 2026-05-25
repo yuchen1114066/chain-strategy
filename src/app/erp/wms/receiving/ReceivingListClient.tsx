@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { IncomingPO } from "@/lib/erp/receiving-checklist";
 
-type ChecklistMeta = { status: string; inspector: string; putawayAt?: string };
+type ChecklistMeta = { verdict?: string; inspector: string; putawayAt?: string; passSteps?: number };
 
 export default function ReceivingListClient({ incoming }: { incoming: IncomingPO[] }) {
   const [meta, setMeta] = useState<Record<string, ChecklistMeta>>({});
@@ -14,10 +14,11 @@ export default function ReceivingListClient({ incoming }: { incoming: IncomingPO
       const out: Record<string, ChecklistMeta> = {};
       for (const p of incoming) {
         try {
-          const raw = window.localStorage.getItem(`gascc.receiving.${p.poId}`);
+          const raw = window.localStorage.getItem(`gascc.receiving.v2.${p.poId}`);
           if (raw) {
             const r = JSON.parse(raw);
-            out[p.poId] = { status: r.status, inspector: r.inspector, putawayAt: r.putawayAt };
+            const passSteps = r.steps ? Object.values(r.steps).filter((s: unknown) => (s as { status: string }).status === "pass").length : 0;
+            out[p.poId] = { verdict: r.verdict, inspector: r.inspector, putawayAt: r.putawayAt, passSteps };
           }
         } catch {}
       }
@@ -38,16 +39,27 @@ export default function ReceivingListClient({ incoming }: { incoming: IncomingPO
         <Link href="/erp/wms" className="text-cyan-700 hover:underline text-sm">← 回 WMS Dashboard</Link>
       </header>
 
-      {/* 5 項規則說明 */}
+      {/* 7 階段風控架構說明 */}
       <section className="rounded-xl border-2 border-amber-300 bg-amber-50/60 p-4">
-        <div className="font-bold text-amber-900 mb-2">⚠ 5 項必過檢核（任何一項未通過 → 不可入庫）</div>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-2 text-xs">
-          {["📦 外箱完整", "🔒 封箱完整", "🗂 格位數正常", "🔢 數量抽驗完成", "⚖️ 重量正常"].map((x) => (
-            <div key={x} className="bg-white border border-amber-200 rounded p-2 text-center font-semibold">{x}</div>
+        <div className="font-bold text-amber-900 mb-2">⚠ 7 階段風險控管（前 6 步必過，第 7 步系統自動判定）</div>
+        <div className="grid grid-cols-2 md:grid-cols-7 gap-2 text-xs">
+          {[
+            { n: 1, t: "📱 掃描收貨" },
+            { n: 2, t: "📦 外箱檢驗" },
+            { n: 3, t: "⚖️ 重量驗證" },
+            { n: 4, t: "📂 開箱驗證" },
+            { n: 5, t: "🔢 數量驗證" },
+            { n: 6, t: "🔬 IQC 品質" },
+            { n: 7, t: "🎯 系統判定" },
+          ].map((x) => (
+            <div key={x.n} className="bg-white border border-amber-200 rounded p-2 text-center">
+              <div className="text-[9px] text-slate-500 font-bold">Step {x.n}</div>
+              <div className="text-[11px] font-semibold">{x.t}</div>
+            </div>
           ))}
         </div>
-        <div className="text-[11px] text-amber-800 mt-2">
-          任何一項 ✗ → 自動拍照存證 / 通知採購 + 供應商 / 計入供應商品質卡 / <b>禁止入庫</b>
+        <div className="text-[11px] text-amber-800 mt-2 leading-relaxed">
+          任一步驟 ✗ → 系統自動 FAIL → HOLD 連鎖：📧 通知採購 + SQE　·　📋 異常單　·　🔒 鎖定本批庫存　·　⛔ 禁止鼎新扣帳　·　📊 計入供應商風險雷達扣分
         </div>
       </section>
 
@@ -75,11 +87,13 @@ export default function ReceivingListClient({ incoming }: { incoming: IncomingPO
             <tbody>
               {incoming.map((p) => {
                 const m = meta[p.poId];
-                const status = m?.status ?? "not_started";
+                const verdict = m?.verdict ?? "pending";
+                const stepsPassed = m?.passSteps ?? 0;
                 const chip =
-                  status === "completed" ? { bg: "bg-emerald-100 text-emerald-700", label: "✓ 已通過" }
-                  : status === "blocked"  ? { bg: "bg-rose-100 text-rose-700",     label: "✗ 禁止入庫" }
-                  : status === "in_progress" ? { bg: "bg-cyan-100 text-cyan-700",  label: "● 進行中" }
+                  m?.putawayAt           ? { bg: "bg-emerald-100 text-emerald-700", label: "✅ 已入庫" }
+                  : verdict === "PASS"   ? { bg: "bg-emerald-100 text-emerald-700", label: "✓ 7 步全通過" }
+                  : verdict === "FAIL_HOLD" ? { bg: "bg-rose-100 text-rose-700",    label: "🚨 HOLD" }
+                  : stepsPassed > 0      ? { bg: "bg-cyan-100 text-cyan-700",        label: `● ${stepsPassed}/7 進行中` }
                   : { bg: "bg-slate-100 text-slate-500", label: "○ 未開始" };
                 return (
                   <tr key={p.poId} className="border-t border-slate-100 hover:bg-slate-50">
@@ -96,7 +110,7 @@ export default function ReceivingListClient({ incoming }: { incoming: IncomingPO
                     <td className="px-3 py-2 text-center">
                       <Link href={`/erp/wms/receiving/${p.poId}`}
                         className="px-3 py-1 text-xs rounded bg-cyan-600 text-white font-semibold hover:bg-cyan-700">
-                        {status === "completed" || status === "blocked" ? "檢視" : "開始檢核 →"}
+                        {verdict === "PASS" || verdict === "FAIL_HOLD" ? "檢視" : "開始檢核 →"}
                       </Link>
                     </td>
                   </tr>
