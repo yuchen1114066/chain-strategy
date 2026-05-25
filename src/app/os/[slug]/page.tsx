@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCenter, allCenters, type CenterSlug } from "@/lib/erp/operations-centers";
+import { workbenchesOf } from "@/lib/erp/workbenches";
 
 const VALID_SLUGS: CenterSlug[] = ["supplier", "delivery", "manufacturing", "inventory", "procurement", "decision"];
 
@@ -13,6 +14,7 @@ export default async function OperationsCenterPage({ params }: { params: Promise
   if (!VALID_SLUGS.includes(slug as CenterSlug)) notFound();
   const center = getCenter(slug as CenterSlug);
   const others = allCenters().filter((c) => c.slug !== slug);
+  const benches = workbenchesOf(slug as CenterSlug);
 
   return (
     <div className="p-6 space-y-6">
@@ -86,27 +88,49 @@ export default async function OperationsCenterPage({ params }: { params: Promise
         </section>
       )}
 
-      {/* Sub-modules / Tools */}
-      <section className="bg-white rounded-xl border border-slate-200 p-5">
-        <h2 className="font-bold text-lg mb-3">🧰 此作戰領域的工具與分頁</h2>
+      {/* L3 專業工作台（新） */}
+      <section className="bg-white rounded-xl border-2 border-cyan-200 p-5">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div>
+            <h2 className="font-bold text-lg">🛠 L3 專業工作台 — 真正操作頁（{benches.length}）</h2>
+            <p className="text-xs text-slate-500 mt-0.5">每個工作台聚焦一個工作流程，URL：/os/{center.slug}/{"{tool}"}</p>
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {center.links.map((l) => (
-            <Link key={l.href} href={l.href}
+          {benches.map((b) => (
+            <Link key={b.slug} href={`/os/${b.center}/${b.slug}`}
               className="block rounded-lg border-2 border-slate-200 hover:border-cyan-400 p-3 transition-colors bg-white">
               <div className="flex items-start justify-between gap-2 mb-1">
-                <div className="text-2xl">{l.emoji}</div>
+                <div className="text-2xl">{b.emoji}</div>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-700 font-bold">L3</span>
+              </div>
+              <div className="font-bold text-sm">{b.title}</div>
+              <div className="text-[11px] font-bold text-cyan-700">{b.titleEn}</div>
+              <div className="text-[11px] text-slate-600 mt-1 leading-relaxed line-clamp-2">{b.role}</div>
+              <code className="text-[9px] font-mono text-slate-400 mt-1 block">/os/{b.center}/{b.slug}</code>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* 快速跳轉工具（保留 deep links） */}
+      <section className="bg-slate-50 rounded-xl p-4">
+        <div className="text-[10px] tracking-widest uppercase text-slate-500 font-bold mb-2">⚡ 快速跳轉（直接到工具）</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+          {center.links.map((l) => (
+            <Link key={l.href} href={l.href}
+              className="block rounded p-2 bg-white border border-slate-200 hover:border-cyan-400 transition-colors">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{l.emoji}</span>
+                <span className="font-bold text-xs">{l.label}</span>
                 {l.badge && (
-                  <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
+                  <span className={`ml-auto text-[9px] px-1.5 py-0.5 rounded font-bold ${
                     l.badgeTone === "rose" ? "bg-rose-100 text-rose-700" :
                     l.badgeTone === "amber" ? "bg-amber-100 text-amber-700" :
-                    l.badgeTone === "cyan" ? "bg-cyan-100 text-cyan-700" :
-                    l.badgeTone === "emerald" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
+                    l.badgeTone === "cyan" ? "bg-cyan-100 text-cyan-700" : "bg-slate-100 text-slate-600"
                   }`}>{l.badge}</span>
                 )}
               </div>
-              <div className="font-bold text-sm">{l.label}</div>
-              <div className="text-[11px] text-slate-600 mt-1 leading-relaxed">{l.desc}</div>
-              <code className="text-[9px] font-mono text-slate-400 mt-1 block">{l.href}</code>
             </Link>
           ))}
         </div>
