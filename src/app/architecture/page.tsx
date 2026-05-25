@@ -23,6 +23,9 @@ export default async function ArchitecturePage() {
           <div className="text-[10px] tracking-[0.3em] uppercase text-cyan-400 font-bold">SYSTEM ARCHITECTURE · 5-LAYER MILITARY DESIGN</div>
           <h1 className="text-3xl font-extrabold mt-1">🏛 {T.system_name} — 5-Layer 架構</h1>
           <p className="text-sm text-slate-400 mt-1">{T.brand_full}　·　世界級供應鏈作戰系統</p>
+          <Link href="/architecture/constitution" className="inline-block mt-3 px-4 py-2 text-sm rounded bg-rose-600 text-white font-bold hover:bg-rose-700">
+            📜 架構憲法 5 條鐵律 + Domain Boundaries →
+          </Link>
         </header>
 
         <div className="text-xs text-slate-400 bg-slate-900/40 rounded p-3 border border-slate-700">

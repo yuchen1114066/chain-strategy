@@ -9,6 +9,7 @@ import LangSwitcher from "./LangSwitcher";
 const primaryLinks = [
   { href: "/erp", label: "🎯 軍事指揮中心（L1）", icon: "🎯", primary: true },
   { href: "/architecture", label: "🏛 5-Layer 架構", icon: "🏛" },
+  { href: "/architecture/constitution", label: "📜 架構憲法 5 鐵律", icon: "📜" },
   { href: "/os", label: "📋 6 大作戰中心（L2）", icon: "📋" },
   { href: "/os/supplier", label: "1. 供應商作戰", icon: "🤝" },
   { href: "/os/delivery", label: "2. 交付指揮", icon: "🚚" },
