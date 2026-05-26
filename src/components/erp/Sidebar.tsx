@@ -8,6 +8,7 @@ import LangSwitcher from "./LangSwitcher";
 // L1 軍事指揮中心 + L2 六大作戰中心
 const primaryLinks = [
   { href: "/erp", label: "🎯 軍事指揮中心（L1）", icon: "🎯", primary: true },
+  { href: "/roadmap", label: "🛣 4 Phase 路線圖", icon: "🛣" },
   { href: "/architecture", label: "🏛 5-Layer 架構", icon: "🏛" },
   { href: "/architecture/constitution", label: "📜 架構憲法 5 鐵律", icon: "📜" },
   { href: "/os", label: "📋 6 大作戰中心（L2）", icon: "📋" },
@@ -79,10 +80,10 @@ export default function Sidebar() {
                 祺驊 CHI HUA
               </div>
               <div className="text-[10px] text-cyan-300 leading-tight font-semibold">
-                供應鏈作戰系統
+                AI Supply Chain Flow
               </div>
               <div className="text-[9px] text-slate-400 leading-tight">
-                Supply Chain War Room
+                Control Tower → Autonomous OS
               </div>
             </div>
           </div>

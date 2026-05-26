@@ -1,5 +1,5 @@
 // 多語系核心 — 繁中 / 簡中 / English / Tiếng Việt
-// 系統名稱：供應鏈作戰系統 — Supply Chain War Room System
+// 系統名稱：AI Supply Chain Flow
 
 export type Lang = "zh-TW" | "zh-CN" | "en" | "vi";
 
@@ -90,10 +90,10 @@ export type Dict = {
 };
 
 const ZH_TW: Dict = {
-  system_name: "供應鏈作戰系統",
-  system_name_en: "Supply Chain War Room System",
+  system_name: "AI Supply Chain Flow",
+  system_name_en: "AI Supply Chain Flow",
   brand_short: "祺驊 CHI HUA",
-  brand_full: "祺驊 CHI HUA · 供應鏈作戰系統",
+  brand_full: "祺驊 CHI HUA · AI Supply Chain Flow",
   l1_title: "🎯 軍事作戰指揮中心",
   l1_subtitle: "BOSS 視角：3 秒看公司現在是否安全",
   l1_q1: "哪裡快爆了？",
@@ -134,8 +134,8 @@ const ZH_TW: Dict = {
 
 const ZH_CN: Dict = {
   ...ZH_TW,
-  system_name: "供应链作战系统",
-  brand_full: "祺骅 CHI HUA · 供应链作战系统",
+  system_name: "AI Supply Chain Flow",
+  brand_full: "祺骅 CHI HUA · AI Supply Chain Flow",
   l1_title: "🎯 军事作战指挥中心",
   l1_subtitle: "BOSS 视角：3 秒看公司现在是否安全",
   l1_q1: "哪里快爆了？",
@@ -170,10 +170,10 @@ const ZH_CN: Dict = {
 };
 
 const EN: Dict = {
-  system_name: "Supply Chain War Room System",
-  system_name_en: "Supply Chain War Room System",
+  system_name: "AI Supply Chain Flow",
+  system_name_en: "AI Supply Chain Flow",
   brand_short: "CHI HUA",
-  brand_full: "CHI HUA · Supply Chain War Room System",
+  brand_full: "CHI HUA · AI Supply Chain Flow",
   l1_title: "🎯 Military Command Center",
   l1_subtitle: "BOSS view: see in 3 seconds whether the company is safe right now",
   l1_q1: "Where is burning?",
@@ -209,10 +209,10 @@ const EN: Dict = {
 };
 
 const VI: Dict = {
-  system_name: "Hệ thống chỉ huy chuỗi cung ứng",
-  system_name_en: "Supply Chain War Room System",
+  system_name: "AI Supply Chain Flow",
+  system_name_en: "AI Supply Chain Flow",
   brand_short: "CHI HUA",
-  brand_full: "CHI HUA · Hệ thống chỉ huy chuỗi cung ứng",
+  brand_full: "CHI HUA · AI Supply Chain Flow",
   l1_title: "🎯 Trung tâm chỉ huy quân sự",
   l1_subtitle: "Góc nhìn BOSS: 3 giây để biết công ty có an toàn không",
   l1_q1: "Đâu đang cháy?",

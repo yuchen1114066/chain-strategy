@@ -128,8 +128,8 @@ export default function CockpitPage() {
         </div>
 
         <h1 className="font-display font-light leading-[0.88] tracking-[-0.04em] text-[44px] sm:text-[72px] md:text-[96px] lg:text-[120px]">
-          供應鏈<br />
-          <span className="italic font-thin" style={{ color: "var(--c-muted)" }}>Command.</span>
+          AI Supply Chain<br />
+          <span className="italic font-thin" style={{ color: "var(--c-muted)" }}>Flow.</span>
         </h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-10 mt-8 sm:mt-12 lg:mt-16">
@@ -360,7 +360,7 @@ export default function CockpitPage() {
       <footer className="relative z-10 border-t lm-hairline mt-8 sm:mt-16">
         <div className="max-w-[1480px] mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-8 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="font-mono text-[10px] tracking-[0.18em] uppercase" style={{ color: "var(--c-muted)" }}>
-            CHI HUA · 供應鏈作戰系統 · 對鼎新唯讀不回寫
+            CHI HUA · AI Supply Chain Flow · 對鼎新唯讀不回寫
           </div>
           <div className="flex items-center gap-4 font-mono text-[10px]" style={{ color: "var(--c-muted)" }}>
             <Link href="/architecture" className="hover:underline" style={{ color: "var(--c-primary)" }}>🏛 5-Layer</Link>
