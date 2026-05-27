@@ -27,6 +27,7 @@ const systemLinks = [
   { href: "/erp/admin/engines", label: "🧠 4 大核心 Engine", icon: "🧠" },
   { href: "/erp/admin/observability", label: "🔭 Observability", icon: "🔭" },
   { href: "/erp/admin/event-engine", label: "⚡ Event Engine", icon: "⚡" },
+  { href: "/erp/admin/sync", label: "🔄 鼎新同步儀表板", icon: "🔄" },
   { href: "/erp/admin/mdm", label: "📚 MDM 主資料", icon: "📚" },
   { href: "/erp/admin/access-control", label: "🔐 RBAC + ABAC", icon: "🔐" },
   { href: "/erp/integration", label: "🔌 鼎新整合說明", icon: "🔌" },
