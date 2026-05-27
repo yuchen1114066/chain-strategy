@@ -1,5 +1,6 @@
 import Link from "next/link";
 import "../erp/luminous.css";
+import BrainGearIcon from "@/components/erp/BrainGearIcon";
 
 // AI Supply Chain Flow — 4 階段成熟度路線圖
 // Phase 1 → 2 → 3 → 4：從「看得到」→「會決策」→「能預測」→「自治運轉」
@@ -313,7 +314,13 @@ function PhaseCard({ phase }: { phase: Phase }) {
       {/* Content card */}
       <div className="lm-hairline rounded-lg p-5 sm:p-6 lg:p-8" style={{ background: "rgba(18,18,22,0.5)", borderColor: `${cc.c}30`, boxShadow: `0 0 60px -20px ${cc.glow}` }}>
         <div className="flex items-baseline gap-2 sm:gap-3 mb-3 sm:mb-4 flex-wrap">
-          <span className="text-3xl sm:text-4xl lg:text-5xl">{phase.emoji}</span>
+          {phase.n === 2 ? (
+            <span className="inline-flex items-center justify-center w-10 sm:w-12 lg:w-14 aspect-square" style={{ color: cc.c, filter: `drop-shadow(0 0 8px ${cc.glow})` }}>
+              <BrainGearIcon className="w-full h-full" />
+            </span>
+          ) : (
+            <span className="text-3xl sm:text-4xl lg:text-5xl">{phase.emoji}</span>
+          )}
           <div className="font-mono text-[10px] tracking-[0.25em] uppercase font-bold" style={{ color: "var(--c-muted)" }}>PHASE {phase.n}　·　{phase.era}</div>
         </div>
         <h2 className="font-display font-light leading-[1.05] tracking-tight" style={{ fontSize: "clamp(28px,5vw,52px)", color: "var(--c-text)" }}>
