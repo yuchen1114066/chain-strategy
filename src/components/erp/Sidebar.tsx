@@ -18,6 +18,7 @@ const primaryLinks = [
   { href: "/os/inventory", label: "4. 庫存倉儲", icon: "📦" },
   { href: "/os/procurement", label: "5. 採購情報", icon: "💎" },
   { href: "/os/decision", label: "6. AI 決策中心 ⭐", icon: "🧠" },
+  { href: "/erp/requisition", label: "📡 Requisition Control Center", icon: "📡" },
 ];
 
 // 系統管理 + 底層架構
