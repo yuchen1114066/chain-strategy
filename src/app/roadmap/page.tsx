@@ -53,7 +53,7 @@ const PHASES: Phase[] = [
   },
   {
     n: 2,
-    emoji: "🧠",
+    emoji: "🤔",
     title: "AI Decision Platform",
     titleZh: "AI 決策平台",
     era: "Next · v2.0",
