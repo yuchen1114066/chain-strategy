@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { getWarRoomSnapshot, type AiVerdict, type RiskLevel } from "@/lib/erp/warroom";
+import { getSnapshot, setSnapshot, ageSeconds, isFresh } from "@/lib/erp/snapshot-cache";
 
-export const dynamic = "force-dynamic";
+// ISR：戰情中心每 60 秒自動 revalidate（cache 仍新時讀 cache，過期就重算）
+export const revalidate = 60;
+
 export const metadata = {
   title: "祺驊戰情中心 — CEO War Room",
   description: "Apple × Palantir 混合版・CEO 一眼看懂・資料取自鼎新 iGP（唯讀）",
@@ -26,10 +29,22 @@ function fmtMoney(n: number): string {
 }
 
 export default function WarRoomPage() {
-  const s = getWarRoomSnapshot();
+  // 1) 優先讀 snapshot cache（cron + sync 推進來的）
+  // 2) 沒 cache 就 lazy 重算（首次訪問）
+  let cached = getSnapshot();
+  if (!cached || !isFresh()) {
+    const snap = getWarRoomSnapshot();
+    setSnapshot(snap, { triggeredBy: "lazy", ttlSeconds: 600 });
+    cached = getSnapshot();
+  }
+  const s = cached!.snapshot;
+  const cacheAge = ageSeconds();
+  const cacheSrc = cached!.triggeredBy;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 text-slate-800 print:bg-white">
+      {/* 客戶端每 60 秒自動 reload，確保 CEO 大屏永遠新鮮 */}
+      <meta httpEquiv="refresh" content="60" />
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
 
         {/* ── Header ─────────────────────────────────────── */}
@@ -217,13 +232,15 @@ export default function WarRoomPage() {
 
         {/* ── Footer ─────────────────────────────────────── */}
         <footer className="flex items-center justify-between flex-wrap gap-2 text-[11px] text-slate-500 pt-3 border-t border-slate-200">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <span className="inline-flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              ERP 同步：3 min ago · <Link href="/erp/admin/sync" className="text-blue-600 hover:underline">鼎新 iGP 唯讀</Link>
+              <span className={`w-1.5 h-1.5 rounded-full ${cacheAge < 300 ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+              AI Snapshot：{cacheAge < 60 ? "剛剛" : `${Math.floor(cacheAge / 60)} min ago`} · 來源 <span className="font-mono">{cacheSrc}</span>
             </span>
             <span>·</span>
-            <span>產生時間 {new Date(s.generatedAt).toLocaleTimeString("zh-TW")}</span>
+            <span><Link href="/erp/admin/sync" className="text-blue-600 hover:underline">鼎新 iGP 同步狀態</Link></span>
+            <span>·</span>
+            <span>下次 refresh 60s</span>
           </div>
           <div>祺驊 CHI HUA · AI Supply Chain Flow · /erp/warroom</div>
         </footer>

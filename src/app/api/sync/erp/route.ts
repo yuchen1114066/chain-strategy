@@ -84,5 +84,19 @@ export async function POST(req: Request) {
   };
   recordRun(run);
 
-  return NextResponse.json({ ok: status !== "failed", run });
+  // 鏈式觸發：sync 成功 → AI recompute → War Room snapshot 更新
+  let recomputed = false;
+  if (status !== "failed") {
+    try {
+      const { getWarRoomSnapshot } = await import("@/lib/erp/warroom");
+      const { setSnapshot } = await import("@/lib/erp/snapshot-cache");
+      const snap = getWarRoomSnapshot();
+      setSnapshot(snap, { triggeredBy: "sync", syncRunId: runId, ttlSeconds: 600 });
+      recomputed = true;
+    } catch {
+      recomputed = false;
+    }
+  }
+
+  return NextResponse.json({ ok: status !== "failed", run, recomputed });
 }
