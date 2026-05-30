@@ -3,11 +3,7 @@
   "crons": [
     {
       "path": "/api/sync/erp?by=cron",
-      "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/ai/recompute?by=cron",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 8 * * *"
     }
   ]
 }

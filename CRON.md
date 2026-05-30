@@ -34,6 +34,9 @@ TOPGP_DB_READONLY=true
 
 ### A. Vercel（已附 `vercel.json`）
 
+**⚠ Hobby（免費）限制**：只允許每天 1 次的 cron。`vercel.json` 已設為每天 08:00 同步 1 次（`0 8 * * *`）。  
+要 `*/10`、`*/15` 這種高頻 cron 需升級 **Pro 方案**，或改用下面 B/C/D 三種外部 cron。
+
 部署即生效。Vercel Cron 會自動帶 `Authorization: Bearer $VERCEL_CRON` header，
 若用 Vercel Cron 並啟用 token 驗證，請改用 Vercel 內建簽章機制或對 cron path 開白名單。
 
