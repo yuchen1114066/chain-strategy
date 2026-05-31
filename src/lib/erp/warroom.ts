@@ -227,8 +227,108 @@ export function getWarRoomHeader(): WarRoomHeader {
 }
 
 // ============================================================
-// 一鍵彙整
+// CEO 簡化版 — 4 大區塊（純高階決策視角，ERP 看得到的不在這層）
 // ============================================================
+
+// 區塊 1：AI 總裁摘要
+export type CeoExecutiveSummary = {
+  healthScore: number;
+  grossMarginPct: number;
+  marginVsBudgetPct: number;          // 負數＝低於預算
+  rootCauses: { tag: string; impact: string }[];
+  topAiAdvice: { rank: number; title: string; href?: string };
+};
+
+export function getCeoExecutiveSummary(): CeoExecutiveSummary {
+  const h = getWarRoomHeader();
+  const actions = getCeoActions();
+  // 取 ID 排序第 3 項作為「今日重點建議」(對應使用者圖示)
+  const top = actions[2] ?? actions[0];
+  return {
+    healthScore: h.healthScore,
+    grossMarginPct: 16.8,
+    marginVsBudgetPct: -1.4,
+    rootCauses: [
+      { tag: "PCB 缺料",   impact: "-1.0%" },
+      { tag: "銅料上漲",   impact: "-0.3%" },
+      { tag: "USD 升值",   impact: "-0.1%" },
+    ],
+    topAiAdvice: { rank: 3, title: top?.title ?? "—", href: top?.href },
+  };
+}
+
+// 區塊 2：異常事件（只紅燈 + 黃燈）
+export type CriticalAlert = {
+  id: string;
+  level: "red" | "yellow";
+  title: string;
+  context: string;        // 「WO-2026-0103」之類
+  href?: string;
+};
+
+export function getCriticalAlerts(): CriticalAlert[] {
+  const prs = computePrAttention();
+  const alerts: CriticalAlert[] = [];
+  for (const p of prs) {
+    if (p.riskBucket === "critical") {
+      alerts.push({
+        id: `pr-${p.pr.id}`, level: "red",
+        title: `${p.pr.prNo} ${p.pr.partName} 卡 ${p.ageHours.toFixed(0)}hr`,
+        context: p.pr.forWoNo ?? p.pr.requestor,
+        href: "/erp/requisition",
+      });
+    } else if (p.riskBucket === "high") {
+      alerts.push({
+        id: `pr-${p.pr.id}`, level: "yellow",
+        title: `${p.pr.prNo} 簽核延誤 ${p.slaOverdueHours.toFixed(0)}hr`,
+        context: p.pr.forCustomer ?? p.pr.department,
+        href: "/erp/requisition",
+      });
+    }
+  }
+  return alerts.slice(0, 6);
+}
+
+// 區塊 3：待 CEO 核准事項
+export type ApprovalItem = {
+  id: string;
+  title: string;
+  amount: string;
+  reason: string;
+  href: string;
+};
+
+export function getApprovalQueue(): ApprovalItem[] {
+  const prs = computePrAttention();
+  return prs
+    .filter((p) => p.pr.status === "submitted" || p.pr.status === "approval_delayed")
+    .filter((p) => p.pr.approvalRequired - p.pr.approvalLevel === 1)   // 剩最後一關
+    .slice(0, 5)
+    .map((p) => ({
+      id: p.pr.id,
+      title: `${p.pr.prNo} ${p.pr.partName}`,
+      amount: `NT$ ${(p.pr.qty * p.pr.estUnitCost).toLocaleString()}`,
+      reason: p.pr.reason,
+      href: "/erp/requisition",
+    }));
+}
+
+// 區塊 4：獲利衝擊
+export type ProfitImpact = {
+  cause: string;
+  amountNTD: number;     // 負數＝損失
+  detail: string;
+};
+
+export function getProfitImpact(): ProfitImpact[] {
+  return [
+    { cause: "PCB 缺料",  amountNTD: -2_800_000, detail: "WO-2026-0103 延 3 天 / OTD ↓" },
+    { cause: "銅料上漲",  amountNTD: -1_200_000, detail: "30 日 ↑12%，影響線圈/馬達" },
+    { cause: "USD 升值",  amountNTD: -800_000,   detail: "30.50 → 31.50，進口成本↑" },
+  ];
+}
+
+// 一鍵彙整（原 6 panel — 給 Page 3 詳細頁用）
 export function getWarRoomSnapshot() {
   return {
     header:     getWarRoomHeader(),
@@ -238,6 +338,17 @@ export function getWarRoomSnapshot() {
     quotes:     getQuoteDigest(),
     commodity:  getCommodityDigest(),
     actions:    getCeoActions(),
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+// 一鍵彙整（CEO 首頁 4 區塊）
+export function getCeoSnapshot() {
+  return {
+    summary:   getCeoExecutiveSummary(),
+    alerts:    getCriticalAlerts(),
+    approvals: getApprovalQueue(),
+    impact:    getProfitImpact(),
     generatedAt: new Date().toISOString(),
   };
 }

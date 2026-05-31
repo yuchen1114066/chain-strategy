@@ -1,291 +1,230 @@
 import Link from "next/link";
-import { getWarRoomSnapshot, type AiVerdict, type RiskLevel } from "@/lib/erp/warroom";
+import { getCeoSnapshot } from "@/lib/erp/warroom";
 import { getSnapshot, setSnapshot, ageSeconds, isFresh } from "@/lib/erp/snapshot-cache";
 
-// ISR：戰情中心每 60 秒自動 revalidate（cache 仍新時讀 cache，過期就重算）
 export const revalidate = 60;
-
-export const metadata = {
-  title: "祺驊戰情中心 — CEO War Room",
-  description: "Apple × Palantir 混合版・CEO 一眼看懂・資料取自鼎新 iGP（唯讀）",
-};
-
-const RISK_COLOR: Record<RiskLevel, { dot: string; chip: string; text: string }> = {
-  high: { dot: "bg-rose-500",   chip: "bg-rose-50 text-rose-700 border-rose-200",     text: "高" },
-  mid:  { dot: "bg-amber-500",  chip: "bg-amber-50 text-amber-700 border-amber-200",  text: "中" },
-  low:  { dot: "bg-emerald-500",chip: "bg-emerald-50 text-emerald-700 border-emerald-200", text: "低" },
-};
-
-const VERDICT: Record<AiVerdict, { chip: string; icon: string }> = {
-  good:     { chip: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: "✓" },
-  warn:     { chip: "bg-amber-50 text-amber-700 border-amber-200",       icon: "!" },
-  critical: { chip: "bg-rose-50 text-rose-700 border-rose-200",           icon: "✗" },
-};
+export const metadata = { title: "祺驊戰情中心 — CEO War Room" };
 
 function fmtMoney(n: number): string {
-  if (n >= 1e8) return `$${(n / 1e8).toFixed(2)} 億`;
-  if (n >= 1e4) return `$${(n / 1e4).toFixed(0)} 萬`;
-  return `$${n.toLocaleString()}`;
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (abs >= 1e8) return `${sign}$${(abs / 1e8).toFixed(2)} 億`;
+  if (abs >= 1e4) return `${sign}$${(abs / 1e4).toFixed(0)} 萬`;
+  return `${sign}$${abs.toLocaleString()}`;
 }
 
-export default function WarRoomPage() {
-  // 1) 優先讀 snapshot cache（cron + sync 推進來的）
-  // 2) 沒 cache 就 lazy 重算（首次訪問）
+export default function WarRoomHomePage() {
+  // 為 CEO 4 區塊單獨快取
   let cached = getSnapshot();
   if (!cached || !isFresh()) {
-    const snap = getWarRoomSnapshot();
-    setSnapshot(snap, { triggeredBy: "lazy", ttlSeconds: 600 });
-    cached = getSnapshot();
+    // CEO snapshot 自帶 lazy 重算
   }
-  const s = cached!.snapshot;
+  void cached;
+  const s = getCeoSnapshot();
   const cacheAge = ageSeconds();
-  const cacheSrc = cached!.triggeredBy;
+  void setSnapshot;
+
+  const healthColor =
+    s.summary.healthScore >= 85 ? "from-emerald-500 to-emerald-600" :
+    s.summary.healthScore >= 70 ? "from-amber-500 to-orange-500"    :
+                                    "from-rose-500 to-rose-600";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 text-slate-800 print:bg-white">
-      {/* 客戶端每 60 秒自動 reload，確保 CEO 大屏永遠新鮮 */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 text-slate-800">
       <meta httpEquiv="refresh" content="60" />
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
 
         {/* ── Header ─────────────────────────────────────── */}
         <header className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
-            <button className="lg:hidden w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600">☰</button>
             <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-              祺驊戰情中心 <span className="text-slate-400 font-normal">— Apple/Palantir 混合版</span>
+              祺驊戰情中心 <span className="text-slate-400 font-normal">— CEO War Room</span>
             </h1>
           </div>
-          <div className="flex items-center gap-2">
-            <Link href="/erp" className="text-xs text-slate-500 hover:text-slate-700">← Control Tower</Link>
-            <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-full pl-3 pr-1 py-1 shadow-sm">
-              <span className="text-xs font-semibold text-slate-600">Health</span>
-              <span className="inline-flex items-center justify-center min-w-[36px] h-7 rounded-full text-sm font-bold text-white"
-                style={{
-                  background: s.header.healthScore >= 85
-                    ? "linear-gradient(135deg,#10b981,#059669)"
-                    : s.header.healthScore >= 70
-                    ? "linear-gradient(135deg,#f59e0b,#d97706)"
-                    : "linear-gradient(135deg,#f43f5e,#e11d48)",
-                }}>{s.header.healthScore}</span>
-            </div>
-          </div>
+          <nav className="flex items-center gap-1 text-xs">
+            <span className="px-3 py-1.5 rounded-md bg-slate-900 text-white font-semibold">📊 總裁首頁</span>
+            <Link href="/erp/warroom/flow" className="px-3 py-1.5 rounded-md text-slate-600 hover:bg-slate-100">🔄 流向監控</Link>
+            <Link href="/erp/warroom/detail" className="px-3 py-1.5 rounded-md text-slate-600 hover:bg-slate-100">🔍 深度分析</Link>
+            <Link href="/erp" className="px-3 py-1.5 rounded-md text-slate-500 hover:bg-slate-100">← Control Tower</Link>
+          </nav>
         </header>
 
-        {/* ── AI Banner ───────────────────────────────────── */}
-        <div className="relative rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-blue-600 text-white px-5 py-4 shadow-md overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_60%)] pointer-events-none" />
-          <div className="relative flex items-start gap-3">
-            <div className="w-9 h-9 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center text-lg shrink-0">🧠</div>
-            <div className="min-w-0">
-              <div className="text-[10px] font-bold tracking-widest uppercase opacity-80">AI 智能監控</div>
-              <div className="text-sm sm:text-base font-semibold leading-snug mt-0.5">{s.header.aiHeadline}</div>
+        {/* ===================================================== */}
+        {/* 區塊 1（最大）AI 總裁摘要                            */}
+        {/* ===================================================== */}
+        <section className="bg-white rounded-3xl border border-slate-200 shadow-md p-6 sm:p-8 relative overflow-hidden">
+          {/* atmosphere */}
+          <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-gradient-to-br from-blue-100/40 to-cyan-100/30 blur-3xl pointer-events-none" />
+
+          <div className="relative">
+            <div className="flex items-baseline gap-2 mb-5">
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold">1</span>
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900">AI 總裁摘要</h2>
+              <span className="text-xs text-slate-500">CEO 第一眼</span>
+            </div>
+
+            {/* 3 大數字並列 */}
+            <div className="grid sm:grid-cols-3 gap-5 sm:gap-8">
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">企業健康度</div>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <div className={`text-5xl sm:text-6xl font-extrabold bg-gradient-to-r ${healthColor} bg-clip-text text-transparent tabular-nums`}>{s.summary.healthScore}</div>
+                  <div className="text-sm text-slate-500">/ 100</div>
+                </div>
+                <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full bg-gradient-to-r ${healthColor}`} style={{ width: `${s.summary.healthScore}%` }} />
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">預估毛利率</div>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <div className="text-5xl sm:text-6xl font-extrabold text-slate-900 tabular-nums">{s.summary.grossMarginPct.toFixed(1)}</div>
+                  <div className="text-2xl font-bold text-slate-400">%</div>
+                </div>
+                <div className="mt-2 text-xs text-slate-500">本期預測值（依在製工單 + BOM 成本）</div>
+              </div>
+
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">較預算落差</div>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <div className={`text-5xl sm:text-6xl font-extrabold tabular-nums ${s.summary.marginVsBudgetPct < 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                    {s.summary.marginVsBudgetPct > 0 ? "+" : ""}{s.summary.marginVsBudgetPct.toFixed(1)}
+                  </div>
+                  <div className={`text-2xl font-bold ${s.summary.marginVsBudgetPct < 0 ? "text-rose-400" : "text-emerald-400"}`}>%</div>
+                </div>
+                <div className={`mt-2 text-xs font-semibold ${s.summary.marginVsBudgetPct < 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                  {s.summary.marginVsBudgetPct < 0 ? "▼ 低於預算" : "▲ 高於預算"}
+                </div>
+              </div>
+            </div>
+
+            {/* 主因 + AI 建議 */}
+            <div className="mt-6 pt-5 border-t border-slate-100 grid md:grid-cols-2 gap-5">
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-2">主因</div>
+                <ul className="space-y-1.5">
+                  {s.summary.rootCauses.map((c) => (
+                    <li key={c.tag} className="flex items-baseline justify-between text-sm">
+                      <span className="text-slate-800">• {c.tag}</span>
+                      <span className="font-mono text-rose-600 text-xs">{c.impact}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-2">🧠 AI 今日重點建議</div>
+                <Link href={s.summary.topAiAdvice.href ?? "#"} className="block rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 hover:bg-blue-100 transition-colors">
+                  <div className="flex items-baseline gap-2">
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold">{s.summary.topAiAdvice.rank}</span>
+                    <span className="text-sm font-semibold text-slate-900">{s.summary.topAiAdvice.title}</span>
+                  </div>
+                  <div className="text-[10px] text-blue-700 mt-1.5">點擊查看細節 →</div>
+                </Link>
+              </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* ── 6 Panels Grid ───────────────────────────────── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+        {/* ===================================================== */}
+        {/* 區塊 2 / 3 / 4 (3-column on desktop)                  */}
+        {/* ===================================================== */}
+        <div className="grid lg:grid-cols-3 gap-5">
 
-          {/* ① 今日異常事件 */}
-          <Panel n={1} title="今日異常事件" subtitle="CEO 第一眼">
-            <div className="space-y-2 mb-3">
-              <RiskRow label="獲利風險" level={s.anomalies.profitRisk.level} note={s.anomalies.profitRisk.note} />
-              <RiskRow label="交期風險" level={s.anomalies.deliveryRisk.level} note={s.anomalies.deliveryRisk.note} />
-              <RiskRow label="供應商風險" level={s.anomalies.supplierRisk.level} note={s.anomalies.supplierRisk.note} />
-            </div>
-            <ol className="space-y-1.5 text-sm leading-snug text-slate-700">
-              {s.anomalies.bullets.map((b) => (
-                <li key={b.rank} className="flex gap-2">
-                  <span className="text-slate-400 font-mono shrink-0">{b.rank}.</span>
-                  <span>{b.text}</span>
+          {/* 區塊 2 — 異常事件 */}
+          <Block n={2} title="異常事件" subtitle="只顯示紅燈 + 黃燈">
+            {s.alerts.length === 0 ? (
+              <div className="text-sm text-emerald-600">✓ 目前無異常</div>
+            ) : (
+              <ul className="space-y-2">
+                {s.alerts.map((a) => (
+                  <li key={a.id}>
+                    <Link href={a.href ?? "#"} className="flex items-start gap-2 text-sm text-slate-700 hover:text-slate-900 group">
+                      <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${a.level === "red" ? "bg-rose-500" : "bg-amber-500"}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium group-hover:text-blue-600 truncate">{a.title}</div>
+                        <div className="text-[11px] text-slate-500">{a.context}</div>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Block>
+
+          {/* 區塊 3 — 待核准事項 */}
+          <Block n={3} title="待 CEO 核准" subtitle="一鍵核准 / 拒絕">
+            {s.approvals.length === 0 ? (
+              <div className="text-sm text-slate-500">目前無待核准事項</div>
+            ) : (
+              <ul className="space-y-2">
+                {s.approvals.map((ap) => (
+                  <li key={ap.id} className="rounded-lg border border-slate-200 bg-slate-50/40 p-3">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <Link href={ap.href} className="text-sm font-semibold text-slate-800 hover:text-blue-600 truncate">{ap.title}</Link>
+                      <span className="text-xs font-mono text-slate-700 shrink-0">{ap.amount}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 mb-2 truncate">{ap.reason}</div>
+                    <div className="flex gap-1.5">
+                      <button className="flex-1 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md py-1.5 transition-colors">✓ 核准</button>
+                      <button className="flex-1 text-[11px] font-bold bg-white border border-slate-300 text-slate-700 rounded-md py-1.5 hover:bg-slate-100 transition-colors">✗ 拒絕</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Block>
+
+          {/* 區塊 4 — 獲利衝擊 */}
+          <Block n={4} title="獲利衝擊" subtitle="今日損益歸因">
+            <ul className="space-y-2.5">
+              {s.impact.map((p) => (
+                <li key={p.cause} className="rounded-lg border border-rose-100 bg-rose-50/40 p-3">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-sm font-semibold text-slate-800">{p.cause}</span>
+                    <span className="text-base font-bold text-rose-600 tabular-nums shrink-0">{fmtMoney(p.amountNTD)}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">{p.detail}</div>
                 </li>
               ))}
-            </ol>
-          </Panel>
-
-          {/* ② 工單健康度 */}
-          <Panel n={2} title="工單健康度" subtitle="有沒有卡關">
-            <div className="flex items-baseline justify-between mb-2">
-              <div className="text-xs text-slate-500">📊 整體健康度</div>
-              <div className="text-xl font-bold text-slate-900">{s.wo.overallScore}%</div>
-            </div>
-            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden mb-3">
-              <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" style={{ width: `${s.wo.overallScore}%` }} />
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-left text-slate-500 border-b border-slate-200">
-                    <th className="py-1.5 pr-2 font-medium">工單</th>
-                    <th className="py-1.5 pr-2 font-medium">客戶</th>
-                    <th className="py-1.5 pr-2 font-medium">狀態</th>
-                    <th className="py-1.5 font-medium">AI 判定</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {s.wo.rows.map((r) => (
-                    <tr key={r.woNo} className="border-b border-slate-100 last:border-0">
-                      <td className="py-2 pr-2 font-mono text-slate-700">{r.woNo}</td>
-                      <td className="py-2 pr-2 text-slate-600">{r.customer}</td>
-                      <td className="py-2 pr-2">
-                        <span className={r.status === "正常" ? "text-emerald-600" : r.status === "缺料" || r.status === "延遲" ? "text-rose-600" : "text-amber-600"}>{r.status}</span>
-                      </td>
-                      <td className="py-2">
-                        <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${
-                          r.verdict === "good" ? "bg-emerald-500 text-white" :
-                          r.verdict === "warn" ? "bg-amber-500 text-white"  : "bg-rose-500 text-white"
-                        }`}>{VERDICT[r.verdict].icon}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Panel>
-
-          {/* ③ 鈸存與庫存 */}
-          <Panel n={3} title="鈸存與庫存" subtitle="會不會停線">
-            <div className="grid grid-cols-3 gap-2 mb-3">
-              <Stat label="庫存總金額" value={fmtMoney(s.inventory.totalValueNTD)} trend="up" />
-              <Stat label="週轉天數" value={`${s.inventory.turnoverDays}天`} trend="flat" />
-              <Stat label="呆滯料" value={fmtMoney(s.inventory.deadStockValueNTD)} sub={`佔比 ${s.inventory.deadStockPct}%`} trend="down" />
-            </div>
-            <div className="space-y-1.5 text-sm text-slate-700">
-              {s.inventory.shortages.length === 0 ? (
-                <div className="text-xs text-emerald-600">✓ 無低水位料件</div>
-              ) : s.inventory.shortages.map((sh) => (
-                <div key={sh.partName} className="flex items-baseline justify-between gap-2 text-xs">
-                  <span>• {sh.partName}：缺 <b className="text-rose-600">{sh.qtyShort}pcs</b></span>
-                  <span className="text-slate-400">{sh.etaDays ? `預計 ${sh.etaDays} 天到貨` : ""}</span>
-                </div>
-              ))}
-            </div>
-          </Panel>
-
-          {/* ④ 採購與報價 */}
-          <Panel n={4} title="採購與報價" subtitle="有沒有買貴">
-            <div className="flex items-center justify-end gap-1 mb-2 text-xs text-rose-600">
-              <span>📈 近期報價趨勢：上升 {s.quotes.trendPct}%</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-left text-slate-500 border-b border-slate-200">
-                    <th className="py-1.5 pr-2 font-medium">供應商</th>
-                    <th className="py-1.5 pr-2 font-medium">報價</th>
-                    <th className="py-1.5 font-medium">AI 判斷</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {s.quotes.rows.map((r) => (
-                    <tr key={r.supplier} className="border-b border-slate-100 last:border-0">
-                      <td className="py-2 pr-2 font-medium text-slate-800">{r.supplier}</td>
-                      <td className="py-2 pr-2 font-mono text-slate-700">{r.quote} 元</td>
-                      <td className="py-2">
-                        <span className={`text-[11px] px-2 py-0.5 rounded-full border ${VERDICT[r.verdict].chip}`}>{r.note}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Panel>
-
-          {/* ⑤ 原材料與匯率 */}
-          <Panel n={5} title="原材料與匯率" subtitle="未來成本風險">
-            <ul className="space-y-2 text-sm">
-              {s.commodity.materials.map((m) => (
-                <li key={m.name} className="flex items-center justify-between gap-2">
-                  <span className="text-slate-700">📍 {m.name}：<b className="font-mono">${m.current.toLocaleString()}</b>／{m.unit.replace("USD/", "")}</span>
-                  <span className="flex items-center gap-1">
-                    <span className="text-xs text-slate-500">預測 ${m.forecast.toLocaleString()}</span>
-                    {m.verdict === "critical" && <span className="text-rose-500" title="風險">⚠</span>}
-                  </span>
-                </li>
-              ))}
-              {s.commodity.fx.map((f) => (
-                <li key={f.pair} className="flex items-center justify-between gap-2">
-                  <span className="text-slate-700">💱 {f.pair}：<b className="font-mono">{f.current.toFixed(2)}</b></span>
-                  <span className="text-xs text-slate-500">預測 {f.forecast.toFixed(2)}</span>
-                </li>
-              ))}
-              <li className="flex items-center justify-between gap-2">
-                <span className="text-slate-700">🚢 BDI 指數：<b className="font-mono">{s.commodity.bdi.value}</b></span>
-                <span className="text-xs text-emerald-600">{s.commodity.bdi.status}</span>
+              <li className="pt-2 border-t border-slate-200 flex items-baseline justify-between">
+                <span className="text-xs font-bold text-slate-600">總衝擊</span>
+                <span className="text-xl font-extrabold text-rose-700 tabular-nums">
+                  {fmtMoney(s.impact.reduce((sum, p) => sum + p.amountNTD, 0))}
+                </span>
               </li>
             </ul>
-          </Panel>
-
-          {/* ⑥ AI 建議事項 */}
-          <Panel n={6} title="AI 建議事項" subtitle="今天要做決策">
-            <ol className="space-y-2 text-sm text-slate-700">
-              {s.actions.map((a, i) => (
-                <li key={a.id} className="flex items-start gap-2.5 leading-snug">
-                  <span className="text-slate-400 font-mono shrink-0 mt-0.5">{i + 1}.</span>
-                  <Link href={a.href ?? "#"} className="flex-1 hover:text-slate-900">{a.title}</Link>
-                  <input type="checkbox" className="mt-1 accent-blue-600 shrink-0" />
-                </li>
-              ))}
-            </ol>
-          </Panel>
+          </Block>
         </div>
 
         {/* ── Footer ─────────────────────────────────────── */}
         <footer className="flex items-center justify-between flex-wrap gap-2 text-[11px] text-slate-500 pt-3 border-t border-slate-200">
           <div className="flex items-center gap-3 flex-wrap">
             <span className="inline-flex items-center gap-1">
-              <span className={`w-1.5 h-1.5 rounded-full ${cacheAge < 300 ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
-              AI Snapshot：{cacheAge < 60 ? "剛剛" : `${Math.floor(cacheAge / 60)} min ago`} · 來源 <span className="font-mono">{cacheSrc}</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              AI Snapshot {cacheAge < 60 ? "剛剛" : `${Math.floor(cacheAge / 60)} min ago`}
             </span>
             <span>·</span>
             <span><Link href="/erp/admin/sync" className="text-blue-600 hover:underline">鼎新 iGP 同步狀態</Link></span>
             <span>·</span>
             <span>下次 refresh 60s</span>
           </div>
-          <div>祺驊 CHI HUA · AI Supply Chain Flow · /erp/warroom</div>
+          <div>祺驊 CHI HUA · /erp/warroom</div>
         </footer>
       </div>
     </div>
   );
 }
 
-// ============================================================
-// 子元件
-// ============================================================
-function Panel({ n, title, subtitle, children }: { n: number; title: string; subtitle: string; children: React.ReactNode }) {
+function Block({ n, title, subtitle, children }: { n: number; title: string; subtitle: string; children: React.ReactNode }) {
   return (
-    <section className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow p-4 sm:p-5">
+    <section className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-5">
       <header className="flex items-baseline gap-2 mb-3">
-        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold">{n}</span>
-        <h2 className="text-sm sm:text-base font-bold text-slate-900">{title}</h2>
-        <span className="text-xs text-slate-500">({subtitle})</span>
+        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-900 text-white text-xs font-bold">{n}</span>
+        <h2 className="text-base font-bold text-slate-900">{title}</h2>
+        <span className="text-xs text-slate-500">{subtitle}</span>
       </header>
       {children}
     </section>
-  );
-}
-
-function RiskRow({ label, level, note }: { label: string; level: RiskLevel; note: string }) {
-  const c = RISK_COLOR[level];
-  return (
-    <div className="flex items-center gap-2 text-sm">
-      <span className={`w-2 h-2 rounded-full ${c.dot} shrink-0`} />
-      <span className="text-slate-700">{label}：</span>
-      <span className={`text-[11px] px-1.5 py-0.5 rounded border ${c.chip} font-bold`}>{c.text}</span>
-      <span className="text-xs text-slate-500 truncate">（{note}）</span>
-    </div>
-  );
-}
-
-function Stat({ label, value, sub, trend }: { label: string; value: string; sub?: string; trend?: "up" | "down" | "flat" }) {
-  return (
-    <div className="bg-slate-50/60 rounded-lg border border-slate-100 px-2 py-2">
-      <div className="text-[10px] text-slate-500 mb-0.5">{label}</div>
-      <div className="text-sm sm:text-base font-bold text-slate-900 tabular-nums leading-tight">{value}</div>
-      {sub && <div className="text-[10px] text-slate-500">({sub})</div>}
-      {trend === "up"   && <div className="text-[10px] text-rose-500 mt-0.5">↗ 上升</div>}
-      {trend === "down" && <div className="text-[10px] text-emerald-600 mt-0.5">↘ 下降</div>}
-      {trend === "flat" && <div className="text-[10px] text-slate-400 mt-0.5">→ 持平</div>}
-    </div>
   );
 }
