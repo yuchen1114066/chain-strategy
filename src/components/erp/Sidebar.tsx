@@ -11,7 +11,7 @@ import LangSwitcher from "./LangSwitcher";
 // ============================================================
 
 const L_NAV = [
-  { href: "/erp",            label: "L1 EXECUTIVE",          zh: "AI 決策中心",     icon: "▤" },
+  { href: "/erp",            label: "L1 EXECUTIVE",          zh: "AI 戰情中心",     icon: "▤" },
   { href: "/erp/operations", label: "L2 OPERATIONS",         zh: "工單作戰中心",    icon: "▦" },
   { href: "/erp/procurement",label: "L3 PROCUREMENT",        zh: "AI 採購中心",     icon: "◈" },
   { href: "/erp/ai-engine",  label: "L4 AI ENGINE",          zh: "AI 決策中心",     icon: "✦" },

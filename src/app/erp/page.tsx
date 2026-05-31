@@ -3,7 +3,7 @@ import { getCeoSnapshot } from "@/lib/erp/warroom";
 import { SC, Card, MiniLabel, FONT } from "@/components/erp/stitch-ui";
 
 export const revalidate = 60;
-export const metadata = { title: "L1 Executive · AI 決策中心" };
+export const metadata = { title: "L1 Executive · AI 戰情中心" };
 
 function fmtMoney(n: number): string {
   const abs = Math.abs(n);
@@ -25,7 +25,7 @@ export default function L1ExecutivePage() {
         {/* Header */}
         <header>
           <div className="text-[11px] font-bold uppercase tracking-widest" style={{ color: SC.blue, letterSpacing: "0.12em" }}>L1 Executive</div>
-          <h1 className="text-3xl sm:text-4xl font-semibold mt-1" style={{ color: SC.text }}>AI 決策中心</h1>
+          <h1 className="text-3xl sm:text-4xl font-semibold mt-1" style={{ color: SC.text }}>AI 戰情中心</h1>
           <p className="text-sm mt-1" style={{ color: SC.textSub }}>實時 KPI Card 視角 · 健康度 + 毛利 + 衝擊 + AI 建議</p>
         </header>
 
