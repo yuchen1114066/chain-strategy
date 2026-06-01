@@ -128,7 +128,6 @@ let cachedDriver: Driver | null | undefined;
 async function loadDriver(): Promise<Driver | null> {
   if (cachedDriver !== undefined) return cachedDriver;
   try {
-    // @ts-expect-error — mssql 為選用相依，安裝後才存在
     const mssql = await import("mssql");
     cachedDriver = {
       async query(cfg, sql) {
