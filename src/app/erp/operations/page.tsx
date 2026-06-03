@@ -25,7 +25,6 @@ export default function L2OperationsPage() {
 
   return (
     <div style={{ background: SC.pageBg, minHeight: "100vh", fontFamily: FONT, color: SC.text }}>
-      <meta httpEquiv="refresh" content="60" />
       <div className="max-w-[1440px] mx-auto px-6 lg:px-10 py-8 space-y-6">
 
         <header>

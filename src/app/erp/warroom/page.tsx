@@ -31,7 +31,6 @@ export default function WarRoomHomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 text-slate-800">
-      <meta httpEquiv="refresh" content="60" />
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
 
         {/* ── Header ─────────────────────────────────────── */}
