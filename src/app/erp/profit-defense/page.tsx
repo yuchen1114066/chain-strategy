@@ -621,50 +621,66 @@ export default function ProfitDefensePage() {
               <span style={{ color: C.textSub }}>v0.3 · 12 個變數 / 預測模型已熱身</span>
             </div>
 
-            {/* Profit Impact Center */}
+            {/* 成本敏感度 Cost Sensitivity（取代原 Profit Impact Center） */}
             <div className="rounded-lg border bg-white p-4" style={{ borderColor: C.border, borderLeft: `4px solid ${C.primary}` }}>
-              <div className="flex items-baseline justify-between mb-3">
-                <h3 className="text-base font-bold">Profit Impact Center</h3>
+              <div className="flex items-baseline justify-between mb-1">
+                <h3 className="text-base font-bold">成本敏感度 <span className="text-[11px] font-normal" style={{ color: C.textSub }}>Cost Sensitivity</span></h3>
                 <span className="text-[9px] font-bold px-2 py-0.5 rounded" style={{ background: C.primary, color: "#fff" }}>L4·EXECUTIVE</span>
               </div>
+              <div className="text-[11px] mb-3" style={{ color: C.textSub }}>Commodity Risk Index · 原料風險指數 ／ 各產品線</div>
 
-              <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C.textSub }}>本期預估毛利率</div>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-4xl font-extrabold tabular-nums" style={{ color: C.red }}>16.8%</span>
-                <span className="text-sm font-semibold" style={{ color: C.red }}>↓ -1.4%</span>
-              </div>
-              <div className="text-[11px] mt-0.5" style={{ color: C.textSub }}>原預算 18.2%</div>
-
-              {/* AI Action Queue */}
-              <div className="mt-4 pt-3 border-t" style={{ borderColor: C.border }}>
-                <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.textSub }}>AI Action Queue</div>
-                <ol className="space-y-1.5 text-xs">
+              {/* 產品線風險表 */}
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left border-b" style={{ borderColor: C.border, color: C.textSub }}>
+                    <th className="py-1.5 text-[9px] font-bold uppercase tracking-widest">產品線</th>
+                    <th className="py-1.5 text-[9px] font-bold uppercase tracking-widest text-right">毛利率</th>
+                    <th className="py-1.5 text-[9px] font-bold uppercase tracking-widest text-right">Profit at Risk</th>
+                    <th className="py-1.5 text-[9px] font-bold uppercase tracking-widest text-right">原料風險</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {[
-                    { rank: "#1", title: "鎖價 銅 (Copper)",  impact: "-280萬", note: "今日內" },
-                    { rank: "#2", title: "鎖價 鋼 (Steel)",   impact: "-120萬", note: "3 日內" },
-                    { rank: "#3", title: "原料替代評估",      impact: "-80萬",  note: "1 週內" },
-                  ].map((a) => (
-                    <li key={a.rank} className="flex items-center justify-between gap-2">
-                      <span className="flex items-center gap-1.5">
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: C.surfaceDim, color: C.text }}>{a.rank}</span>
-                        <span>{a.title}</span>
-                      </span>
-                      <span className="text-right">
-                        <span className="font-mono font-semibold" style={{ color: C.red }}>{a.impact}</span>
-                        <span className="block text-[9px]" style={{ color: C.textSub }}>{a.note}</span>
-                      </span>
-                    </li>
+                    { line: "跑步機", margin: 22.1, par: "+80 萬",  parTone: C.primary, risk: "低", riskColor: "#059669" },
+                    { line: "飛輪車", margin: 18.4, par: "-120 萬", parTone: C.red,     risk: "中", riskColor: "#d97706" },
+                    { line: "橢圓機", margin: 13.2, par: "-320 萬", parTone: C.red,     risk: "高", riskColor: C.red },
+                    { line: "重訓",   margin: 16.7, par: "-95 萬",  parTone: C.red,     risk: "中", riskColor: "#d97706" },
+                  ].map((p) => (
+                    <tr key={p.line} className="border-b" style={{ borderColor: C.border }}>
+                      <td className="py-2 font-semibold" style={{ color: C.text }}>{p.line}</td>
+                      <td className="py-2 text-right font-mono">{p.margin.toFixed(1)}%</td>
+                      <td className="py-2 text-right font-mono font-semibold" style={{ color: p.parTone }}>{p.par}</td>
+                      <td className="py-2 text-right">
+                        <span className="font-bold" style={{ color: p.riskColor }}>● {p.risk}</span>
+                      </td>
+                    </tr>
                   ))}
-                </ol>
-              </div>
+                </tbody>
+              </table>
 
-              {/* 3 sub-tabs */}
-              <div className="mt-4 grid grid-cols-3 gap-1.5">
-                {["預測模型", "影響分析", "比較模型"].map((t, i) => (
-                  <button key={t} className="text-[10px] py-1.5 rounded border" style={{ borderColor: C.border, background: i === 0 ? C.surfaceDim : "white", color: C.text }}>
-                    {t}
-                  </button>
-                ))}
+              {/* 原料風險分析（drill-down） */}
+              <div className="mt-3 pt-3 border-t" style={{ borderColor: C.border }}>
+                <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.textSub }}>原料風險分析（成本佔比）</div>
+                <div className="space-y-1.5">
+                  {[
+                    { name: "銅材", pct: 42, tone: C.red },
+                    { name: "鋼材", pct: 18, tone: "#d97706" },
+                    { name: "IC",   pct: 12, tone: C.blue },
+                    { name: "塑膠", pct:  8, tone: "#059669" },
+                    { name: "其他", pct: 20, tone: C.outline },
+                  ].map((r) => (
+                    <div key={r.name} className="flex items-center gap-2 text-[11px]">
+                      <span className="w-10 shrink-0" style={{ color: C.text }}>{r.name}</span>
+                      <span className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: C.surfaceDim }}>
+                        <span className="block h-full rounded-full" style={{ width: `${r.pct}%`, background: r.tone }} />
+                      </span>
+                      <span className="w-10 text-right font-mono font-semibold" style={{ color: r.tone }}>{r.pct}%</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-[10px]" style={{ color: C.textSub }}>
+                  ※ 銅材佔比 42% 為最高風險 — 銅價每漲 5% 直接影響整體成本 +2.1%
+                </div>
               </div>
             </div>
 
