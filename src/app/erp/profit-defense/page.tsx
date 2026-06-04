@@ -30,10 +30,10 @@ const TABS: { code: Commodity["code"]; label: string; nameEn: string }[] = [
 ];
 
 const RANGES: { key: string; months: number }[] = [
-  { key: "10Y",           months: 120 },
   { key: "1M",            months: 1   },
   { key: "3M",            months: 3   },
   { key: "1Y",            months: 12  },
+  { key: "10Y",           months: 120 },
   { key: "AI Prediction", months: 24  },
 ];
 
