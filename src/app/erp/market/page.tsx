@@ -25,11 +25,11 @@ export default function L5MarketPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {[
               { q: "市場正在發生什麼？",   anchor: "#q1", chip: "1", target: "區塊 1·10",  desc: "Commodity / Volatility", tone: SC.blue },
-              { q: "未來會發生什麼？",     anchor: "#q2", chip: "2", target: "區塊 5·7·8·9",desc: "AI Why / 匯率 / 運費 / 能源", tone: SC.red },
-              { q: "我該買嗎？",            anchor: "#q3", chip: "3", target: "區塊 3·4",   desc: "Action Queue / Copilot",  tone: "#d97706" },
+              { q: "未來會發生什麼？",     anchor: "#q2", chip: "2", target: "區塊 5·18",  desc: "AI Why / 12 Month Forecast", tone: SC.red },
+              { q: "我該買嗎？",            anchor: "#q3-engine", chip: "3", target: "區塊 16", desc: "Buy Signal Engine",   tone: "#d97706" },
               { q: "何時買？",              anchor: "#q4", chip: "4", target: "區塊 4",     desc: "AI 鎖價時機建議",          tone: "#d97706" },
               { q: "漲價合理嗎？",          anchor: "#q5", chip: "5", target: "區塊 2·6",   desc: "Profit Impact / Product",  tone: SC.amber },
-              { q: "供應商是否說謊？",      anchor: "#q6", chip: "6", target: "區塊 15",    desc: "Supplier Truth Check",     tone: SC.primary },
+              { q: "供應商是否說謊？",      anchor: "#q6-validation", chip: "6", target: "區塊 15·17", desc: "Truth Check + Validation",     tone: SC.primary },
             ].map((x) => (
               <a key={x.q} href={x.anchor} className="block rounded-md border p-3 hover:shadow-sm transition-shadow"
                  style={{ borderColor: SC.border, background: SC.surface, borderLeft: `4px solid ${x.tone}` }}>
@@ -577,6 +577,165 @@ export default function L5MarketPage() {
             <div>合理價 = LME / 中鋼 / INSEE 市場指數 × 該料件金屬佔比 × 製造加工係數（業界常數 1.2-1.5x）</div>
             <div>誠信度 = 過去 12 個月「報價跟市場走勢」相關係數（&gt;85% 良好 / 70-85 觀察 / &lt;70 紅旗）</div>
             <div>連續 3 月偏高 &gt; 10%（且金屬價無對應上漲）= 自動標 🚨</div>
+          </div>
+        </Card>
+
+        {/* ❓ Q3 區塊 16 — Buy Signal Engine 採購最在乎的 */}
+        <div id="q3-engine" />
+        <Card accent={SC.red}>
+          <div className="flex items-baseline justify-between mb-2 flex-wrap gap-2">
+            <Header n="16" title="Buy Signal Engine · 採購買進訊號引擎" />
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded text-white" style={{ background: "#d97706" }}>❓Q3 我該買嗎</span>
+          </div>
+          <div className="text-[11px] mb-3" style={{ color: SC.textSub }}>採購最在乎的問題 — 直接給「該不該買」的答案，不只是預測</div>
+
+          {/* 3 商品的買進訊號 */}
+          <div className="grid md:grid-cols-3 gap-3">
+            {[
+              { metal: "銅",   price: 9472,    verdict: "立即買進", stars: 5, conf: 91, alt: { wait: 30, drop: -4 },  tone: SC.primary, bg: `${SC.primary}10` },
+              { metal: "鋼",   price: 1099,    verdict: "等待回檔", stars: 3, conf: 78, alt: { wait: 45, drop: -6 },  tone: "#d97706", bg: "#fef3c7" },
+              { metal: "鋁",   price: 2598,    verdict: "立即買進", stars: 4, conf: 85, alt: { wait: 60, drop: -2 },  tone: SC.primary, bg: `${SC.primary}10` },
+            ].map((s) => (
+              <div key={s.metal} className="rounded-md border p-3" style={{ borderColor: SC.border, background: s.bg }}>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-base font-bold" style={{ color: SC.text }}>{s.metal}價</span>
+                  <span className="font-mono font-extrabold text-lg" style={{ color: SC.text }}>${s.price.toLocaleString()}</span>
+                </div>
+                <div className="mt-2 rounded p-2" style={{ background: "#fff", border: `1px solid ${s.tone}` }}>
+                  <div className="text-[9px] font-bold uppercase tracking-widest" style={{ color: s.tone }}>🧠 AI 買進建議</div>
+                  <div className="text-base font-extrabold mt-1" style={{ color: s.tone }}>{s.verdict}</div>
+                  <div className="text-xs mt-0.5" style={{ color: "#d97706" }}>{"★".repeat(s.stars)}<span style={{ color: SC.outline }}>{"☆".repeat(5 - s.stars)}</span></div>
+                  <div className="text-[10px] mt-1" style={{ color: SC.textSub }}>信心度 <b className="font-mono" style={{ color: s.tone }}>{s.conf}%</b></div>
+                </div>
+                <div className="mt-2 text-[10px]" style={{ color: SC.textSub }}>
+                  或：等待 <b className="font-mono">{s.alt.wait}</b> 天後預估 <b className="font-mono" style={{ color: SC.emerald }}>{s.alt.drop}%</b>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 直接回答區 */}
+          <div className="mt-3 rounded-md p-4" style={{ background: SC.surfaceDim, border: `2px solid ${SC.primary}` }}>
+            <div className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: SC.textSub }}>直接回答</div>
+            <div className="text-xl font-extrabold" style={{ color: SC.primary }}>
+              👉 銅、鋁今日內買進　·　鋼等待 45 天回檔
+            </div>
+            <div className="text-xs mt-1" style={{ color: SC.text }}>
+              預估綜合節省 <b className="font-mono" style={{ color: SC.primary }}>+128 萬</b> · 風險窗口 30 天內
+            </div>
+          </div>
+        </Card>
+
+        {/* ❓ Q6 區塊 17 — Supplier Price Validation 供應商漲價驗證（未來最強功能） */}
+        <div id="q6-validation" />
+        <Card accent={SC.primary}>
+          <div className="flex items-baseline justify-between mb-2 flex-wrap gap-2">
+            <Header n="17" title="Supplier Price Validation · 供應商漲價即時驗證" />
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded text-white" style={{ background: SC.primary }}>❓Q6 供應商是否說謊</span>
+          </div>
+          <div className="text-[11px] mb-3" style={{ color: SC.textSub }}>這是未來最強的功能 — 供應商打電話來說「銅漲我要漲」AI 立即算給你合理範圍</div>
+
+          {/* 3 個近期供應商漲價請求 */}
+          <div className="space-y-3">
+            {[
+              { sup: "B 線材", part: "FB64-WIRE", part_name: "電線組",  metal: "銅", metalPct: 18, metalRise: 8, askRise: 5,  fairRise: 1.4, verdict: "不合理", excess: 3.6 },
+              { sup: "鋼鋒",   part: "FB64-FRM",  part_name: "車架",   metal: "鋼", metalPct: 85, metalRise: 3, askRise: 4,  fairRise: 2.55, verdict: "合理偏高", excess: 1.45 },
+              { sup: "鋁友",   part: "FB64-RIM",  part_name: "車架鋁件", metal: "鋁", metalPct: 70, metalRise: 5, askRise: 3,  fairRise: 3.5, verdict: "合理（甚至低於該漲幅）", excess: -0.5 },
+            ].map((c, i) => (
+              <div key={i} className="rounded-md border" style={{ borderColor: SC.border, background: c.excess > 2 ? "#fef3c7" : c.excess < 0 ? `${SC.primary}10` : "#ffffff" }}>
+                <div className="grid md:grid-cols-[1fr,1fr,180px] gap-3 p-3">
+                  {/* 供應商說 */}
+                  <div>
+                    <div className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: SC.textSub }}>📞 供應商說</div>
+                    <div className="text-sm" style={{ color: SC.text }}>
+                      <b>{c.sup}</b>（{c.part}）：「{c.metal}價漲 <b className="font-mono">{c.metalRise}%</b>，我要漲 <b className="font-mono" style={{ color: SC.red }}>{c.askRise}%</b>」
+                    </div>
+                  </div>
+                  {/* AI 即時驗證 */}
+                  <div>
+                    <div className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: SC.blue }}>🧠 AI 立即驗證</div>
+                    <div className="text-xs font-mono leading-snug" style={{ color: SC.text }}>
+                      {c.part_name} 含{c.metal}佔比 <b>{c.metalPct}%</b><br/>
+                      合理漲幅 = {c.metalPct}% × {c.metalRise}% = <b style={{ color: SC.primary }}>{c.fairRise}%</b><br/>
+                      供應商要求 <b>{c.askRise}%</b>，{c.excess > 0 ? "超出" : "低於"} <b style={{ color: c.excess > 0 ? SC.red : SC.primary }}>{Math.abs(c.excess).toFixed(1)}%</b>
+                    </div>
+                  </div>
+                  {/* 直接揭示 */}
+                  <div className="rounded-md p-3 text-center flex flex-col justify-center" style={{ background: c.excess > 2 ? SC.red : c.excess > 0 ? "#d97706" : SC.primary }}>
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-white opacity-80">AI 直接揭示</div>
+                    <div className="text-base font-extrabold text-white mt-0.5">{c.verdict}</div>
+                    {c.excess > 0 && <div className="text-[10px] text-white opacity-90 mt-0.5">建議反議價至 {c.fairRise}%</div>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 演算法 */}
+          <div className="mt-3 rounded-md p-3 text-[11px]" style={{ background: SC.surfaceDim, color: SC.textSub }}>
+            <div className="font-bold mb-1" style={{ color: SC.text }}>📐 AI 驗證演算法</div>
+            <div>合理漲幅 = 該料件{`{金屬佔比 %}`} × {`{該金屬市場真實漲幅 %}`}　·　全部由系統自動拉 LME / 中鋼 / INSEE 即時行情驗證</div>
+            <div>差距 &gt; 2% → 自動標「不合理」並推薦反議價底價</div>
+          </div>
+        </Card>
+
+        {/* ❓ Q2 區塊 18 — 12 Month Forecast 年度議價預測 */}
+        <div id="q2-12m" />
+        <Card accent={SC.blue}>
+          <div className="flex items-baseline justify-between mb-2 flex-wrap gap-2">
+            <Header n="18" title="12 Month Forecast · 12 個月預測（年度議價必備）" />
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded text-white" style={{ background: SC.red }}>❓Q2 未來會發生什麼</span>
+          </div>
+          <div className="text-[11px] mb-3" style={{ color: SC.textSub }}>原本只看 30/90/180 天 — 世界級採購做年度議價要看 3M / 6M / 12M</div>
+
+          {/* 3 個商品的 3M / 6M / 12M */}
+          <div className="space-y-3">
+            {[
+              { metal: "銅",  current: 9472, forecasts: [
+                { period: "3M",  delta:  +3,  conf: 88, label: "2026/Q3" },
+                { period: "6M",  delta:  +8,  conf: 78, label: "2026/Q4", note: "↑ 中國基建續強" },
+                { period: "12M", delta:  -8,  conf: 65, label: "2027/Q1", note: "↓ 美聯儲降息 + EV 過剩" },
+              ]},
+              { metal: "鋼",  current: 1099, forecasts: [
+                { period: "3M",  delta:  -2,  conf: 80, label: "2026/Q3" },
+                { period: "6M",  delta:  -6,  conf: 72, label: "2026/Q4", note: "↓ 中國產能過剩" },
+                { period: "12M", delta: +12,  conf: 58, label: "2027/Q1", note: "↑ 全球基建週期" },
+              ]},
+              { metal: "鋁",  current: 2598, forecasts: [
+                { period: "3M",  delta:  +1,  conf: 85, label: "2026/Q3" },
+                { period: "6M",  delta:  +4,  conf: 75, label: "2026/Q4", note: "↑ 綠能需求" },
+                { period: "12M", delta:  +9,  conf: 62, label: "2027/Q1", note: "↑ 電動車輕量化趨勢" },
+              ]},
+            ].map((m) => (
+              <div key={m.metal} className="rounded-md border p-3" style={{ borderColor: SC.border }}>
+                <div className="flex items-baseline justify-between mb-2">
+                  <span className="text-base font-bold" style={{ color: SC.text }}>{m.metal}價</span>
+                  <span className="text-[10px]" style={{ color: SC.textSub }}>當前 <b className="font-mono">${m.current.toLocaleString()}</b></span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {m.forecasts.map((f) => (
+                    <div key={f.period} className="rounded-md p-3 text-center"
+                         style={{ background: f.delta > 5 ? `${SC.red}10` : f.delta < -5 ? `${SC.primary}10` : SC.surfaceDim,
+                                  border: `1px solid ${f.delta > 5 ? SC.red : f.delta < -5 ? SC.primary : SC.border}` }}>
+                      <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: SC.textSub }}>{f.period} · {f.label}</div>
+                      <div className="text-2xl font-extrabold font-mono mt-1"
+                           style={{ color: f.delta > 0 ? SC.red : SC.primary }}>
+                        {f.delta > 0 ? "+" : ""}{f.delta}%
+                      </div>
+                      <div className="text-[10px] mt-0.5" style={{ color: SC.textSub }}>信心 {f.conf}%</div>
+                      {f.note && <div className="text-[10px] mt-1" style={{ color: SC.text }}>{f.note}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-3 rounded-md p-3 text-[11px]" style={{ background: SC.surfaceDim, color: SC.textSub }}>
+            <div className="font-bold mb-1" style={{ color: SC.text }}>💡 為什麼必須有 12M 預測</div>
+            <div>· 年度議價（11-12 月）採購要看全年走勢，30/90/180 天不夠</div>
+            <div>· 12 個月預測讓你決定：簽 1 年長約 vs 半年滾動 vs 現貨</div>
+            <div>· 例：銅 6M ↑8% 12M ↓8% → 簽半年合約最划算（前 6 月鎖價，後 6 月走現貨）</div>
           </div>
         </Card>
 
