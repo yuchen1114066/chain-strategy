@@ -536,22 +536,25 @@ export default function ProfitDefensePage() {
                   </ul>
                 </div>
 
-                {/* 區塊 2 — 成本構成（圓餅圖） */}
+                {/* 區塊 2 — 成本構成（圓餅圖，文字直接放色塊上） */}
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.textSub, letterSpacing: "0.08em" }}>
                     ▎成本構成
                   </div>
                   {(() => {
                     const slices = [
-                      { name: "銅材", pct: 42, tone: C.red },
-                      { name: "鋼材", pct: 18, tone: "#d97706" },
-                      { name: "IC",   pct: 12, tone: C.blue },
-                      { name: "塑膠", pct:  8, tone: "#059669" },
-                      { name: "其他", pct: 20, tone: C.outline },
+                      { name: "銅材", pct: 42, tone: C.red,     fg: "#ffffff" },
+                      { name: "鋼材", pct: 18, tone: "#d97706", fg: "#ffffff" },
+                      { name: "IC",   pct: 12, tone: C.blue,    fg: "#ffffff" },
+                      { name: "塑膠", pct:  8, tone: "#059669", fg: "#ffffff" },
+                      { name: "其他", pct: 20, tone: C.outline, fg: "#ffffff" },
                     ];
                     const total = slices.reduce((s, x) => s + x.pct, 0);
-                    const cx = 70, cy = 70, R = 60, ir = 32;
-                    let angle = -Math.PI / 2; // 從 12 點鐘方向開始
+                    const SZ = 240;
+                    const cx = SZ / 2, cy = SZ / 2;
+                    const R = 110, ir = 58;
+                    const labelR = (R + ir) / 2; // 文字錨點在環中線
+                    let angle = -Math.PI / 2;
                     const arcs = slices.map((s) => {
                       const sweep = (s.pct / total) * Math.PI * 2;
                       const a0 = angle;
@@ -563,33 +566,44 @@ export default function ProfitDefensePage() {
                       const xi1 = cx + ir * Math.cos(a1), yi1 = cy + ir * Math.sin(a1);
                       const xi0 = cx + ir * Math.cos(a0), yi0 = cy + ir * Math.sin(a0);
                       const d = `M ${x0} ${y0} A ${R} ${R} 0 ${largeArc} 1 ${x1} ${y1} L ${xi1} ${yi1} A ${ir} ${ir} 0 ${largeArc} 0 ${xi0} ${yi0} Z`;
-                      // label 位置（圓弧中點外推）
                       const mid = (a0 + a1) / 2;
-                      const lx = cx + (R + 10) * Math.cos(mid);
-                      const ly = cy + (R + 10) * Math.sin(mid);
-                      return { ...s, d, lx, ly };
+                      const lx = cx + labelR * Math.cos(mid);
+                      const ly = cy + labelR * Math.sin(mid);
+                      // 小片（< 5%）只顯示百分比，更小片不顯示
+                      const showName = s.pct >= 10;
+                      const showPct  = s.pct >= 5;
+                      return { ...s, d, lx, ly, showName, showPct };
                     });
                     return (
-                      <div className="flex items-center gap-3">
-                        <svg viewBox="0 0 140 140" width="140" height="140" className="shrink-0">
+                      <div className="flex justify-center">
+                        <svg viewBox={`0 0 ${SZ} ${SZ}`} width="100%" height="auto" style={{ maxWidth: SZ }}>
                           {arcs.map((a) => (
                             <g key={a.name}>
-                              <path d={a.d} fill={a.tone} stroke="#fff" strokeWidth="1.5" />
+                              <path d={a.d} fill={a.tone} stroke="#fff" strokeWidth="2" />
+                              {a.showName && (
+                                <text x={a.lx} y={a.ly - 6} textAnchor="middle" fontSize="13" fontWeight="700" fill={a.fg}>
+                                  {a.name}
+                                </text>
+                              )}
+                              {a.showPct && (
+                                <text
+                                  x={a.lx}
+                                  y={a.showName ? a.ly + 10 : a.ly + 4}
+                                  textAnchor="middle"
+                                  fontSize={a.showName ? "12" : "11"}
+                                  fontWeight="600"
+                                  fill={a.fg}
+                                  fontFamily="monospace"
+                                >
+                                  {a.pct}%
+                                </text>
+                              )}
                             </g>
                           ))}
                           {/* 中央文字 */}
-                          <text x={cx} y={cy - 2} textAnchor="middle" fontSize="10" fill={C.textSub}>合計</text>
-                          <text x={cx} y={cy + 12} textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>100%</text>
+                          <text x={cx} y={cy - 4} textAnchor="middle" fontSize="11" fill={C.textSub}>合計</text>
+                          <text x={cx} y={cy + 14} textAnchor="middle" fontSize="18" fontWeight="800" fill={C.text}>100%</text>
                         </svg>
-                        <ul className="flex-1 space-y-1 text-[11px]">
-                          {slices.map((s) => (
-                            <li key={s.name} className="flex items-baseline gap-2">
-                              <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: s.tone }} />
-                              <span className="flex-1" style={{ color: C.text }}>{s.name}</span>
-                              <span className="font-mono font-semibold" style={{ color: s.tone }}>{s.pct}%</span>
-                            </li>
-                          ))}
-                        </ul>
                       </div>
                     );
                   })()}
