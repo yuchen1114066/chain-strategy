@@ -337,7 +337,7 @@ export default function ProfitDefensePage() {
                     />
                   )}
 
-                  {/* 突兀峰值標註（含原因 callout） */}
+                  {/* 突兀峰值標註（含原因 callout — 放在圖表空白角落） */}
                   {(() => {
                     if (realPoints.length === 0) return null;
                     const maxP = Math.max(...realPoints.map((p) => p.price));
@@ -350,23 +350,27 @@ export default function ProfitDefensePage() {
                     // Callout 尺寸
                     const boxW = 230;
                     const boxH = 60;
-                    const VGAP = 28;   // box 與 dot 的垂直間距（避免壓到點）
-                    // X 位置：點上方 / clamp 不出邊界
-                    const boxX = Math.max(PAD_L + 4, Math.min(W - PAD_R - boxW - 4, sx - boxW / 2));
-                    // Y 位置：優先上方；若上方空間不夠則翻到下方
-                    const placeAbove = sy - boxH - VGAP >= PAD_T + 4;
-                    const boxY = placeAbove
-                      ? sy - boxH - VGAP
-                      : Math.min(H - PAD_B - boxH - 4, sy + VGAP);
-                    // 連接線端點
-                    const lineY1 = placeAbove ? sy - 8 : sy + 8;
-                    const lineY2 = placeAbove ? boxY + boxH : boxY;
+                    // 策略：把 box 放在離 dot 最遠的「上方角落」（通常空白區）
+                    //  - 點在右半 → box 放左上
+                    //  - 點在左半 → box 放右上
+                    //  - 若點本身在上半且垂直距離不夠 → box 改放下方角落
+                    const cornerLeft = sx >= (PAD_L + (W - PAD_R)) / 2;
+                    const cornerTop = sy >= (PAD_T + (H - PAD_B)) / 2;
+                    const boxX = cornerLeft
+                      ? PAD_L + 8
+                      : W - PAD_R - boxW - 8;
+                    const boxY = cornerTop
+                      ? PAD_T + 8
+                      : H - PAD_B - boxH - 8;
+                    // box 朝向 dot 的錨點（用於連接線）
+                    const boxAnchorX = cornerLeft ? boxX + boxW : boxX;
+                    const boxAnchorY = boxY + boxH / 2;
                     return (
                       <g>
                         {/* dot */}
                         <circle cx={sx} cy={sy} r="6" fill="#fbbf24" stroke={C.red} strokeWidth="2" />
-                        {/* 連接虛線（不再壓到點） */}
-                        <line x1={sx} y1={lineY1} x2={sx} y2={lineY2} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="3,3" />
+                        {/* 斜虛線：box 邊緣 → dot */}
+                        <line x1={boxAnchorX} y1={boxAnchorY} x2={sx} y2={sy} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="3,3" />
                         {/* callout 框 */}
                         <rect x={boxX} y={boxY} width={boxW} height={boxH} rx="4" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1.2" />
                         {/* 價格 */}
