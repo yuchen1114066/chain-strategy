@@ -883,8 +883,10 @@ type ProductProfile = {
     costPct: number;      // 整機成本影響 %
     marginAfter: number;  // 毛利下調至
     loss: number;         // 損失 萬
+    // 深層 cascade：原料 → 料件 → 零件 → 系統 → 整機
+    cascade: { layer: string; name: string; impact: string; tone?: string }[];
   }[];
-  recovery: { action: string; saving: number }[];
+  recovery: { action: string; saving: number; difficulty: number; successRate: number }[];
 };
 
 const PRODUCT_PROFILES: ProductProfile[] = [
@@ -898,16 +900,34 @@ const PRODUCT_PROFILES: ProductProfile[] = [
       { node: "Console 控制板",     metal: "IC",   pct:  6, cost:  2_500 },
       { node: "Cover 外殼",         metal: "塑料", pct:  4, cost:  1_600 },
     ],
-    driver: ["銅價", "Motor", "Drive System", "橢圓機", "毛利", "損失"],
+    driver: ["銅價", "Motor", "Drive Assy", "橢圓機", "毛利", "損失"],
     sensitivity: [
-      { metal: "銅",  pct: 5,  costPct: 0.82, marginAfter: 12.4, loss: -320 },
-      { metal: "鋼",  pct: 5,  costPct: 0.65, marginAfter: 12.6, loss: -250 },
-      { metal: "IC",  pct: 10, costPct: 0.18, marginAfter: 13.0, loss:  -70 },
+      { metal: "銅",  pct: 5,  costPct: 0.82, marginAfter: 12.4, loss: -320,
+        cascade: [
+          { layer: "料件", name: "FB64-WIRE 電線組", impact: "+3.80%" },
+          { layer: "零件", name: "Motor 馬達",        impact: "+2.25%" },
+          { layer: "系統", name: "Drive Assy 傳動",   impact: "+1.18%" },
+          { layer: "整機", name: "橢圓機",             impact: "+0.82%" },
+        ]},
+      { metal: "鋼",  pct: 5,  costPct: 0.65, marginAfter: 12.6, loss: -250,
+        cascade: [
+          { layer: "料件", name: "鋼板 CR-1.5T",       impact: "+4.20%" },
+          { layer: "零件", name: "Frame Assy 車架",   impact: "+3.40%" },
+          { layer: "系統", name: "結構系統",           impact: "+1.65%" },
+          { layer: "整機", name: "橢圓機",             impact: "+0.65%" },
+        ]},
+      { metal: "IC",  pct: 10, costPct: 0.18, marginAfter: 13.0, loss:  -70,
+        cascade: [
+          { layer: "料件", name: "ARM MCU + LCD",     impact: "+8.00%" },
+          { layer: "零件", name: "PCB Board",          impact: "+5.20%" },
+          { layer: "系統", name: "Console Assy",       impact: "+1.20%" },
+          { layer: "整機", name: "橢圓機",             impact: "+0.18%" },
+        ]},
     ],
     recovery: [
-      { action: "提前採購銅（45 天）",          saving: 95 },
-      { action: "替代供應商 B（Motor）",         saving: 60 },
-      { action: "議價／長約鎖價",                saving: 25 },
+      { action: "提前採購銅（45 天）",          saving: 95, difficulty: 5, successRate: 92 },
+      { action: "替代供應商 B（Motor）",         saving: 60, difficulty: 2, successRate: 80 },
+      { action: "議價／長約鎖價",                saving: 25, difficulty: 3, successRate: 65 },
     ],
   },
   {
@@ -922,14 +942,32 @@ const PRODUCT_PROFILES: ProductProfile[] = [
     ],
     driver: ["鋁價", "Flywheel", "飛輪車", "毛利", "損失"],
     sensitivity: [
-      { metal: "鋁",  pct: 5, costPct: 0.54, marginAfter: 17.9, loss: -120 },
-      { metal: "銅",  pct: 5, costPct: 0.31, marginAfter: 18.1, loss:  -70 },
-      { metal: "鋼",  pct: 5, costPct: 0.48, marginAfter: 17.9, loss: -100 },
+      { metal: "鋁",  pct: 5, costPct: 0.54, marginAfter: 17.9, loss: -120,
+        cascade: [
+          { layer: "料件", name: "鋁錠 6061-T6",     impact: "+3.50%" },
+          { layer: "零件", name: "Flywheel 18kg",    impact: "+2.10%" },
+          { layer: "系統", name: "Drive Assy",       impact: "+0.95%" },
+          { layer: "整機", name: "飛輪車",            impact: "+0.54%" },
+        ]},
+      { metal: "銅",  pct: 5, costPct: 0.31, marginAfter: 18.1, loss:  -70,
+        cascade: [
+          { layer: "料件", name: "漆包銅線 1.5mm",    impact: "+4.20%" },
+          { layer: "零件", name: "Magnet Coil",       impact: "+1.85%" },
+          { layer: "系統", name: "阻力系統",           impact: "+0.62%" },
+          { layer: "整機", name: "飛輪車",            impact: "+0.31%" },
+        ]},
+      { metal: "鋼",  pct: 5, costPct: 0.48, marginAfter: 17.9, loss: -100,
+        cascade: [
+          { layer: "料件", name: "鋼管 25mm",         impact: "+4.10%" },
+          { layer: "零件", name: "Frame Assy",        impact: "+2.80%" },
+          { layer: "系統", name: "結構系統",           impact: "+1.20%" },
+          { layer: "整機", name: "飛輪車",            impact: "+0.48%" },
+        ]},
     ],
     recovery: [
-      { action: "鋁料長約鎖價",        saving: 55 },
-      { action: "啟用替代車架供應商",   saving: 40 },
-      { action: "議價",                 saving: 15 },
+      { action: "鋁料長約鎖價",        saving: 55, difficulty: 4, successRate: 88 },
+      { action: "啟用替代車架供應商",   saving: 40, difficulty: 2, successRate: 70 },
+      { action: "議價",                 saving: 15, difficulty: 3, successRate: 60 },
     ],
   },
   {
@@ -943,13 +981,25 @@ const PRODUCT_PROFILES: ProductProfile[] = [
     ],
     driver: ["混鐵價", "鑄鐵塊", "重訓", "毛利", "損失"],
     sensitivity: [
-      { metal: "混鐵", pct: 5, costPct: 1.20, marginAfter: 15.5, loss: -95 },
-      { metal: "鋼",   pct: 5, costPct: 0.45, marginAfter: 16.3, loss: -35 },
+      { metal: "混鐵", pct: 5, costPct: 1.20, marginAfter: 15.5, loss: -95,
+        cascade: [
+          { layer: "料件", name: "鐵礦石",            impact: "+5.00%" },
+          { layer: "零件", name: "鑄鐵塊 20kg",       impact: "+5.00%" },
+          { layer: "系統", name: "配重系統",           impact: "+3.00%" },
+          { layer: "整機", name: "重訓器材",           impact: "+1.20%" },
+        ]},
+      { metal: "鋼",   pct: 5, costPct: 0.45, marginAfter: 16.3, loss: -35,
+        cascade: [
+          { layer: "料件", name: "鋼管 + 鋼索",        impact: "+4.30%" },
+          { layer: "零件", name: "Frame + Cable",     impact: "+2.20%" },
+          { layer: "系統", name: "結構系統",           impact: "+1.05%" },
+          { layer: "整機", name: "重訓器材",           impact: "+0.45%" },
+        ]},
     ],
     recovery: [
-      { action: "提前採購混鐵（60 天）", saving: 50 },
-      { action: "越南混鐵替代",           saving: 30 },
-      { action: "議價",                   saving: 15 },
+      { action: "提前採購混鐵（60 天）", saving: 50, difficulty: 4, successRate: 85 },
+      { action: "越南混鐵替代",           saving: 30, difficulty: 2, successRate: 75 },
+      { action: "議價",                   saving: 15, difficulty: 3, successRate: 60 },
     ],
   },
   {
@@ -963,12 +1013,24 @@ const PRODUCT_PROFILES: ProductProfile[] = [
     ],
     driver: ["銅價", "Motor", "跑步機", "毛利", "獲利"],
     sensitivity: [
-      { metal: "銅",   pct: 5, costPct: 0.45, marginAfter: 21.6, loss: -60 },
-      { metal: "塑料", pct: 5, costPct: 0.28, marginAfter: 21.8, loss: -35 },
+      { metal: "銅",   pct: 5, costPct: 0.45, marginAfter: 21.6, loss: -60,
+        cascade: [
+          { layer: "料件", name: "漆包銅線",            impact: "+3.80%" },
+          { layer: "零件", name: "Motor 主馬達",        impact: "+1.95%" },
+          { layer: "系統", name: "Drive Assy",          impact: "+0.90%" },
+          { layer: "整機", name: "跑步機",              impact: "+0.45%" },
+        ]},
+      { metal: "塑料", pct: 5, costPct: 0.28, marginAfter: 21.8, loss: -35,
+        cascade: [
+          { layer: "料件", name: "PE / PU 顆粒",        impact: "+4.00%" },
+          { layer: "零件", name: "Belt + Roller",       impact: "+1.40%" },
+          { layer: "系統", name: "傳動系統",             impact: "+0.55%" },
+          { layer: "整機", name: "跑步機",              impact: "+0.28%" },
+        ]},
     ],
     recovery: [
-      { action: "維持現有議價方案",      saving: 20 },
-      { action: "監控銅料 30 天",         saving: 10 },
+      { action: "維持現有議價方案",      saving: 20, difficulty: 5, successRate: 95 },
+      { action: "監控銅料 30 天",         saving: 10, difficulty: 5, successRate: 90 },
     ],
   },
 ];
@@ -1038,27 +1100,48 @@ function ProductCostIntelligence() {
             <ImpactExplosionTree product={p} />
           </div>
 
-          {/* 區塊 D — AI Recovery Plan */}
+          {/* 區塊 D — AI Recovery Plan（含執行難度 + 成功率） */}
           <div className="rounded-md border p-3" style={{ borderColor: C.border, borderLeft: `3px solid ${C.primary}`, background: `${C.primary}05` }}>
-            <div className="flex items-baseline justify-between mb-2">
+            <div className="flex items-baseline justify-between mb-2 flex-wrap gap-1">
               <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C.primary, letterSpacing: "0.08em" }}>
-                ▎AI Recovery Plan · {p.name} 救援方案
+                ▎🚀 AI Recovery Plan · {p.name} 救援方案
               </div>
               <span className="text-[10px] font-bold font-mono" style={{ color: C.primary }}>
                 總可回收 +{p.recovery.reduce((s, r) => s + r.saving, 0)} 萬
               </span>
             </div>
-            <ul className="grid sm:grid-cols-3 gap-2">
-              {p.recovery.map((r) => (
-                <li key={r.action} className="rounded-md bg-white border p-2" style={{ borderColor: C.border }}>
-                  <div className="flex items-baseline gap-1">
-                    <span style={{ color: C.primary }}>✓</span>
-                    <span className="text-xs font-semibold" style={{ color: C.text }}>{r.action}</span>
-                  </div>
-                  <div className="text-right mt-1 font-mono font-bold text-sm" style={{ color: C.primary }}>+{r.saving} 萬</div>
-                </li>
-              ))}
-            </ul>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left border-b" style={{ borderColor: C.border, color: C.textSub }}>
+                    <th className="py-1.5 text-[9px] font-bold uppercase tracking-widest">動作</th>
+                    <th className="py-1.5 text-[9px] font-bold uppercase tracking-widest text-center">執行難度</th>
+                    <th className="py-1.5 text-[9px] font-bold uppercase tracking-widest text-right">成功率</th>
+                    <th className="py-1.5 text-[9px] font-bold uppercase tracking-widest text-right">可省</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {p.recovery.map((r) => (
+                    <tr key={r.action} className="border-b" style={{ borderColor: C.border }}>
+                      <td className="py-2">
+                        <span style={{ color: C.primary }}>✓</span>{" "}
+                        <span className="font-semibold" style={{ color: C.text }}>{r.action}</span>
+                      </td>
+                      <td className="py-2 text-center font-mono" style={{ color: r.difficulty >= 4 ? "#059669" : r.difficulty >= 3 ? "#d97706" : C.red }}>
+                        {"★".repeat(r.difficulty)}<span style={{ color: C.outline }}>{"☆".repeat(5 - r.difficulty)}</span>
+                      </td>
+                      <td className="py-2 text-right font-mono font-bold" style={{ color: r.successRate >= 85 ? "#059669" : r.successRate >= 70 ? "#d97706" : C.red }}>
+                        {r.successRate}%
+                      </td>
+                      <td className="py-2 text-right font-mono font-bold" style={{ color: C.primary }}>+{r.saving} 萬</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-2 text-[10px]" style={{ color: C.textSub }}>
+              ※ 執行難度：★越多越容易（5 = 立即可做，2 = 需多方協調）
+            </div>
           </div>
         </div>
       </div>
@@ -1080,7 +1163,7 @@ type CostNode = {
 const COST_TREES: Record<ProductLine, CostNode> = {
   橢圓機: {
     name: "橢圓機", pct: 100, children: [
-      { name: "Drive System", pct: 35, children: [
+      { name: "Drive Assy",   pct: 35, children: [
         { name: "Motor",        pct: 45, children: [
           { name: "銅材", pct: 45, metalType: "銅" },
           { name: "鋼材", pct: 30, metalType: "鋼" },
@@ -1102,12 +1185,12 @@ const COST_TREES: Record<ProductLine, CostNode> = {
           { name: "其他",       pct: 10, metalType: "其他" },
         ]},
       ]},
-      { name: "Frame",     pct: 30, children: [
+      { name: "Frame Assy",   pct: 30, children: [
         { name: "鋼材", pct: 85, metalType: "鋼" },
         { name: "塑料", pct: 10, metalType: "塑料" },
         { name: "其他", pct:  5, metalType: "其他" },
       ]},
-      { name: "Console",   pct: 15, children: [
+      { name: "Console Assy", pct: 15, children: [
         { name: "PCB / IC", pct: 60, metalType: "IC" },
         { name: "塑料",      pct: 25, metalType: "塑料" },
         { name: "其他",      pct: 15, metalType: "其他" },
@@ -1130,7 +1213,7 @@ const COST_TREES: Record<ProductLine, CostNode> = {
         { name: "鋼材", pct: 25, metalType: "鋼" },
         { name: "其他", pct:  5, metalType: "其他" },
       ]},
-      { name: "Frame",     pct: 24, children: [
+      { name: "Frame Assy",   pct: 24, children: [
         { name: "鋼材", pct: 85, metalType: "鋼" },
         { name: "塑料", pct: 10, metalType: "塑料" },
         { name: "其他", pct:  5, metalType: "其他" },
@@ -1145,7 +1228,7 @@ const COST_TREES: Record<ProductLine, CostNode> = {
         { name: "鋼材", pct: 25, metalType: "鋼" },
         { name: "其他", pct: 10, metalType: "其他" },
       ]},
-      { name: "Console",   pct:  8, children: [
+      { name: "Console Assy", pct:  8, children: [
         { name: "PCB / IC", pct: 60, metalType: "IC" },
         { name: "塑料",      pct: 40, metalType: "塑料" },
       ]},
@@ -1160,7 +1243,7 @@ const COST_TREES: Record<ProductLine, CostNode> = {
       { name: "鑄鐵塊 20kg", pct: 42, children: [
         { name: "混鐵", pct: 100, metalType: "混鐵" },
       ]},
-      { name: "Frame",      pct: 28, children: [
+      { name: "Frame Assy",   pct: 28, children: [
         { name: "鋼材", pct: 90, metalType: "鋼" },
         { name: "其他", pct: 10, metalType: "其他" },
       ]},
@@ -1193,11 +1276,11 @@ const COST_TREES: Record<ProductLine, CostNode> = {
         { name: "鋼板", pct: 80, metalType: "鋼" },
         { name: "其他", pct: 20, metalType: "其他" },
       ]},
-      { name: "Frame",       pct: 14, children: [
+      { name: "Frame Assy",   pct: 14, children: [
         { name: "鋼材", pct: 85, metalType: "鋼" },
         { name: "其他", pct: 15, metalType: "其他" },
       ]},
-      { name: "Console+LCD", pct: 12, children: [
+      { name: "Console Assy", pct: 12, children: [
         { name: "PCB / IC", pct: 70, metalType: "IC" },
         { name: "塑料",      pct: 30, metalType: "塑料" },
       ]},
@@ -1308,16 +1391,13 @@ function ImpactExplosionTree({ product }: { product: ProductProfile }) {
   const C2 = { primary: "#005245", red: "#ba1a1a", blue: "#005cba", text: "#1a1c1c", textSub: "#574146", border: "#e2e2e2", outline: "#8a7176" };
 
   if (!s) return null;
-  const partImpact = (s.costPct * 2.75).toFixed(2);     // 零件級放大 ~2.75x
-  const systemImpact = (s.costPct * 1.44).toFixed(2);   // 系統級放大 ~1.44x
-
   return (
     <div className="rounded-md border p-3" style={{ borderColor: C2.border, borderLeft: `3px solid ${C2.red}`, background: `${C2.red}05` }}>
       <div className="flex items-baseline justify-between mb-2 flex-wrap gap-1">
         <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C2.red, letterSpacing: "0.08em" }}>
           ▎🌋 Impact Explosion Tree
         </div>
-        <span className="text-[9px]" style={{ color: C2.outline }}>選一個金屬漲價 → 看 cascade</span>
+        <span className="text-[9px]" style={{ color: C2.outline }}>選一個金屬漲價 → 看深層 cascade</span>
       </div>
 
       {/* 情境選擇 */}
@@ -1341,24 +1421,54 @@ function ImpactExplosionTree({ product }: { product: ProductProfile }) {
         })}
       </div>
 
-      {/* Cascade */}
-      <div className="font-mono text-xs space-y-1" style={{ color: C2.text }}>
-        <ImpactRow label={`${s.metal}價`}                 value={`+${s.pct}%`}    tone={metalColor(s.metal)} bold />
-        <ImpactArrow />
-        <ImpactRow label="零件成本（Motor 等）"            value={`+${partImpact}%`}   tone={C2.red} indent={1} />
-        <ImpactArrow indent={1} />
-        <ImpactRow label="系統成本（Drive System 等）"     value={`+${systemImpact}%`} tone={C2.red} indent={1} />
-        <ImpactArrow indent={1} />
-        <ImpactRow label={`${product.name}整機成本`}      value={`+${s.costPct}%`}    tone={C2.red} bold indent={1} />
-        <ImpactArrow indent={1} />
-        <div className="pl-4 text-[11px]" style={{ color: C2.text }}>
-          毛利率 <span className="font-mono">{product.marginBefore}%</span>
-          <span className="mx-1" style={{ color: C2.red }}>↓</span>
-          <span className="font-mono font-bold" style={{ color: C2.red }}>{s.marginAfter}%</span>
+      {/* Deep Cascade: 原料 → 料件 → 零件 → 系統 → 整機 → 毛利 → 損失 */}
+      <div className="font-mono text-xs" style={{ color: C2.text }}>
+        {/* 原料起點 */}
+        <div className="rounded px-2 py-1.5 mb-1" style={{ background: `${metalColor(s.metal)}15`, border: `1px solid ${metalColor(s.metal)}` }}>
+          <div className="flex items-baseline justify-between">
+            <span className="font-bold" style={{ color: metalColor(s.metal) }}>🔧 原料 · {s.metal}價</span>
+            <span className="font-bold font-mono" style={{ color: metalColor(s.metal) }}>+{s.pct}%</span>
+          </div>
         </div>
-        <ImpactArrow indent={1} />
-        <div className="pl-4 text-sm font-bold" style={{ color: C2.red }}>
-          💸 損失 <span className="font-mono">{s.loss} 萬</span>
+
+        {/* 多層 cascade 鏈 */}
+        {s.cascade.map((step, i) => (
+          <React.Fragment key={i}>
+            <div className="text-[10px] pl-2" style={{ color: C2.blue }}>↓</div>
+            <div className="rounded px-2 py-1.5 mb-1" style={{ background: "#ffffff", border: `1px solid ${C2.border}` }}>
+              <div className="flex items-baseline justify-between">
+                <span>
+                  <span className="text-[9px] px-1 py-0.5 rounded mr-1.5" style={{ background: "#f4f3f3", color: C2.textSub }}>
+                    {step.layer}
+                  </span>
+                  <span className="font-semibold" style={{ color: C2.text }}>{step.name}</span>
+                </span>
+                <span className="font-bold font-mono" style={{ color: step.tone ?? C2.red }}>{step.impact}</span>
+              </div>
+            </div>
+          </React.Fragment>
+        ))}
+
+        {/* 毛利衝擊 */}
+        <div className="text-[10px] pl-2" style={{ color: C2.blue }}>↓</div>
+        <div className="rounded px-2 py-1.5 mb-1" style={{ background: "#fef3c7", border: `1px solid #f59e0b` }}>
+          <div className="flex items-baseline justify-between">
+            <span className="font-bold" style={{ color: "#92400e" }}>📉 毛利率</span>
+            <span className="font-mono" style={{ color: "#92400e" }}>
+              {product.marginBefore}%
+              <span className="mx-1 font-bold" style={{ color: C2.red }}>↓</span>
+              <span className="font-bold" style={{ color: C2.red }}>{s.marginAfter}%</span>
+            </span>
+          </div>
+        </div>
+
+        {/* 損失終點 */}
+        <div className="text-[10px] pl-2" style={{ color: C2.blue }}>↓</div>
+        <div className="rounded px-2 py-2" style={{ background: `${C2.red}15`, border: `1.5px solid ${C2.red}` }}>
+          <div className="flex items-baseline justify-between">
+            <span className="text-sm font-bold" style={{ color: C2.red }}>💸 損失</span>
+            <span className="text-base font-extrabold font-mono" style={{ color: C2.red }}>{s.loss} 萬</span>
+          </div>
         </div>
       </div>
     </div>
