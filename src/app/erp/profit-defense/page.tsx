@@ -55,36 +55,53 @@ const SPIKE_CAUSES: Record<string, { yearMonth: string; reason: string; detail: 
 type AffectedPart = {
   code: string;
   name: string;
-  metalPct: number;     // 此件成本中金屬佔比 %
-  stockQty: number;     // 目前庫存件數
-  unitMetalKg: number;  // 每件含金屬重量 kg
-  monthlyQty: number;   // 月平均用量
+  metalPct: number;        // 此件成本中金屬佔比 %
+  stockQty: number;        // 目前庫存件數
+  unitMetalKg: number;     // 每件含金屬重量 kg
+  monthlyQty: number;      // 月平均用量
+  usedInProducts: string[];// 主要用於哪些成品料號
+  usedInModels: string;    // 機種說明
 };
 
 // 各金屬影響的零件（依公司實際 BOM 結構，本檔為 seed demo）
 const AFFECTED_PARTS: Record<string, AffectedPart[]> = {
   CU: [
-    { code: "FB64-MOT",   name: "FB64 主馬達線圈",     metalPct: 65, stockQty: 120, unitMetalKg: 2.5, monthlyQty: 1500 },
-    { code: "FB64-WIRE",  name: "FB64 電線組",         metalPct: 80, stockQty: 380, unitMetalKg: 0.8, monthlyQty: 5000 },
-    { code: "FB42-COIL",  name: "FB42 磁鐵線圈",       metalPct: 45, stockQty: 280, unitMetalKg: 1.2, monthlyQty: 2000 },
-    { code: "FB64-PSU",   name: "FB64 電源變壓器",     metalPct: 35, stockQty:   4, unitMetalKg: 1.8, monthlyQty: 1500 },
+    { code: "FB64-MOT",   name: "FB64 主馬達線圈",     metalPct: 65, stockQty: 120, unitMetalKg: 2.5, monthlyQty: 1500,
+      usedInProducts: ["FB64-Main", "FB64-Lite", "FB64-Pro"], usedInModels: "FB64 健身車全系列（主機型）" },
+    { code: "FB64-WIRE",  name: "FB64 電線組",         metalPct: 80, stockQty: 380, unitMetalKg: 0.8, monthlyQty: 5000,
+      usedInProducts: ["FB64-Main", "FB64-Lite", "FB42-Lite"], usedInModels: "FB64 + FB42 多型號共用" },
+    { code: "FB42-COIL",  name: "FB42 磁鐵線圈",       metalPct: 45, stockQty: 280, unitMetalKg: 1.2, monthlyQty: 2000,
+      usedInProducts: ["FB42-Lite", "FB42-Std"], usedInModels: "FB42 入門系列（磁控阻力）" },
+    { code: "FB64-PSU",   name: "FB64 電源變壓器",     metalPct: 35, stockQty:   4, unitMetalKg: 1.8, monthlyQty: 1500,
+      usedInProducts: ["FB64-Main"], usedInModels: "FB64 主機 only（含 LCD 顯示）" },
   ],
   STEEL: [
-    { code: "FB64-FRM",   name: "FB64 主車架",         metalPct: 90, stockQty: 200, unitMetalKg: 18.0, monthlyQty: 1500 },
-    { code: "FB42-FRM",   name: "FB42 副車架",         metalPct: 85, stockQty: 150, unitMetalKg: 12.0, monthlyQty: 1500 },
-    { code: "FB64-SHF",   name: "FB64 軸件",           metalPct: 95, stockQty: 320, unitMetalKg:  4.5, monthlyQty: 3000 },
-    { code: "FB42-PED-S", name: "FB42 踏板鋼軸",       metalPct: 80, stockQty: 450, unitMetalKg:  2.2, monthlyQty: 4500 },
+    { code: "FB64-FRM",   name: "FB64 主車架",         metalPct: 90, stockQty: 200, unitMetalKg: 18.0, monthlyQty: 1500,
+      usedInProducts: ["FB64-Main", "FB64-Pro"], usedInModels: "FB64 主旗艦車型（HRC 鋼）" },
+    { code: "FB42-FRM",   name: "FB42 副車架",         metalPct: 85, stockQty: 150, unitMetalKg: 12.0, monthlyQty: 1500,
+      usedInProducts: ["FB42-Lite", "FB42-Std"], usedInModels: "FB42 入門系列（低碳鋼）" },
+    { code: "FB64-SHF",   name: "FB64 軸件",           metalPct: 95, stockQty: 320, unitMetalKg:  4.5, monthlyQty: 3000,
+      usedInProducts: ["FB64-Main", "FB64-Lite", "FB42-Std"], usedInModels: "全系列通用（合金鋼軸）" },
+    { code: "FB42-PED-S", name: "FB42 踏板鋼軸",       metalPct: 80, stockQty: 450, unitMetalKg:  2.2, monthlyQty: 4500,
+      usedInProducts: ["FB42-Lite", "FB42-Std", "FB64-Lite"], usedInModels: "FB42 + FB64 入門（踏板組）" },
   ],
   AL: [
-    { code: "FB64-FLY18", name: "18kg 飛輪組",         metalPct: 70, stockQty: 100, unitMetalKg: 14.0, monthlyQty: 1500 },
-    { code: "FB64-RIM",   name: "車架鋁件",            metalPct:100, stockQty: 240, unitMetalKg:  3.5, monthlyQty: 1500 },
-    { code: "FB42-PED-A", name: "踏板鋁支架",          metalPct: 65, stockQty: 380, unitMetalKg:  1.8, monthlyQty: 4500 },
+    { code: "FB64-FLY18", name: "18kg 飛輪組",         metalPct: 70, stockQty: 100, unitMetalKg: 14.0, monthlyQty: 1500,
+      usedInProducts: ["FB64-Main", "FB64-Pro"], usedInModels: "FB64 主旗艦（18kg 飛輪）" },
+    { code: "FB64-RIM",   name: "車架鋁件",            metalPct:100, stockQty: 240, unitMetalKg:  3.5, monthlyQty: 1500,
+      usedInProducts: ["FB64-Main", "FB64-Lite"], usedInModels: "FB64 系列（鋁合金車架）" },
+    { code: "FB42-PED-A", name: "踏板鋁支架",          metalPct: 65, stockQty: 380, unitMetalKg:  1.8, monthlyQty: 4500,
+      usedInProducts: ["FB42-Lite", "FB42-Std", "FB64-Lite"], usedInModels: "FB42 + FB64 入門（踏板支架）" },
   ],
   PLASTIC: [
-    { code: "FB64-COVER", name: "FB64 外殼",           metalPct: 95, stockQty: 220, unitMetalKg:  1.2, monthlyQty: 1500 },
-    { code: "FB64-PANEL", name: "顯示面板塑件",        metalPct:100, stockQty: 180, unitMetalKg:  0.4, monthlyQty: 1500 },
-    { code: "PKG-BOX-L",  name: "包裝紙箱大",          metalPct:100, stockQty: 600, unitMetalKg:  0.8, monthlyQty: 3000 },
-    { code: "FB42-GRIP",  name: "握把橡塑",            metalPct: 80, stockQty: 320, unitMetalKg:  0.3, monthlyQty: 3000 },
+    { code: "FB64-COVER", name: "FB64 外殼",           metalPct: 95, stockQty: 220, unitMetalKg:  1.2, monthlyQty: 1500,
+      usedInProducts: ["FB64-Main", "FB64-Lite", "FB64-Pro"], usedInModels: "FB64 全系列外殼（ABS）" },
+    { code: "FB64-PANEL", name: "顯示面板塑件",        metalPct:100, stockQty: 180, unitMetalKg:  0.4, monthlyQty: 1500,
+      usedInProducts: ["FB64-Main", "FB64-Pro"], usedInModels: "FB64 含 LCD 機型（PC + ABS）" },
+    { code: "PKG-BOX-L",  name: "包裝紙箱大",          metalPct:100, stockQty: 600, unitMetalKg:  0.8, monthlyQty: 3000,
+      usedInProducts: ["FB64-Main", "FB42-Std"], usedInModels: "FB64/FB42 出貨包裝（瓦楞）" },
+    { code: "FB42-GRIP",  name: "握把橡塑",            metalPct: 80, stockQty: 320, unitMetalKg:  0.3, monthlyQty: 3000,
+      usedInProducts: ["FB42-Lite", "FB64-Lite"], usedInModels: "FB42 + FB64 入門握把（TPE）" },
   ],
 };
 
@@ -473,6 +490,9 @@ export default function ProfitDefensePage() {
               const impactPer5Pct = (kg: number) => Math.round((kg / 1000) * lastPrice * 0.05 * USD_TWD);
               const stockImpact   = impactPer5Pct(totalStockKg);
               const monthlyImpact = impactPer5Pct(totalMonthlyKg);
+              // 合理漲幅 = 該金屬近 6 個月漲跌幅 × 此零件金屬佔比%
+              const sixAgoPrice = c.prices[c.prices.length - 7]?.price ?? lastPrice;
+              const metalPctChange = ((lastPrice - sixAgoPrice) / Math.max(1, sixAgoPrice)) * 100;
               return (
                 <div className="rounded-lg border bg-white p-4" style={{ borderColor: C.border, borderLeft: `4px solid ${C.primary}` }}>
                   <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
@@ -502,25 +522,37 @@ export default function ProfitDefensePage() {
 
                   {/* 零件明細表 */}
                   <div className="overflow-x-auto">
-                    <table className="w-full text-xs min-w-[640px]">
+                    <table className="w-full text-xs min-w-[880px]">
                       <thead>
                         <tr className="text-left border-b" style={{ borderColor: C.border, color: C.textSub }}>
-                          <th className="py-2 font-semibold uppercase tracking-widest text-[9px]">零件</th>
+                          <th className="py-2 font-semibold uppercase tracking-widest text-[9px]">零件 / 用於成品</th>
                           <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">金屬佔比</th>
                           <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">庫存件</th>
                           <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">每件含{c.name}</th>
                           <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">月用量</th>
+                          <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">合理漲幅</th>
                           <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">±5% 衝擊</th>
                         </tr>
                       </thead>
                       <tbody>
                         {parts.map((p) => {
                           const impact = impactPer5Pct((p.stockQty + p.monthlyQty) * p.unitMetalKg);
+                          const reasonablePct = (p.metalPct / 100) * metalPctChange;
+                          const reasonableTone = reasonablePct > 3 ? C.red : reasonablePct > 0 ? "#d97706" : C.primary;
                           return (
-                            <tr key={p.code} className="border-b" style={{ borderColor: C.border }}>
-                              <td className="py-2">
+                            <tr key={p.code} className="border-b align-top" style={{ borderColor: C.border }}>
+                              <td className="py-2 pr-2">
                                 <div className="font-semibold" style={{ color: C.text }}>{p.code}</div>
-                                <div className="text-[10px]" style={{ color: C.textSub }}>{p.name}</div>
+                                <div className="text-[10px] mb-1" style={{ color: C.textSub }}>{p.name}</div>
+                                <div className="flex flex-wrap gap-1 mb-0.5">
+                                  {p.usedInProducts.map((pid) => (
+                                    <span key={pid} className="text-[9px] px-1.5 py-0.5 rounded font-mono"
+                                          style={{ background: `${C.blue}15`, color: C.blue, border: `1px solid ${C.blue}30` }}>
+                                      {pid}
+                                    </span>
+                                  ))}
+                                </div>
+                                <div className="text-[9px] leading-tight" style={{ color: C.outline }}>機種：{p.usedInModels}</div>
                               </td>
                               <td className="py-2 text-right">
                                 <span className="font-mono font-semibold" style={{ color: p.metalPct >= 70 ? C.red : p.metalPct >= 40 ? "#d97706" : C.text }}>{p.metalPct}%</span>
@@ -528,6 +560,12 @@ export default function ProfitDefensePage() {
                               <td className="py-2 text-right font-mono">{p.stockQty.toLocaleString()}</td>
                               <td className="py-2 text-right font-mono">{p.unitMetalKg} kg</td>
                               <td className="py-2 text-right font-mono" style={{ color: C.textSub }}>{p.monthlyQty.toLocaleString()}</td>
+                              <td className="py-2 text-right">
+                                <span className="font-mono font-bold" style={{ color: reasonableTone }}>
+                                  {reasonablePct >= 0 ? "+" : ""}{reasonablePct.toFixed(2)}%
+                                </span>
+                                <div className="text-[9px]" style={{ color: C.outline }}>議價上限</div>
+                              </td>
                               <td className="py-2 text-right font-mono font-bold" style={{ color: C.red }}>±${impact.toLocaleString()}</td>
                             </tr>
                           );
@@ -540,15 +578,20 @@ export default function ProfitDefensePage() {
                           <td className="py-2 text-right font-mono font-bold">{parts.reduce((s,p)=>s+p.stockQty,0).toLocaleString()}</td>
                           <td className="py-2 text-right font-mono font-bold">{totalStockKg.toLocaleString()} kg</td>
                           <td className="py-2 text-right font-mono font-bold" style={{ color: C.textSub }}>{parts.reduce((s,p)=>s+p.monthlyQty,0).toLocaleString()}</td>
+                          <td className="py-2 text-right font-mono font-bold" style={{ color: metalPctChange >= 0 ? C.red : C.primary }}>
+                            金屬 {metalPctChange >= 0 ? "+" : ""}{metalPctChange.toFixed(2)}%
+                          </td>
                           <td className="py-2 text-right font-mono font-extrabold" style={{ color: C.red }}>±NT$ {(stockImpact + monthlyImpact).toLocaleString()}</td>
                         </tr>
                       </tfoot>
                     </table>
                   </div>
 
-                  <div className="mt-2 text-[10px]" style={{ color: C.textSub }}>
-                    ※ 衝擊試算 = (庫存 + 月用量) × 每件含{c.name}量 × 當前單價 × 5% × USD/TWD {USD_TWD}。
-                    金屬佔比為此零件 BOM 成本中 {c.name} 占比，數據來源：鼎新 iGP <code className="font-mono">INVMB</code> + <code className="font-mono">BOMMA</code>。
+                  <div className="mt-2 text-[10px] leading-relaxed" style={{ color: C.textSub }}>
+                    <div>※ <b>衝擊試算</b> = (庫存 + 月用量) × 每件含{c.name}量 × 當前單價 × 5% × USD/TWD {USD_TWD}</div>
+                    <div>※ <b>合理漲幅（議價上限）</b> = {c.name}近 6 個月漲跌 ({metalPctChange >= 0 ? "+" : ""}{metalPctChange.toFixed(2)}%) × 此零件金屬佔比%　·　供應商若要求超過此值即不合理</div>
+                    <div>※ <b>用於成品 + 機種</b>：依鼎新 iGP <code className="font-mono">BOMMA / BOMMB</code> 自動 lookup 上層成品</div>
+                    <div>※ 資料來源：鼎新 iGP <code className="font-mono">INVMB</code> + <code className="font-mono">BOMMA</code> + <code className="font-mono">BOMMB</code>　·　LME / INSEE 金屬報價</div>
                   </div>
                 </div>
               );
