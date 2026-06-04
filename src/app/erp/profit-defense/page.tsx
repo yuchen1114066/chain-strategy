@@ -1027,72 +1027,15 @@ function ProductCostIntelligence() {
           </div>
         </div>
 
-        {/* 右側 — selected 產品的 4 個區塊 */}
+        {/* 右側 — selected 產品的 Cost + Impact 雙爆炸圖 + AI Recovery */}
         <div className="space-y-4">
-          {/* 區塊 A — BOM Tree + 成本佔比 */}
-          <div className="rounded-md border p-3" style={{ borderColor: C.border, background: C.surfaceDim }}>
-            <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.textSub, letterSpacing: "0.08em" }}>
-              ▎{p.emoji} {p.name} · BOM 拆解 + 成本佔比
-            </div>
-            <ul className="space-y-1.5">
-              {p.bom.map((b) => (
-                <li key={b.node} className="flex items-center gap-2 text-xs">
-                  <span className="w-32 shrink-0 font-semibold" style={{ color: C.text }}>{b.node}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded font-mono shrink-0"
-                        style={{ background: b.metal === "銅" ? `${C.red}15` : b.metal === "鋼" ? "#fef3c7" : b.metal === "鋁" ? `${C.blue}15` : b.metal === "塑料" ? `${C.primary}15` : b.metal === "混鐵" ? `${C.outline}30` : C.surface,
-                                 color: b.metal === "銅" ? C.red : b.metal === "鋼" ? "#92400e" : b.metal === "鋁" ? C.blue : b.metal === "塑料" ? C.primary : b.metal === "混鐵" ? "#574146" : C.text }}>
-                    {b.metal}
-                  </span>
-                  <span className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "#ffffff" }}>
-                    <span className="block h-full rounded-full"
-                          style={{ width: `${b.pct * 2}%`,
-                                   background: b.metal === "銅" ? C.red : b.metal === "鋼" ? "#d97706" : b.metal === "鋁" ? C.blue : b.metal === "塑料" ? "#059669" : b.metal === "混鐵" ? C.outline : C.text }} />
-                  </span>
-                  <span className="w-10 text-right font-mono font-semibold text-[10px]" style={{ color: C.text }}>{b.pct}%</span>
-                  {b.cost && (
-                    <span className="w-16 text-right font-mono text-[10px]" style={{ color: C.textSub }}>${b.cost.toLocaleString()}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* 兩棵爆炸樹並排 */}
+          <div className="grid lg:grid-cols-2 gap-3">
+            {/* ① Cost Explosion Tree — 互動 drill-down */}
+            <CostExplosionTree key={p.name} root={COST_TREES[p.name]} />
 
-          {/* 區塊 B / C 並排：Cost Driver Tree + Commodity Sensitivity */}
-          <div className="grid md:grid-cols-2 gap-3">
-            {/* B — Cost Driver Tree（因果鏈） */}
-            <div className="rounded-md border p-3" style={{ borderColor: C.border }}>
-              <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.textSub, letterSpacing: "0.08em" }}>
-                ▎Cost Driver Tree · 因果鏈
-              </div>
-              <div className="space-y-0.5 text-xs font-mono">
-                {p.driver.map((step, i) => (
-                  <div key={i} style={{ color: i === 0 ? C.red : i === p.driver.length - 1 ? C.red : C.text }}>
-                    {i > 0 && <span className="block" style={{ color: C.blue }}>↓</span>}
-                    <span className={i === 0 || i === p.driver.length - 1 ? "font-bold" : ""}>{step}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* C — Commodity Sensitivity */}
-            <div className="rounded-md border p-3" style={{ borderColor: C.border }}>
-              <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.textSub, letterSpacing: "0.08em" }}>
-                ▎Commodity Sensitivity · 敏感度
-              </div>
-              <ul className="space-y-2 text-xs">
-                {p.sensitivity.map((s) => (
-                  <li key={s.metal} className="border-b pb-2 last:border-0" style={{ borderColor: C.border }}>
-                    <div className="flex items-baseline justify-between mb-0.5">
-                      <span className="font-bold" style={{ color: C.text }}>{s.metal}價 +{s.pct}%</span>
-                      <span className="font-mono font-bold" style={{ color: C.red }}>{s.loss} 萬</span>
-                    </div>
-                    <div className="text-[10px] font-mono" style={{ color: C.textSub }}>
-                      整機成本 <b style={{ color: C.red }}>+{s.costPct}%</b>　·　毛利 {p.marginBefore}% <span style={{ color: C.red }}>↓</span> <b style={{ color: C.red }}>{s.marginAfter}%</b>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {/* ② Impact Explosion Tree — 多金屬 cascade */}
+            <ImpactExplosionTree product={p} />
           </div>
 
           {/* 區塊 D — AI Recovery Plan */}
@@ -1121,4 +1064,315 @@ function ProductCostIntelligence() {
       </div>
     </div>
   );
+}
+
+// ============================================================
+// Cost Explosion Tree · 成本爆炸圖 + Impact Explosion Tree · 影響爆炸圖
+// AI Supply Chain OS 最有價值的兩張爆炸圖
+// ============================================================
+type CostNode = {
+  name: string;
+  pct: number;
+  metalType?: "銅" | "鋼" | "鋁" | "塑料" | "混鐵" | "IC" | "其他";
+  children?: CostNode[];
+};
+
+const COST_TREES: Record<ProductLine, CostNode> = {
+  橢圓機: {
+    name: "橢圓機", pct: 100, children: [
+      { name: "Drive System", pct: 35, children: [
+        { name: "Motor",        pct: 45, children: [
+          { name: "銅材", pct: 45, metalType: "銅" },
+          { name: "鋼材", pct: 30, metalType: "鋼" },
+          { name: "磁鐵", pct: 15, metalType: "銅" },
+          { name: "其他", pct: 10, metalType: "其他" },
+        ]},
+        { name: "Wire Harness", pct: 25, children: [
+          { name: "銅材", pct: 80, metalType: "銅" },
+          { name: "塑料", pct: 15, metalType: "塑料" },
+          { name: "其他", pct:  5, metalType: "其他" },
+        ]},
+        { name: "Flywheel",     pct: 20, children: [
+          { name: "鋁材", pct: 70, metalType: "鋁" },
+          { name: "鋼材", pct: 25, metalType: "鋼" },
+          { name: "其他", pct:  5, metalType: "其他" },
+        ]},
+        { name: "Belt",         pct: 10, children: [
+          { name: "橡膠/塑料", pct: 90, metalType: "塑料" },
+          { name: "其他",       pct: 10, metalType: "其他" },
+        ]},
+      ]},
+      { name: "Frame",     pct: 30, children: [
+        { name: "鋼材", pct: 85, metalType: "鋼" },
+        { name: "塑料", pct: 10, metalType: "塑料" },
+        { name: "其他", pct:  5, metalType: "其他" },
+      ]},
+      { name: "Console",   pct: 15, children: [
+        { name: "PCB / IC", pct: 60, metalType: "IC" },
+        { name: "塑料",      pct: 25, metalType: "塑料" },
+        { name: "其他",      pct: 15, metalType: "其他" },
+      ]},
+      { name: "Packaging", pct: 10, children: [
+        { name: "瓦楞紙箱", pct: 70, metalType: "其他" },
+        { name: "保麗龍",    pct: 25, metalType: "塑料" },
+        { name: "其他",       pct:  5, metalType: "其他" },
+      ]},
+      { name: "Others",    pct: 10, children: [
+        { name: "螺絲五金", pct: 50, metalType: "鋼" },
+        { name: "其他",       pct: 50, metalType: "其他" },
+      ]},
+    ],
+  },
+  飛輪車: {
+    name: "飛輪車", pct: 100, children: [
+      { name: "Flywheel",  pct: 28, children: [
+        { name: "鋁材", pct: 70, metalType: "鋁" },
+        { name: "鋼材", pct: 25, metalType: "鋼" },
+        { name: "其他", pct:  5, metalType: "其他" },
+      ]},
+      { name: "Frame",     pct: 24, children: [
+        { name: "鋼材", pct: 85, metalType: "鋼" },
+        { name: "塑料", pct: 10, metalType: "塑料" },
+        { name: "其他", pct:  5, metalType: "其他" },
+      ]},
+      { name: "Magnet Coil", pct: 14, children: [
+        { name: "銅材", pct: 45, metalType: "銅" },
+        { name: "磁鐵", pct: 40, metalType: "銅" },
+        { name: "其他", pct: 15, metalType: "其他" },
+      ]},
+      { name: "Pedal",     pct: 10, children: [
+        { name: "鋁材", pct: 65, metalType: "鋁" },
+        { name: "鋼材", pct: 25, metalType: "鋼" },
+        { name: "其他", pct: 10, metalType: "其他" },
+      ]},
+      { name: "Console",   pct:  8, children: [
+        { name: "PCB / IC", pct: 60, metalType: "IC" },
+        { name: "塑料",      pct: 40, metalType: "塑料" },
+      ]},
+      { name: "Others",    pct: 16, children: [
+        { name: "握把/包裝", pct: 50, metalType: "塑料" },
+        { name: "其他",       pct: 50, metalType: "其他" },
+      ]},
+    ],
+  },
+  重訓: {
+    name: "重訓", pct: 100, children: [
+      { name: "鑄鐵塊 20kg", pct: 42, children: [
+        { name: "混鐵", pct: 100, metalType: "混鐵" },
+      ]},
+      { name: "Frame",      pct: 28, children: [
+        { name: "鋼材", pct: 90, metalType: "鋼" },
+        { name: "其他", pct: 10, metalType: "其他" },
+      ]},
+      { name: "鑄鐵塊 10kg", pct: 18, children: [
+        { name: "混鐵", pct: 100, metalType: "混鐵" },
+      ]},
+      { name: "Cable",       pct:  6, children: [
+        { name: "鋼索", pct: 95, metalType: "鋼" },
+        { name: "其他", pct:  5, metalType: "其他" },
+      ]},
+      { name: "Others",      pct:  6, children: [
+        { name: "握把/包裝", pct: 60, metalType: "塑料" },
+        { name: "其他",       pct: 40, metalType: "其他" },
+      ]},
+    ],
+  },
+  跑步機: {
+    name: "跑步機", pct: 100, children: [
+      { name: "Motor",      pct: 32, children: [
+        { name: "銅材", pct: 65, metalType: "銅" },
+        { name: "鋼材", pct: 25, metalType: "鋼" },
+        { name: "其他", pct: 10, metalType: "其他" },
+      ]},
+      { name: "Belt+Roller", pct: 18, children: [
+        { name: "塑料/橡膠", pct: 80, metalType: "塑料" },
+        { name: "鋼軸",      pct: 15, metalType: "鋼" },
+        { name: "其他",       pct:  5, metalType: "其他" },
+      ]},
+      { name: "Deck",        pct: 16, children: [
+        { name: "鋼板", pct: 80, metalType: "鋼" },
+        { name: "其他", pct: 20, metalType: "其他" },
+      ]},
+      { name: "Frame",       pct: 14, children: [
+        { name: "鋼材", pct: 85, metalType: "鋼" },
+        { name: "其他", pct: 15, metalType: "其他" },
+      ]},
+      { name: "Console+LCD", pct: 12, children: [
+        { name: "PCB / IC", pct: 70, metalType: "IC" },
+        { name: "塑料",      pct: 30, metalType: "塑料" },
+      ]},
+      { name: "Others",      pct:  8, children: [
+        { name: "包裝", pct: 60, metalType: "其他" },
+        { name: "其他", pct: 40, metalType: "其他" },
+      ]},
+    ],
+  },
+};
+
+function metalColor(m?: string): string {
+  switch (m) {
+    case "銅":   return "#ba1a1a";
+    case "鋼":   return "#d97706";
+    case "鋁":   return "#005cba";
+    case "塑料": return "#059669";
+    case "混鐵": return "#574146";
+    case "IC":   return "#005cba";
+    default:     return "#8a7176";
+  }
+}
+
+// ─────────────── Cost Explosion Tree ───────────────
+function CostExplosionTree({ root }: { root: CostNode }) {
+  const [path, setPath] = React.useState<string[]>([]);
+  // 根據 path 找到 current node
+  let current: CostNode = root;
+  const breadcrumb: CostNode[] = [root];
+  for (const seg of path) {
+    const next = current.children?.find((c) => c.name === seg);
+    if (!next) break;
+    current = next;
+    breadcrumb.push(next);
+  }
+  const C2 = { primary: "#005245", red: "#ba1a1a", blue: "#005cba", text: "#1a1c1c", textSub: "#574146", border: "#e2e2e2", surfaceDim: "#f4f3f3", outline: "#8a7176" };
+  return (
+    <div className="rounded-md border p-3" style={{ borderColor: C2.border, background: C2.surfaceDim }}>
+      <div className="flex items-baseline justify-between mb-2 flex-wrap gap-1">
+        <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C2.textSub, letterSpacing: "0.08em" }}>
+          ▎💥 Cost Explosion Tree
+        </div>
+        <span className="text-[9px]" style={{ color: C2.outline }}>點任一節點 → 爆炸下一層</span>
+      </div>
+
+      {/* Breadcrumb */}
+      <div className="flex flex-wrap items-baseline gap-1 mb-2 text-[10px]">
+        {breadcrumb.map((n, i) => (
+          <span key={i} className="flex items-baseline">
+            {i > 0 && <span className="mx-1" style={{ color: C2.outline }}>›</span>}
+            <button
+              onClick={() => setPath(path.slice(0, i))}
+              className="font-mono font-semibold hover:underline"
+              style={{ color: i === breadcrumb.length - 1 ? C2.primary : C2.blue }}
+            >
+              {n.name}
+            </button>
+          </span>
+        ))}
+      </div>
+
+      {/* Current node + children */}
+      <div className="font-mono text-xs" style={{ color: C2.text }}>
+        <div className="font-bold mb-1">
+          <span style={{ color: C2.red }}>●</span> {current.name} <span style={{ color: C2.textSub }}>100%</span>
+        </div>
+        <div className="pl-2 space-y-0.5">
+          {(current.children ?? []).map((c, i, arr) => {
+            const isLast = i === arr.length - 1;
+            const drillable = !!c.children && c.children.length > 0;
+            return (
+              <div key={c.name} className="flex items-baseline">
+                <span className="w-4 shrink-0" style={{ color: C2.outline }}>{isLast ? "└" : "├"}</span>
+                {drillable ? (
+                  <button
+                    onClick={() => setPath([...path, c.name])}
+                    className="text-left hover:underline flex items-baseline gap-1.5"
+                    style={{ color: C2.blue }}
+                  >
+                    <span className="font-semibold">{c.name}</span>
+                    <span className="font-mono" style={{ color: C2.red }}>{c.pct}%</span>
+                    <span className="text-[9px]" style={{ color: C2.outline }}>▸</span>
+                  </button>
+                ) : (
+                  <span className="flex items-baseline gap-1.5">
+                    {c.metalType && (
+                      <span className="text-[9px] px-1 rounded font-mono" style={{ background: `${metalColor(c.metalType)}15`, color: metalColor(c.metalType) }}>{c.metalType}</span>
+                    )}
+                    <span style={{ color: C2.text }}>{c.name}</span>
+                    <span className="font-mono" style={{ color: C2.red }}>{c.pct}%</span>
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────── Impact Explosion Tree ───────────────
+function ImpactExplosionTree({ product }: { product: ProductProfile }) {
+  const [scenario, setScenario] = React.useState<{ metal: string; pct: number }>(
+    product.sensitivity[0] ? { metal: product.sensitivity[0].metal, pct: product.sensitivity[0].pct } : { metal: "銅", pct: 5 }
+  );
+  const s = product.sensitivity.find((x) => x.metal === scenario.metal && x.pct === scenario.pct);
+  const C2 = { primary: "#005245", red: "#ba1a1a", blue: "#005cba", text: "#1a1c1c", textSub: "#574146", border: "#e2e2e2", outline: "#8a7176" };
+
+  if (!s) return null;
+  const partImpact = (s.costPct * 2.75).toFixed(2);     // 零件級放大 ~2.75x
+  const systemImpact = (s.costPct * 1.44).toFixed(2);   // 系統級放大 ~1.44x
+
+  return (
+    <div className="rounded-md border p-3" style={{ borderColor: C2.border, borderLeft: `3px solid ${C2.red}`, background: `${C2.red}05` }}>
+      <div className="flex items-baseline justify-between mb-2 flex-wrap gap-1">
+        <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C2.red, letterSpacing: "0.08em" }}>
+          ▎🌋 Impact Explosion Tree
+        </div>
+        <span className="text-[9px]" style={{ color: C2.outline }}>選一個金屬漲價 → 看 cascade</span>
+      </div>
+
+      {/* 情境選擇 */}
+      <div className="flex flex-wrap gap-1 mb-3">
+        {product.sensitivity.map((x) => {
+          const active = x.metal === scenario.metal;
+          return (
+            <button
+              key={x.metal + x.pct}
+              onClick={() => setScenario({ metal: x.metal, pct: x.pct })}
+              className="text-[10px] px-2 py-1 rounded font-mono font-semibold"
+              style={{
+                background: active ? metalColor(x.metal) : "#ffffff",
+                color: active ? "#ffffff" : C2.text,
+                border: `1px solid ${active ? metalColor(x.metal) : C2.border}`,
+              }}
+            >
+              {x.metal} +{x.pct}%
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Cascade */}
+      <div className="font-mono text-xs space-y-1" style={{ color: C2.text }}>
+        <ImpactRow label={`${s.metal}價`}                 value={`+${s.pct}%`}    tone={metalColor(s.metal)} bold />
+        <ImpactArrow />
+        <ImpactRow label="零件成本（Motor 等）"            value={`+${partImpact}%`}   tone={C2.red} indent={1} />
+        <ImpactArrow indent={1} />
+        <ImpactRow label="系統成本（Drive System 等）"     value={`+${systemImpact}%`} tone={C2.red} indent={1} />
+        <ImpactArrow indent={1} />
+        <ImpactRow label={`${product.name}整機成本`}      value={`+${s.costPct}%`}    tone={C2.red} bold indent={1} />
+        <ImpactArrow indent={1} />
+        <div className="pl-4 text-[11px]" style={{ color: C2.text }}>
+          毛利率 <span className="font-mono">{product.marginBefore}%</span>
+          <span className="mx-1" style={{ color: C2.red }}>↓</span>
+          <span className="font-mono font-bold" style={{ color: C2.red }}>{s.marginAfter}%</span>
+        </div>
+        <ImpactArrow indent={1} />
+        <div className="pl-4 text-sm font-bold" style={{ color: C2.red }}>
+          💸 損失 <span className="font-mono">{s.loss} 萬</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ImpactRow({ label, value, tone, bold, indent = 0 }: { label: string; value: string; tone: string; bold?: boolean; indent?: number }) {
+  return (
+    <div className="flex items-baseline justify-between" style={{ paddingLeft: indent * 12 }}>
+      <span className={bold ? "font-bold" : ""} style={{ color: "#1a1c1c" }}>{label}</span>
+      <span className="font-mono font-bold" style={{ color: tone }}>{value}</span>
+    </div>
+  );
+}
+function ImpactArrow({ indent = 0 }: { indent?: number }) {
+  return <div className="text-[10px]" style={{ paddingLeft: indent * 12 + 4, color: "#005cba" }}>↓</div>;
 }
