@@ -41,7 +41,7 @@ const RANGES: { key: string; months: number }[] = [
 const DATA_SOURCE: Record<string, { label: string; url?: string }> = {
   CU:      { label: "LME 倫敦金屬交易所 (Copper Grade A spot) · INSEE 法國國家統計局",     url: "https://www.insee.fr/en/statistiques/serie/010002052" },
   AL:      { label: "LME 倫敦金屬交易所 (Aluminum spot) · INSEE 法國國家統計局",            url: "https://www.insee.fr/en/statistiques/serie/010002052" },
-  STEEL:   { label: "中鋼牌價 CSC (HRC 熱軋鋼捲) · MoneyDJ 鋼鐵類股",                       url: "https://concords.moneydj.com/z/ze/zeq/zeqa_D0200110.djhtm" },
+  STEEL:   { label: "中鋼牌價 CSC（CR 冷軋鋼捲）· MoneyDJ 鋼鐵類股",                       url: "https://concords.moneydj.com/z/ze/zeq/zeqa_D0200110.djhtm" },
   PLASTIC:  { label: "Brent 原油現貨 · Platts 塑料報價 · ICIS 亞洲樹脂 (油價聯動)" },
   PIG_IRON: { label: "中鋼牌價 · 台灣鋼鐵公會 · Hoa Phat 越南鋼鐵（台/越混鐵均價）",
               url: "https://concords.moneydj.com/z/ze/zeq/zeqa_D0200110.djhtm" },
@@ -50,7 +50,7 @@ const DATA_SOURCE: Record<string, { label: string; url?: string }> = {
 // 突兀峰值說明（對應 commodities.ts 的 spikeIdx + 真實事件）
 const SPIKE_CAUSES: Record<string, { yearMonth: string; reason: string; detail: string }> = {
   CU:      { yearMonth: "2024-01", reason: "中國基建 + EV 需求回升", detail: "LME 庫存連 30 日下降 8%，銅價突破歷史 $15,800/MT 高點" },
-  STEEL:   { yearMonth: "2021-05", reason: "全球疫後復甦 + 中國產能管控", detail: "碳達峰政策 + 供應鏈瓶頸，HRC 飆破 $1,800/MT" },
+  STEEL:   { yearMonth: "2021-05", reason: "全球疫後復甦 + 中國產能管控", detail: "碳達峰政策 + 供應鏈瓶頸，CR 冷軋鋼捲飆破 $1,800/MT" },
   AL:      { yearMonth: "2023-10", reason: "歐洲能源危機 + 中國雲南限電",   detail: "歐洲冶煉廠減產 25%，鋁價短期衝高 $4,696/MT" },
   PLASTIC:  { yearMonth: "2023-07", reason: "OPEC+ 減產 + 亞洲塑料 turnaround", detail: "Brent 原油飆至 $90+/桶，塑料聯動上漲至 $2,230/MT" },
   PIG_IRON: { yearMonth: "2021-05", reason: "鐵礦石飆漲 + 中國產能管控",         detail: "巴西淡水河谷礦災 + 中國碳達峰減產，混鐵衝高 NT$36,000/MT" },
@@ -81,7 +81,7 @@ const AFFECTED_PARTS: Record<string, AffectedPart[]> = {
   ],
   STEEL: [
     { code: "FB64-FRM",   name: "FB64 主車架",         metalPct: 90, stockQty: 200, unitMetalKg: 18.0, monthlyQty: 1500,
-      usedInProducts: ["FB64-Main", "FB64-Pro"], usedInModels: "FB64 主旗艦車型（HRC 鋼）" },
+      usedInProducts: ["FB64-Main", "FB64-Pro"], usedInModels: "FB64 主旗艦車型（CR 冷軋鋼）" },
     { code: "FB42-FRM",   name: "FB42 副車架",         metalPct: 85, stockQty: 150, unitMetalKg: 12.0, monthlyQty: 1500,
       usedInProducts: ["FB42-Lite", "FB42-Std"], usedInModels: "FB42 入門系列（低碳鋼）" },
     { code: "FB64-SHF",   name: "FB64 軸件",           metalPct: 95, stockQty: 320, unitMetalKg:  4.5, monthlyQty: 3000,
@@ -536,28 +536,63 @@ export default function ProfitDefensePage() {
                   </ul>
                 </div>
 
-                {/* 區塊 2 — 成本構成 */}
+                {/* 區塊 2 — 成本構成（圓餅圖） */}
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.textSub, letterSpacing: "0.08em" }}>
                     ▎成本構成
                   </div>
-                  <div className="space-y-1.5">
-                    {[
+                  {(() => {
+                    const slices = [
                       { name: "銅材", pct: 42, tone: C.red },
                       { name: "鋼材", pct: 18, tone: "#d97706" },
                       { name: "IC",   pct: 12, tone: C.blue },
                       { name: "塑膠", pct:  8, tone: "#059669" },
                       { name: "其他", pct: 20, tone: C.outline },
-                    ].map((r) => (
-                      <div key={r.name} className="flex items-center gap-2 text-[11px]">
-                        <span className="w-10 shrink-0" style={{ color: C.text }}>{r.name}</span>
-                        <span className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: C.surfaceDim }}>
-                          <span className="block h-full rounded-full" style={{ width: `${r.pct}%`, background: r.tone }} />
-                        </span>
-                        <span className="w-10 text-right font-mono font-semibold" style={{ color: r.tone }}>{r.pct}%</span>
+                    ];
+                    const total = slices.reduce((s, x) => s + x.pct, 0);
+                    const cx = 70, cy = 70, R = 60, ir = 32;
+                    let angle = -Math.PI / 2; // 從 12 點鐘方向開始
+                    const arcs = slices.map((s) => {
+                      const sweep = (s.pct / total) * Math.PI * 2;
+                      const a0 = angle;
+                      const a1 = angle + sweep;
+                      angle = a1;
+                      const largeArc = sweep > Math.PI ? 1 : 0;
+                      const x0 = cx + R * Math.cos(a0), y0 = cy + R * Math.sin(a0);
+                      const x1 = cx + R * Math.cos(a1), y1 = cy + R * Math.sin(a1);
+                      const xi1 = cx + ir * Math.cos(a1), yi1 = cy + ir * Math.sin(a1);
+                      const xi0 = cx + ir * Math.cos(a0), yi0 = cy + ir * Math.sin(a0);
+                      const d = `M ${x0} ${y0} A ${R} ${R} 0 ${largeArc} 1 ${x1} ${y1} L ${xi1} ${yi1} A ${ir} ${ir} 0 ${largeArc} 0 ${xi0} ${yi0} Z`;
+                      // label 位置（圓弧中點外推）
+                      const mid = (a0 + a1) / 2;
+                      const lx = cx + (R + 10) * Math.cos(mid);
+                      const ly = cy + (R + 10) * Math.sin(mid);
+                      return { ...s, d, lx, ly };
+                    });
+                    return (
+                      <div className="flex items-center gap-3">
+                        <svg viewBox="0 0 140 140" width="140" height="140" className="shrink-0">
+                          {arcs.map((a) => (
+                            <g key={a.name}>
+                              <path d={a.d} fill={a.tone} stroke="#fff" strokeWidth="1.5" />
+                            </g>
+                          ))}
+                          {/* 中央文字 */}
+                          <text x={cx} y={cy - 2} textAnchor="middle" fontSize="10" fill={C.textSub}>合計</text>
+                          <text x={cx} y={cy + 12} textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>100%</text>
+                        </svg>
+                        <ul className="flex-1 space-y-1 text-[11px]">
+                          {slices.map((s) => (
+                            <li key={s.name} className="flex items-baseline gap-2">
+                              <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: s.tone }} />
+                              <span className="flex-1" style={{ color: C.text }}>{s.name}</span>
+                              <span className="font-mono font-semibold" style={{ color: s.tone }}>{s.pct}%</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()}
                 </div>
 
                 {/* 區塊 3 — 成本敏感度 */}

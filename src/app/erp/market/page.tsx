@@ -7,13 +7,13 @@ export const metadata = { title: "L5 Market Intelligence · 全球市場情報�
 
 export default function L5MarketPage() {
   return (
-    <div style={{ background: SC.pageBg, minHeight: "100vh", fontFamily: FONT, color: SC.text }}>
-      <div className="max-w-[1440px] mx-auto px-6 lg:px-10 py-8 space-y-6">
+    <div style={{ background: SC.pageBg, minHeight: "100vh", fontFamily: FONT, color: SC.text, fontSize: "16px" }}>
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-10 py-8 space-y-7 text-[15px] leading-relaxed">
 
         <header>
-          <div className="text-[11px] font-bold uppercase tracking-widest" style={{ color: SC.blue, letterSpacing: "0.12em" }}>L5 Market Intelligence</div>
-          <h1 className="text-3xl sm:text-4xl font-semibold mt-1">全球市場情報中心</h1>
-          <p className="text-sm mt-1" style={{ color: SC.textSub }}>10 區塊 · 全方位市場 + AI Copilot + Why 解釋</p>
+          <div className="text-[13px] font-bold uppercase tracking-widest" style={{ color: SC.blue, letterSpacing: "0.12em" }}>L5 Market Intelligence</div>
+          <h1 className="text-4xl sm:text-5xl font-semibold mt-1">全球市場情報中心</h1>
+          <p className="text-base mt-1" style={{ color: SC.textSub }}>10 區塊 · 全方位市場 + AI Copilot + Why 解釋</p>
         </header>
 
         {/* 區塊 1 — Commodity Dashboard */}
@@ -50,7 +50,7 @@ export default function L5MarketPage() {
             <ul className="space-y-2 mt-2">
               {[
                 { rank: 1, item: "銅",      impact: "-280 萬", note: "Cu LME +5.6%" },
-                { rank: 2, item: "鋼",      impact: "-120 萬", note: "HRC ↑ 3.2%" },
+                { rank: 2, item: "鋼",      impact: "-120 萬", note: "CR ↑ 3.2%" },
                 { rank: 3, item: "運費 USD", impact: "-80 萬",  note: "海運回穩中" },
               ].map((r) => (
                 <li key={r.rank} className="flex items-baseline justify-between border-b pb-2 last:border-0" style={{ borderColor: SC.border }}>
@@ -470,8 +470,8 @@ export default function L5MarketPage() {
 function Header({ n, title }: { n: string; title: string }) {
   return (
     <div className="flex items-baseline gap-2">
-      <span className="text-[10px] font-bold px-2 py-0.5 rounded text-white" style={{ background: SC.text }}>區塊 {n}</span>
-      <h2 className="text-base font-semibold">{title}</h2>
+      <span className="text-[12px] font-bold px-2 py-0.5 rounded text-white" style={{ background: SC.text }}>區塊 {n}</span>
+      <h2 className="text-lg font-semibold">{title}</h2>
     </div>
   );
 }

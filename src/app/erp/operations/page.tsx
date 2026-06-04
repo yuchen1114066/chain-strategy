@@ -33,9 +33,13 @@ export default function L2OperationsPage() {
           <p className="text-sm mt-1" style={{ color: SC.textSub }}>留卡片 · 工單健康 + 端到端追蹤 + AI 卡點分析</p>
         </header>
 
-        {/* Order Health */}
+        {/* ① CURRENT — Order Health */}
         <Card accent={SC.primary}>
-          <h2 className="text-base font-semibold mb-3">Order Health · 工單健康</h2>
+          <div className="flex items-baseline gap-2 mb-2 flex-wrap">
+            <span className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded text-white" style={{ background: SC.blue, letterSpacing: "0.12em" }}>① CURRENT</span>
+            <h2 className="text-base font-semibold">Order Health · 工單健康</h2>
+            <span className="text-[11px]" style={{ color: SC.textSub }}>現在發生什麼</span>
+          </div>
           <div className="grid grid-cols-3 gap-4">
             <Stat label="正常" value={normal}    tone={SC.emerald} />
             <Stat label="異常" value={abnormal}  tone={SC.amber} />
@@ -43,10 +47,14 @@ export default function L2OperationsPage() {
           </div>
         </Card>
 
-        {/* End-To-End Tracker */}
+        {/* ② WHY — End-To-End Tracker */}
         <Card accent={SC.blue}>
-          <div className="flex items-baseline justify-between mb-3">
-            <h2 className="text-base font-semibold">End-To-End Tracker · 端到端</h2>
+          <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded text-white" style={{ background: "#d97706", letterSpacing: "0.12em" }}>② WHY</span>
+              <h2 className="text-base font-semibold">End-To-End Tracker · 端到端</h2>
+              <span className="text-[11px]" style={{ color: SC.textSub }}>為什麼卡關（看哪段卡住）</span>
+            </div>
             <span className="text-[10px]" style={{ color: SC.textSub }}>各階段在製數</span>
           </div>
           <div className="grid grid-cols-3 md:grid-cols-6 gap-2">

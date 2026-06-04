@@ -59,8 +59,8 @@ export const commodities: Commodity[] = [
     forecast: { low: 3000, high: 4200 },
   },
   {
-    code: "STEEL", name: "鋼", nameEn: "熱軋鋼 HRC", unit: "USD/MT",
-    source: "中鋼牌價 / Fastmarkets 國際熱軋",
+    code: "STEEL", name: "鋼", nameEn: "冷軋鋼 CR", unit: "USD/MT",
+    source: "中鋼牌價（CR 冷軋鋼捲）/ MoneyDJ 鋼鐵類股",
     category: ["鋼架", "框架", "軸件", "鐵心"],
     prices: series(1154, 190, 4, 1842),
     forecast: { low: 900, high: 1200 },
@@ -97,7 +97,7 @@ export const commodities: Commodity[] = [
 
 // ============================================================
 // 真實年度統計（依公司 Excel 計算，UCL/LCL = 年平均 ± 1.5σ）
-// 來源：銅/鋁 LME，鋼 中鋼 HRC 國際熱軋
+// 來源：銅/鋁 LME，鋼 中鋼 CR 冷軋鋼捲
 // ============================================================
 export type YearStats = {
   year: number;
