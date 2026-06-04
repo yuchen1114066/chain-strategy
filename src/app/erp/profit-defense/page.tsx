@@ -22,10 +22,11 @@ const C = {
 };
 
 const TABS: { code: Commodity["code"]; label: string; nameEn: string }[] = [
-  { code: "CU",      label: "銅",   nameEn: "Copper" },
-  { code: "STEEL",   label: "鋼",   nameEn: "Steel" },
-  { code: "AL",      label: "鋁",   nameEn: "Aluminum" },
-  { code: "PLASTIC", label: "塑料", nameEn: "Plastic" },
+  { code: "CU",       label: "銅",   nameEn: "Copper" },
+  { code: "STEEL",    label: "鋼",   nameEn: "Steel" },
+  { code: "AL",       label: "鋁",   nameEn: "Aluminum" },
+  { code: "PLASTIC",  label: "塑料", nameEn: "Plastic" },
+  { code: "PIG_IRON", label: "混鐵", nameEn: "Pig Iron" },
 ];
 
 const RANGES: { key: string; months: number }[] = [
@@ -41,7 +42,9 @@ const DATA_SOURCE: Record<string, { label: string; url?: string }> = {
   CU:      { label: "LME 倫敦金屬交易所 (Copper Grade A spot) · INSEE 法國國家統計局",     url: "https://www.insee.fr/en/statistiques/serie/010002052" },
   AL:      { label: "LME 倫敦金屬交易所 (Aluminum spot) · INSEE 法國國家統計局",            url: "https://www.insee.fr/en/statistiques/serie/010002052" },
   STEEL:   { label: "中鋼牌價 CSC (HRC 熱軋鋼捲) · MoneyDJ 鋼鐵類股",                       url: "https://concords.moneydj.com/z/ze/zeq/zeqa_D0200110.djhtm" },
-  PLASTIC: { label: "Brent 原油現貨 · Platts 塑料報價 · ICIS 亞洲樹脂 (油價聯動)" },
+  PLASTIC:  { label: "Brent 原油現貨 · Platts 塑料報價 · ICIS 亞洲樹脂 (油價聯動)" },
+  PIG_IRON: { label: "中鋼牌價 · 台灣鋼鐵公會 · Hoa Phat 越南鋼鐵（台/越混鐵均價）",
+              url: "https://concords.moneydj.com/z/ze/zeq/zeqa_D0200110.djhtm" },
 };
 
 // 突兀峰值說明（對應 commodities.ts 的 spikeIdx + 真實事件）
@@ -49,7 +52,8 @@ const SPIKE_CAUSES: Record<string, { yearMonth: string; reason: string; detail: 
   CU:      { yearMonth: "2024-01", reason: "中國基建 + EV 需求回升", detail: "LME 庫存連 30 日下降 8%，銅價突破歷史 $15,800/MT 高點" },
   STEEL:   { yearMonth: "2021-05", reason: "全球疫後復甦 + 中國產能管控", detail: "碳達峰政策 + 供應鏈瓶頸，HRC 飆破 $1,800/MT" },
   AL:      { yearMonth: "2023-10", reason: "歐洲能源危機 + 中國雲南限電",   detail: "歐洲冶煉廠減產 25%，鋁價短期衝高 $4,696/MT" },
-  PLASTIC: { yearMonth: "2023-07", reason: "OPEC+ 減產 + 亞洲塑料 turnaround", detail: "Brent 原油飆至 $90+/桶，塑料聯動上漲至 $2,230/MT" },
+  PLASTIC:  { yearMonth: "2023-07", reason: "OPEC+ 減產 + 亞洲塑料 turnaround", detail: "Brent 原油飆至 $90+/桶，塑料聯動上漲至 $2,230/MT" },
+  PIG_IRON: { yearMonth: "2021-05", reason: "鐵礦石飆漲 + 中國產能管控",         detail: "巴西淡水河谷礦災 + 中國碳達峰減產，混鐵衝高 NT$36,000/MT" },
 };
 
 type AffectedPart = {
@@ -102,6 +106,16 @@ const AFFECTED_PARTS: Record<string, AffectedPart[]> = {
       usedInProducts: ["FB64-Main", "FB42-Std"], usedInModels: "FB64/FB42 出貨包裝（瓦楞）" },
     { code: "FB42-GRIP",  name: "握把橡塑",            metalPct: 80, stockQty: 320, unitMetalKg:  0.3, monthlyQty: 3000,
       usedInProducts: ["FB42-Lite", "FB64-Lite"], usedInModels: "FB42 + FB64 入門握把（TPE）" },
+  ],
+  PIG_IRON: [
+    { code: "TR-WEIGHT-20", name: "重訓鑄鐵塊 20kg",   metalPct:100, stockQty: 180, unitMetalKg: 20.0, monthlyQty: 800,
+      usedInProducts: ["TR-Pro", "TR-Std"], usedInModels: "重訓器材槓鈴片（20kg）" },
+    { code: "TR-WEIGHT-10", name: "重訓鑄鐵塊 10kg",   metalPct:100, stockQty: 240, unitMetalKg: 10.0, monthlyQty: 1200,
+      usedInProducts: ["TR-Pro", "TR-Std", "TR-Home"], usedInModels: "重訓器材槓鈴片（10kg）" },
+    { code: "FB-BASE",      name: "健身車鑄鐵底座",     metalPct: 85, stockQty: 320, unitMetalKg:  8.5, monthlyQty: 1500,
+      usedInProducts: ["FB64-Main", "FB42-Std"], usedInModels: "健身車底座配重（穩定 + 防傾倒）" },
+    { code: "TM-MOTOR-CASE",name: "跑步機馬達外殼",     metalPct: 75, stockQty:  85, unitMetalKg:  4.2, monthlyQty: 600,
+      usedInProducts: ["TM-Pro", "TM-Std"], usedInModels: "跑步機主馬達鑄鐵外殼" },
   ],
 };
 
@@ -406,6 +420,44 @@ export default function ProfitDefensePage() {
                 </div>
               </div>
             </div>
+
+            {/* 4 商品 KPI 卡（移到折線圖下方 — 一眼比較切換用） */}
+            <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+              {TABS.map((t) => {
+                const cm = commodities.find((x) => x.code === t.code)!;
+                const last = cm.prices[cm.prices.length - 1]?.price ?? 0;
+                const prev = cm.prices[cm.prices.length - 5]?.price ?? last;
+                const pct  = ((last - prev) / Math.max(1, prev)) * 100;
+                const z    = priceZone(cm);
+                const bar  = z.tone === "rose" ? C.red : z.tone === "emerald" ? C.primary : z.tone === "amber" ? "#d97706" : C.blue;
+                const active = t.code === tab;
+                return (
+                  <button
+                    key={t.code}
+                    onClick={() => setTab(t.code)}
+                    className="text-left bg-white rounded-lg border p-4 hover:shadow-md transition-shadow"
+                    style={{ borderColor: active ? C.primary : C.border, borderLeft: `4px solid ${bar}` }}
+                  >
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C.textSub }}>{t.label} · {t.nameEn}</span>
+                      <span className="text-[10px] font-bold" style={{ color: pct >= 0 ? C.red : "#059669" }}>
+                        {pct >= 0 ? "↑" : "↓"} {Math.abs(pct).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-baseline gap-1">
+                      <span className="text-2xl font-extrabold tabular-nums" style={{ color: C.text }}>
+                        ${last >= 1000 ? `${(last / 1000).toFixed(2)}k` : last.toFixed(0)}
+                      </span>
+                      <span className="text-[10px]" style={{ color: C.textSub }}>/{cm.unit.split("/")[1] ?? "MT"}</span>
+                    </div>
+                    <div className="text-[10px] mt-0.5" style={{ color: C.textSub }}>vs 上週 {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%</div>
+                    <div className="mt-2 pt-2 border-t text-[10px] line-clamp-2" style={{ borderColor: C.border, color: C.textSub }}>
+                      {procurementAdvice(cm).recommendation}
+                    </div>
+                  </button>
+                );
+              })}
+            </section>
 
             {/* 2021 基期 + 2026/Q1 漲跌幅 */}
             <div className="rounded-lg border bg-white p-5" style={{ borderColor: C.border }}>
@@ -777,44 +829,6 @@ export default function ProfitDefensePage() {
 
           </aside>
         </div>
-
-        {/* ── 底部 4 KPI 卡 ───────────────────────────── */}
-        <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
-          {TABS.map((t) => {
-            const cm = commodities.find((x) => x.code === t.code)!;
-            const last = cm.prices[cm.prices.length - 1]?.price ?? 0;
-            const prev = cm.prices[cm.prices.length - 5]?.price ?? last;
-            const pct  = ((last - prev) / Math.max(1, prev)) * 100;
-            const z    = priceZone(cm);
-            const bar  = z.tone === "rose" ? C.red : z.tone === "emerald" ? C.primary : z.tone === "amber" ? "#d97706" : C.blue;
-            const active = t.code === tab;
-            return (
-              <button
-                key={t.code}
-                onClick={() => setTab(t.code)}
-                className="text-left bg-white rounded-lg border p-4 hover:shadow-md transition-shadow"
-                style={{ borderColor: active ? C.primary : C.border, borderLeft: `4px solid ${bar}` }}
-              >
-                <div className="flex items-baseline justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C.textSub }}>{t.label} · {t.nameEn}</span>
-                  <span className="text-[10px] font-bold" style={{ color: pct >= 0 ? C.red : "#059669" }}>
-                    {pct >= 0 ? "↑" : "↓"} {Math.abs(pct).toFixed(1)}%
-                  </span>
-                </div>
-                <div className="mt-1 flex items-baseline gap-1">
-                  <span className="text-2xl font-extrabold tabular-nums" style={{ color: C.text }}>
-                    ${last >= 1000 ? `${(last / 1000).toFixed(2)}k` : last.toFixed(0)}
-                  </span>
-                  <span className="text-[10px]" style={{ color: C.textSub }}>/{cm.unit.split("/")[1] ?? "MT"}</span>
-                </div>
-                <div className="text-[10px] mt-0.5" style={{ color: C.textSub }}>vs 上週 {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%</div>
-                <div className="mt-2 pt-2 border-t text-[10px] line-clamp-2" style={{ borderColor: C.border, color: C.textSub }}>
-                  {procurementAdvice(cm).recommendation}
-                </div>
-              </button>
-            );
-          })}
-        </section>
 
         {/* footer */}
         <footer className="flex items-center justify-between flex-wrap gap-2 text-[10px] pt-3 border-t" style={{ borderColor: C.border, color: C.textSub }}>

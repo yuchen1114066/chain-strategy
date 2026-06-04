@@ -86,6 +86,13 @@ export const commodities: Commodity[] = [
     prices: series(18, 4, 30, 38),       // 2023-07 短缺峰值 38 週
     forecast: { low: 12, high: 24 },
   },
+  {
+    code: "PIG_IRON", name: "混鐵", nameEn: "Pig Iron", unit: "NTD/MT",
+    source: "中鋼 + 台灣鋼鐵公會 + Hoa Phat 越南鋼鐵",
+    category: ["鑄件", "重訓鑄鐵塊", "底座配重", "馬達外殼"],
+    prices: series(28000, 4000, 4, 36000),   // 2021-05 鐵礦石飆漲尖峰
+    forecast: { low: 26000, high: 33000 },
+  },
 ];
 
 // ============================================================
