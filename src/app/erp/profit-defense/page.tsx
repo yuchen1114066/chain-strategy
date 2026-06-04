@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { commodities, priceZone, procurementAdvice, type Commodity,
   COMMODITY_YEAR_STATS, COMMODITY_PERIOD_STATS, BASELINE_2021, BASELINE_BY_CODE } from "@/lib/erp/commodities";
@@ -501,183 +501,8 @@ export default function ProfitDefensePage() {
               </div>
             </div>
 
-            {/* 成本敏感度分析 Cost Sensitivity Intelligence（Executive 版 — 移到漲跌幅之下） */}
-            <div className="rounded-lg border bg-white p-5" style={{ borderColor: C.border, borderLeft: `4px solid ${C.primary}` }}>
-              <div className="flex items-baseline justify-between mb-1">
-                <h3 className="text-base font-bold">成本敏感度分析</h3>
-                <span className="text-[9px] font-bold px-2 py-0.5 rounded" style={{ background: C.primary, color: "#fff" }}>L4·EXECUTIVE</span>
-              </div>
-              <div className="text-[11px] mb-4" style={{ color: C.textSub }}>Cost Sensitivity Intelligence</div>
-
-              {/* 5 區塊以 2x3 grid 並排（橫展開，因為現在版面變寬了） */}
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {/* 區塊 1 — 產品線風險排行 */}
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.textSub, letterSpacing: "0.08em" }}>
-                    ▎產品線風險排行
-                  </div>
-                  <ul className="text-xs">
-                    {[
-                      { line: "橢圓機", par: -320, risk: "高", riskColor: C.red },
-                      { line: "飛輪車", par: -120, risk: "中", riskColor: "#d97706" },
-                      { line: "重訓",   par:  -95, risk: "中", riskColor: "#d97706" },
-                      { line: "跑步機", par:  +80, risk: "低", riskColor: "#059669" },
-                    ].map((p) => (
-                      <li key={p.line} className="flex items-baseline justify-between border-b py-1.5 last:border-0" style={{ borderColor: C.border }}>
-                        <span className="font-semibold" style={{ color: C.text }}>{p.line}</span>
-                        <span className="flex items-baseline gap-3">
-                          <span className="font-mono font-semibold" style={{ color: p.par < 0 ? C.red : "#059669" }}>
-                            {p.par > 0 ? "+" : ""}{p.par} 萬
-                          </span>
-                          <span className="text-xs font-bold w-6 text-right" style={{ color: p.riskColor }}>● {p.risk}</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* 區塊 2 — 成本構成（圓餅圖，文字直接放色塊上） */}
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.textSub, letterSpacing: "0.08em" }}>
-                    ▎成本構成
-                  </div>
-                  {(() => {
-                    const slices = [
-                      { name: "銅材", pct: 42, tone: C.red,     fg: "#ffffff" },
-                      { name: "鋼材", pct: 18, tone: "#d97706", fg: "#ffffff" },
-                      { name: "IC",   pct: 12, tone: C.blue,    fg: "#ffffff" },
-                      { name: "塑膠", pct:  8, tone: "#059669", fg: "#ffffff" },
-                      { name: "其他", pct: 20, tone: C.outline, fg: "#ffffff" },
-                    ];
-                    const total = slices.reduce((s, x) => s + x.pct, 0);
-                    const SZ = 240;
-                    const cx = SZ / 2, cy = SZ / 2;
-                    const R = 110, ir = 58;
-                    const labelR = (R + ir) / 2; // 文字錨點在環中線
-                    let angle = -Math.PI / 2;
-                    const arcs = slices.map((s) => {
-                      const sweep = (s.pct / total) * Math.PI * 2;
-                      const a0 = angle;
-                      const a1 = angle + sweep;
-                      angle = a1;
-                      const largeArc = sweep > Math.PI ? 1 : 0;
-                      const x0 = cx + R * Math.cos(a0), y0 = cy + R * Math.sin(a0);
-                      const x1 = cx + R * Math.cos(a1), y1 = cy + R * Math.sin(a1);
-                      const xi1 = cx + ir * Math.cos(a1), yi1 = cy + ir * Math.sin(a1);
-                      const xi0 = cx + ir * Math.cos(a0), yi0 = cy + ir * Math.sin(a0);
-                      const d = `M ${x0} ${y0} A ${R} ${R} 0 ${largeArc} 1 ${x1} ${y1} L ${xi1} ${yi1} A ${ir} ${ir} 0 ${largeArc} 0 ${xi0} ${yi0} Z`;
-                      const mid = (a0 + a1) / 2;
-                      const lx = cx + labelR * Math.cos(mid);
-                      const ly = cy + labelR * Math.sin(mid);
-                      // 小片（< 5%）只顯示百分比，更小片不顯示
-                      const showName = s.pct >= 10;
-                      const showPct  = s.pct >= 5;
-                      return { ...s, d, lx, ly, showName, showPct };
-                    });
-                    return (
-                      <div className="flex justify-center">
-                        <svg viewBox={`0 0 ${SZ} ${SZ}`} width="100%" height="auto" style={{ maxWidth: SZ }}>
-                          {arcs.map((a) => (
-                            <g key={a.name}>
-                              <path d={a.d} fill={a.tone} stroke="#fff" strokeWidth="2" />
-                              {a.showName && (
-                                <text x={a.lx} y={a.ly - 6} textAnchor="middle" fontSize="13" fontWeight="700" fill={a.fg}>
-                                  {a.name}
-                                </text>
-                              )}
-                              {a.showPct && (
-                                <text
-                                  x={a.lx}
-                                  y={a.showName ? a.ly + 10 : a.ly + 4}
-                                  textAnchor="middle"
-                                  fontSize={a.showName ? "12" : "11"}
-                                  fontWeight="600"
-                                  fill={a.fg}
-                                  fontFamily="monospace"
-                                >
-                                  {a.pct}%
-                                </text>
-                              )}
-                            </g>
-                          ))}
-                          {/* 中央文字 */}
-                          <text x={cx} y={cy - 4} textAnchor="middle" fontSize="11" fill={C.textSub}>合計</text>
-                          <text x={cx} y={cy + 14} textAnchor="middle" fontSize="18" fontWeight="800" fill={C.text}>100%</text>
-                        </svg>
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                {/* 區塊 3 — 成本敏感度 */}
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.textSub, letterSpacing: "0.08em" }}>
-                    ▎成本敏感度
-                  </div>
-                  <ul className="space-y-2 text-xs">
-                    {[
-                      { metal: "銅材", up: "+5%", margin: "-2.1%", tone: C.red },
-                      { metal: "鋁材", up: "+5%", margin: "-0.9%", tone: "#d97706" },
-                      { metal: "鋼材", up: "+3%", margin: "-0.4%", tone: "#d97706" },
-                    ].map((s) => (
-                      <li key={s.metal} className="flex items-baseline justify-between border-b py-1.5 last:border-0" style={{ borderColor: C.border }}>
-                        <span className="flex items-baseline gap-2">
-                          <span className="font-semibold" style={{ color: C.text }}>{s.metal}</span>
-                          <span className="font-mono" style={{ color: s.tone }}>{s.up}</span>
-                        </span>
-                        <span className="flex items-baseline gap-1">
-                          <span style={{ color: C.textSub }}>毛利</span>
-                          <span className="font-mono font-bold" style={{ color: s.tone }}>{s.margin}</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* 區塊 4 — AI 預測 */}
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.textSub, letterSpacing: "0.08em" }}>
-                    ▎AI 預測
-                  </div>
-                  <div className="rounded-md p-3" style={{ background: C.surfaceDim }}>
-                    <div className="text-[10px]" style={{ color: C.textSub }}>未來 30 天</div>
-                    <div className="flex items-baseline gap-2 mt-0.5">
-                      <span className="text-sm font-semibold" style={{ color: C.text }}>銅材</span>
-                      <span className="text-base font-bold" style={{ color: C.red }}>↑</span>
-                    </div>
-                    <div className="mt-1.5 text-[11px]" style={{ color: C.textSub }}>
-                      相關毛利 <span className="font-mono" style={{ color: C.textSub }}>13.2%</span>
-                      <span className="mx-1" style={{ color: C.red }}>↓</span>
-                      <span className="font-mono font-bold" style={{ color: C.red }}>11.8%</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 區塊 5 — AI 建議（橫跨兩格） */}
-                <div className="md:col-span-2">
-                  <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.textSub, letterSpacing: "0.08em" }}>
-                    ▎AI 建議
-                  </div>
-                  <ul className="space-y-2 text-xs">
-                    {[
-                      { title: "提前採購銅",       saving: "+95 萬" },
-                      { title: "啟動替代規格",     saving: "+60 萬" },
-                      { title: "議價／避險方案",   saving: "+25 萬" },
-                    ].map((a) => (
-                      <li key={a.title} className="flex items-baseline justify-between border-b py-1.5 last:border-0" style={{ borderColor: C.border }}>
-                        <span className="flex items-baseline gap-1.5" style={{ color: C.text }}>
-                          <span style={{ color: C.primary }}>✓</span>
-                          <span className="font-semibold">{a.title}</span>
-                        </span>
-                        <span className="text-[10px]" style={{ color: C.textSub }}>
-                          可省 <span className="font-mono font-bold" style={{ color: C.primary }}>{a.saving}</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
+            {/* Product Cost Intelligence · 產品成本情報（互動式 — 點產品線展開 BOM + 成本鏈） */}
+            <ProductCostIntelligence />
 
             {/* AI 判斷 — 4 步框架：Current / Why / Prediction / Action */}
             <div className="rounded-lg border p-4" style={{ borderColor: C.border, background: `${C.blueLight}10` }}>
@@ -1032,6 +857,267 @@ export default function ProfitDefensePage() {
           </div>
           <div>CHI HUA · AI Profit Defense Center · /erp/profit-defense</div>
         </footer>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Product Cost Intelligence · 產品成本情報
+// 點產品線 → 展 BOM Tree → 展 Cost Driver Tree → 展 Commodity Impact → AI 救援
+// ============================================================
+type ProductLine = "橢圓機" | "飛輪車" | "重訓" | "跑步機";
+
+type ProductProfile = {
+  name: ProductLine;
+  emoji: string;
+  par: number;
+  risk: "高" | "中" | "低";
+  riskColor: string;
+  marginBefore: number;
+  bom: { node: string; metal?: string; pct: number; cost?: number }[];   // BOM tree
+  driver: string[];                                                       // Cost Driver Tree
+  sensitivity: {
+    metal: string;
+    pct: number;          // 該金屬漲跌 %
+    costPct: number;      // 整機成本影響 %
+    marginAfter: number;  // 毛利下調至
+    loss: number;         // 損失 萬
+  }[];
+  recovery: { action: string; saving: number }[];
+};
+
+const PRODUCT_PROFILES: ProductProfile[] = [
+  {
+    name: "橢圓機", emoji: "🏃‍♂️", par: -320, risk: "高", riskColor: "#ba1a1a", marginBefore: 13.2,
+    bom: [
+      { node: "Motor 馬達",        metal: "銅",   pct: 35, cost: 14_500 },
+      { node: "Drive System 傳動", metal: "鋼",   pct: 25, cost: 10_300 },
+      { node: "Frame 車架",         metal: "鋼",   pct: 22, cost:  9_100 },
+      { node: "Magnet 磁鐵組",      metal: "銅",   pct:  8, cost:  3_400 },
+      { node: "Console 控制板",     metal: "IC",   pct:  6, cost:  2_500 },
+      { node: "Cover 外殼",         metal: "塑料", pct:  4, cost:  1_600 },
+    ],
+    driver: ["銅價", "Motor", "Drive System", "橢圓機", "毛利", "損失"],
+    sensitivity: [
+      { metal: "銅",  pct: 5,  costPct: 0.82, marginAfter: 12.4, loss: -320 },
+      { metal: "鋼",  pct: 5,  costPct: 0.65, marginAfter: 12.6, loss: -250 },
+      { metal: "IC",  pct: 10, costPct: 0.18, marginAfter: 13.0, loss:  -70 },
+    ],
+    recovery: [
+      { action: "提前採購銅（45 天）",          saving: 95 },
+      { action: "替代供應商 B（Motor）",         saving: 60 },
+      { action: "議價／長約鎖價",                saving: 25 },
+    ],
+  },
+  {
+    name: "飛輪車", emoji: "🚴", par: -120, risk: "中", riskColor: "#d97706", marginBefore: 18.4,
+    bom: [
+      { node: "Flywheel 飛輪 18kg",   metal: "鋁",   pct: 28, cost: 12_400 },
+      { node: "Frame 車架",            metal: "鋼",   pct: 24, cost: 10_800 },
+      { node: "Magnet Coil 磁阻線圈",  metal: "銅",   pct: 14, cost:  6_200 },
+      { node: "Pedal 踏板",            metal: "鋁",   pct: 10, cost:  4_500 },
+      { node: "Console 控制板",        metal: "IC",   pct:  8, cost:  3_500 },
+      { node: "Grip 握把",             metal: "塑料", pct:  4, cost:  1_700 },
+    ],
+    driver: ["鋁價", "Flywheel", "飛輪車", "毛利", "損失"],
+    sensitivity: [
+      { metal: "鋁",  pct: 5, costPct: 0.54, marginAfter: 17.9, loss: -120 },
+      { metal: "銅",  pct: 5, costPct: 0.31, marginAfter: 18.1, loss:  -70 },
+      { metal: "鋼",  pct: 5, costPct: 0.48, marginAfter: 17.9, loss: -100 },
+    ],
+    recovery: [
+      { action: "鋁料長約鎖價",        saving: 55 },
+      { action: "啟用替代車架供應商",   saving: 40 },
+      { action: "議價",                 saving: 15 },
+    ],
+  },
+  {
+    name: "重訓", emoji: "💪", par: -95, risk: "中", riskColor: "#d97706", marginBefore: 16.7,
+    bom: [
+      { node: "鑄鐵塊 20kg",  metal: "混鐵", pct: 42, cost: 18_500 },
+      { node: "Frame 框架",    metal: "鋼",   pct: 28, cost: 12_200 },
+      { node: "鑄鐵塊 10kg",  metal: "混鐵", pct: 18, cost:  7_900 },
+      { node: "Cable 鋼索",    metal: "鋼",   pct:  6, cost:  2_600 },
+      { node: "Grip 握把",     metal: "塑料", pct:  3, cost:  1_300 },
+    ],
+    driver: ["混鐵價", "鑄鐵塊", "重訓", "毛利", "損失"],
+    sensitivity: [
+      { metal: "混鐵", pct: 5, costPct: 1.20, marginAfter: 15.5, loss: -95 },
+      { metal: "鋼",   pct: 5, costPct: 0.45, marginAfter: 16.3, loss: -35 },
+    ],
+    recovery: [
+      { action: "提前採購混鐵（60 天）", saving: 50 },
+      { action: "越南混鐵替代",           saving: 30 },
+      { action: "議價",                   saving: 15 },
+    ],
+  },
+  {
+    name: "跑步機", emoji: "🏃", par: 80, risk: "低", riskColor: "#059669", marginBefore: 22.1,
+    bom: [
+      { node: "Motor 主馬達",       metal: "銅",   pct: 32, cost: 15_600 },
+      { node: "Belt 跑帶 + Roller", metal: "塑料", pct: 18, cost:  8_900 },
+      { node: "Deck 跑板",          metal: "鋼",   pct: 16, cost:  7_800 },
+      { node: "Frame 框架",         metal: "鋼",   pct: 14, cost:  6_900 },
+      { node: "Console + LCD",      metal: "IC",   pct: 12, cost:  5_900 },
+    ],
+    driver: ["銅價", "Motor", "跑步機", "毛利", "獲利"],
+    sensitivity: [
+      { metal: "銅",   pct: 5, costPct: 0.45, marginAfter: 21.6, loss: -60 },
+      { metal: "塑料", pct: 5, costPct: 0.28, marginAfter: 21.8, loss: -35 },
+    ],
+    recovery: [
+      { action: "維持現有議價方案",      saving: 20 },
+      { action: "監控銅料 30 天",         saving: 10 },
+    ],
+  },
+];
+
+function ProductCostIntelligence() {
+  const [selected, setSelected] = React.useState<ProductLine>("橢圓機");
+  const p = PRODUCT_PROFILES.find((x) => x.name === selected) ?? PRODUCT_PROFILES[0];
+  return (
+    <div className="rounded-lg border bg-white p-5" style={{ borderColor: C.border, borderLeft: `4px solid ${C.primary}` }}>
+      <div className="flex items-baseline justify-between mb-1 flex-wrap gap-2">
+        <h3 className="text-base font-bold">Product Cost Intelligence</h3>
+        <span className="text-[9px] font-bold px-2 py-0.5 rounded" style={{ background: C.primary, color: "#fff" }}>L4·EXECUTIVE</span>
+      </div>
+      <div className="text-[11px] mb-4" style={{ color: C.textSub }}>產品成本情報 · 點產品線展開該產品的 BOM + 成本鏈 + 敏感度 + AI 救援</div>
+
+      <div className="grid lg:grid-cols-[220px,1fr] gap-5">
+        {/* 左側 — 產品線清單 */}
+        <div>
+          <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.textSub, letterSpacing: "0.08em" }}>
+            ▎產品線風險排行
+          </div>
+          <ul className="space-y-1.5">
+            {PRODUCT_PROFILES.map((pp) => {
+              const active = pp.name === selected;
+              return (
+                <li key={pp.name}>
+                  <button
+                    onClick={() => setSelected(pp.name)}
+                    className="w-full text-left rounded-md border px-3 py-2 transition-all"
+                    style={{
+                      borderColor: active ? C.primary : C.border,
+                      background: active ? `${C.primary}10` : C.surface,
+                      borderLeftWidth: 4,
+                      borderLeftColor: pp.riskColor,
+                    }}
+                  >
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-sm font-semibold" style={{ color: C.text }}>
+                        {pp.emoji} {pp.name}
+                      </span>
+                      <span className="text-xs font-bold font-mono" style={{ color: pp.par < 0 ? C.red : "#059669" }}>
+                        {pp.par > 0 ? "+" : ""}{pp.par} 萬
+                      </span>
+                    </div>
+                    <div className="flex items-baseline justify-between mt-0.5 text-[10px]">
+                      <span style={{ color: C.textSub }}>毛利 {pp.marginBefore}%</span>
+                      <span className="font-bold" style={{ color: pp.riskColor }}>● {pp.risk}</span>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="mt-3 text-[10px] leading-snug" style={{ color: C.outline }}>
+            點任一產品線 → 右側展開該產品的完整成本拆解
+          </div>
+        </div>
+
+        {/* 右側 — selected 產品的 4 個區塊 */}
+        <div className="space-y-4">
+          {/* 區塊 A — BOM Tree + 成本佔比 */}
+          <div className="rounded-md border p-3" style={{ borderColor: C.border, background: C.surfaceDim }}>
+            <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.textSub, letterSpacing: "0.08em" }}>
+              ▎{p.emoji} {p.name} · BOM 拆解 + 成本佔比
+            </div>
+            <ul className="space-y-1.5">
+              {p.bom.map((b) => (
+                <li key={b.node} className="flex items-center gap-2 text-xs">
+                  <span className="w-32 shrink-0 font-semibold" style={{ color: C.text }}>{b.node}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded font-mono shrink-0"
+                        style={{ background: b.metal === "銅" ? `${C.red}15` : b.metal === "鋼" ? "#fef3c7" : b.metal === "鋁" ? `${C.blue}15` : b.metal === "塑料" ? `${C.primary}15` : b.metal === "混鐵" ? `${C.outline}30` : C.surface,
+                                 color: b.metal === "銅" ? C.red : b.metal === "鋼" ? "#92400e" : b.metal === "鋁" ? C.blue : b.metal === "塑料" ? C.primary : b.metal === "混鐵" ? "#574146" : C.text }}>
+                    {b.metal}
+                  </span>
+                  <span className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "#ffffff" }}>
+                    <span className="block h-full rounded-full"
+                          style={{ width: `${b.pct * 2}%`,
+                                   background: b.metal === "銅" ? C.red : b.metal === "鋼" ? "#d97706" : b.metal === "鋁" ? C.blue : b.metal === "塑料" ? "#059669" : b.metal === "混鐵" ? C.outline : C.text }} />
+                  </span>
+                  <span className="w-10 text-right font-mono font-semibold text-[10px]" style={{ color: C.text }}>{b.pct}%</span>
+                  {b.cost && (
+                    <span className="w-16 text-right font-mono text-[10px]" style={{ color: C.textSub }}>${b.cost.toLocaleString()}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* 區塊 B / C 並排：Cost Driver Tree + Commodity Sensitivity */}
+          <div className="grid md:grid-cols-2 gap-3">
+            {/* B — Cost Driver Tree（因果鏈） */}
+            <div className="rounded-md border p-3" style={{ borderColor: C.border }}>
+              <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.textSub, letterSpacing: "0.08em" }}>
+                ▎Cost Driver Tree · 因果鏈
+              </div>
+              <div className="space-y-0.5 text-xs font-mono">
+                {p.driver.map((step, i) => (
+                  <div key={i} style={{ color: i === 0 ? C.red : i === p.driver.length - 1 ? C.red : C.text }}>
+                    {i > 0 && <span className="block" style={{ color: C.blue }}>↓</span>}
+                    <span className={i === 0 || i === p.driver.length - 1 ? "font-bold" : ""}>{step}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* C — Commodity Sensitivity */}
+            <div className="rounded-md border p-3" style={{ borderColor: C.border }}>
+              <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.textSub, letterSpacing: "0.08em" }}>
+                ▎Commodity Sensitivity · 敏感度
+              </div>
+              <ul className="space-y-2 text-xs">
+                {p.sensitivity.map((s) => (
+                  <li key={s.metal} className="border-b pb-2 last:border-0" style={{ borderColor: C.border }}>
+                    <div className="flex items-baseline justify-between mb-0.5">
+                      <span className="font-bold" style={{ color: C.text }}>{s.metal}價 +{s.pct}%</span>
+                      <span className="font-mono font-bold" style={{ color: C.red }}>{s.loss} 萬</span>
+                    </div>
+                    <div className="text-[10px] font-mono" style={{ color: C.textSub }}>
+                      整機成本 <b style={{ color: C.red }}>+{s.costPct}%</b>　·　毛利 {p.marginBefore}% <span style={{ color: C.red }}>↓</span> <b style={{ color: C.red }}>{s.marginAfter}%</b>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* 區塊 D — AI Recovery Plan */}
+          <div className="rounded-md border p-3" style={{ borderColor: C.border, borderLeft: `3px solid ${C.primary}`, background: `${C.primary}05` }}>
+            <div className="flex items-baseline justify-between mb-2">
+              <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C.primary, letterSpacing: "0.08em" }}>
+                ▎AI Recovery Plan · {p.name} 救援方案
+              </div>
+              <span className="text-[10px] font-bold font-mono" style={{ color: C.primary }}>
+                總可回收 +{p.recovery.reduce((s, r) => s + r.saving, 0)} 萬
+              </span>
+            </div>
+            <ul className="grid sm:grid-cols-3 gap-2">
+              {p.recovery.map((r) => (
+                <li key={r.action} className="rounded-md bg-white border p-2" style={{ borderColor: C.border }}>
+                  <div className="flex items-baseline gap-1">
+                    <span style={{ color: C.primary }}>✓</span>
+                    <span className="text-xs font-semibold" style={{ color: C.text }}>{r.action}</span>
+                  </div>
+                  <div className="text-right mt-1 font-mono font-bold text-sm" style={{ color: C.primary }}>+{r.saving} 萬</div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );
