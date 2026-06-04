@@ -28,12 +28,17 @@ export default function L1ExecutivePage() {
           <p className="text-sm mt-1" style={{ color: SC.textSub }}>實時 KPI Card 視角 · 健康度 + 毛利 + 衝擊 + AI 建議</p>
         </header>
 
-        {/* 第一區（最大）— Executive Summary */}
+        {/* 第一區（最大）— Executive Summary · ① CURRENT */}
         <Card accent={SC.primary}>
-          <div className="flex items-baseline justify-between flex-wrap gap-2 mb-5">
-            <h2 className="text-xl font-semibold">第一區 · Executive Summary</h2>
+          <div className="flex items-baseline justify-between flex-wrap gap-2 mb-2">
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded text-white" style={{ background: SC.blue, letterSpacing: "0.12em" }}>① CURRENT</span>
+              <h2 className="text-xl font-semibold">Executive Summary</h2>
+              <span className="text-[11px]" style={{ color: SC.textSub }}>現在發生什麼</span>
+            </div>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded text-white" style={{ background: SC.primary }}>L1·EXECUTIVE</span>
           </div>
+          <div className="text-[11px] mb-4" style={{ color: SC.textSub }}>三大核心指標（健康度 + AI 信心 + 預估毛利）</div>
 
           <div className="grid sm:grid-cols-3 gap-6">
             <div>
@@ -66,10 +71,14 @@ export default function L1ExecutivePage() {
           </div>
         </Card>
 
-        {/* Profit Impact + AI Action Queue */}
-        <div className="grid md:grid-cols-2 gap-5">
+        {/* ② WHY + ③ PREDICTION + ④ ACTION 三卡並排（完整 4 步框架） */}
+        <div className="grid md:grid-cols-3 gap-5">
           <Card accent={SC.red}>
-            <h2 className="text-base font-semibold mb-3">Profit Impact</h2>
+            <div className="flex items-baseline gap-2 mb-2 flex-wrap">
+              <span className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded text-white" style={{ background: "#d97706", letterSpacing: "0.12em" }}>② WHY</span>
+              <h2 className="text-base font-semibold">Profit Impact</h2>
+            </div>
+            <div className="text-[11px] mb-2" style={{ color: SC.textSub }}>為什麼毛利下降</div>
             <ul className="space-y-2.5">
               {s.impact.map((p) => (
                 <li key={p.cause} className="flex items-baseline justify-between border-b pb-2 last:border-0" style={{ borderColor: SC.border }}>
@@ -87,8 +96,41 @@ export default function L1ExecutivePage() {
             </ul>
           </Card>
 
+          {/* ③ PREDICTION — AI 預測 */}
+          <Card accent={"#d97706"}>
+            <div className="flex items-baseline gap-2 mb-2 flex-wrap">
+              <span className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded text-white" style={{ background: SC.red, letterSpacing: "0.12em" }}>③ PREDICTION</span>
+              <h2 className="text-base font-semibold">AI 預測</h2>
+            </div>
+            <div className="text-[11px] mb-3" style={{ color: SC.textSub }}>未來會怎樣（30/60/90 天）</div>
+            <ul className="space-y-2.5">
+              {[
+                { period: "30 天", title: "銅料續漲 +5%",          impact: "毛利再 ↓ 0.8%",  tone: SC.red },
+                { period: "60 天", title: "鋼料趨穩",                impact: "影響有限",       tone: "#d97706" },
+                { period: "90 天", title: "USD/TWD 升破 32",         impact: "進口成本 +2%",   tone: SC.red },
+              ].map((p) => (
+                <li key={p.period} className="border-b pb-2 last:border-0" style={{ borderColor: SC.border }}>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[10px] font-bold" style={{ color: SC.textSub }}>{p.period}</span>
+                    <span className="text-[10px] font-mono" style={{ color: p.tone }}>{p.impact}</span>
+                  </div>
+                  <div className="text-sm font-semibold mt-0.5" style={{ color: SC.text }}>{p.title}</div>
+                </li>
+              ))}
+              <li className="pt-1 flex items-baseline justify-between">
+                <span className="text-xs font-bold" style={{ color: SC.textSub }}>AI 信心</span>
+                <span className="text-base font-extrabold" style={{ color: SC.blue }}>91.8%</span>
+              </li>
+            </ul>
+          </Card>
+
+          {/* ④ ACTION — AI Action Queue */}
           <Card accent={SC.blue}>
-            <h2 className="text-base font-semibold mb-3">AI Action Queue</h2>
+            <div className="flex items-baseline gap-2 mb-2 flex-wrap">
+              <span className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded text-white" style={{ background: SC.primary, letterSpacing: "0.12em" }}>④ ACTION</span>
+              <h2 className="text-base font-semibold">AI Action Queue</h2>
+            </div>
+            <div className="text-[11px] mb-3" style={{ color: SC.textSub }}>要怎麼做（依優先級）</div>
             <ol className="space-y-2">
               {[
                 { rank: "P1", title: "鎖價 銅 (Copper)", deadline: "48 小時內", impact: "預估擋損 280 萬", tone: SC.red },
