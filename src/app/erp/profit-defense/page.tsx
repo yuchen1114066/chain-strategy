@@ -449,27 +449,83 @@ export default function ProfitDefensePage() {
               </div>
             </div>
 
-            {/* AI 判斷 chip */}
-            <div className="rounded-lg border p-4 flex items-start gap-3" style={{ borderColor: C.border, background: `${C.blueLight}10` }}>
-              <span className="text-lg">✨</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: C.blue }}>AI 判定 · {zone.zone}</div>
-                <div className="text-sm font-semibold" style={{ color: C.text }}>{zone.oneLiner}</div>
-                <div className="text-xs mt-1" style={{ color: C.textSub }}>{zone.action}</div>
-                <div className="mt-2 grid sm:grid-cols-2 gap-2 text-[11px]">
-                  <div>
-                    <div className="font-bold mb-0.5" style={{ color: C.text }}>📌 過去 30 日事實</div>
-                    {adv.facts.map((f) => <div key={f} style={{ color: C.textSub }}>· {f}</div>)}
+            {/* AI 判斷 — 4 步框架：Current / Why / Prediction / Action */}
+            <div className="rounded-lg border p-4" style={{ borderColor: C.border, background: `${C.blueLight}10` }}>
+              <div className="flex items-baseline justify-between mb-3">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-lg">✨</span>
+                  <h3 className="text-sm font-bold">AI 四步分析框架</h3>
+                  <span className="text-[10px]" style={{ color: C.textSub }}>{c.name} ({c.nameEn})</span>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded" style={{ background: C.primary, color: "#fff" }}>信心 {adv.confidence}</span>
+              </div>
+
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {/* 1. 現在發生什麼 Current */}
+                <div className="rounded-md p-3 border" style={{ background: "#ffffff", borderColor: C.border, borderTop: `3px solid ${C.blue}` }}>
+                  <div className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: C.blue, letterSpacing: "0.1em" }}>
+                    ① CURRENT
                   </div>
-                  <div>
-                    <div className="font-bold mb-0.5" style={{ color: C.text }}>⚖ 但有相反信號</div>
-                    {adv.butFactors.map((f) => <div key={f} style={{ color: C.textSub }}>· {f}</div>)}
+                  <div className="text-[10px] mb-1" style={{ color: C.textSub }}>現在發生什麼</div>
+                  <div className="text-sm font-bold" style={{ color: C.text }}>{c.name}價格進入「{zone.zone}」區</div>
+                  <div className="text-[10px] mt-1" style={{ color: C.textSub }}>{zone.oneLiner}</div>
+                  <div className="mt-1.5 font-mono text-xs font-semibold" style={{ color: C.text }}>
+                    當前 ${Math.round(lastPrice).toLocaleString()}/{c.unit.split("/")[1] ?? "MT"}
                   </div>
                 </div>
-                <div className="mt-2 pt-2 border-t text-xs" style={{ borderColor: C.border, color: C.text }}>
-                  <b>AI 判定：</b>{adv.aiVerdict}　<br/>
-                  <b>建議：</b><span style={{ color: C.primary }}>{adv.recommendation}</span>
-                  <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded" style={{ background: C.primary, color: "#fff" }}>信心 {adv.confidence}</span>
+
+                {/* 2. 為什麼發生 Why */}
+                <div className="rounded-md p-3 border" style={{ background: "#ffffff", borderColor: C.border, borderTop: `3px solid #d97706` }}>
+                  <div className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: "#d97706", letterSpacing: "0.1em" }}>
+                    ② WHY
+                  </div>
+                  <div className="text-[10px] mb-1" style={{ color: C.textSub }}>為什麼發生</div>
+                  <div className="text-[10px]" style={{ color: C.text }}>
+                    <div className="font-bold mb-0.5">過去 30 日：</div>
+                    {adv.facts.slice(0, 2).map((f) => <div key={f} className="leading-tight" style={{ color: C.textSub }}>· {f}</div>)}
+                    <div className="font-bold mt-1.5 mb-0.5">但反向信號：</div>
+                    {adv.butFactors.slice(0, 2).map((f) => <div key={f} className="leading-tight" style={{ color: C.textSub }}>· {f}</div>)}
+                  </div>
+                </div>
+
+                {/* 3. 未來會怎樣 Prediction */}
+                <div className="rounded-md p-3 border" style={{ background: "#ffffff", borderColor: C.border, borderTop: `3px solid ${C.red}` }}>
+                  <div className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: C.red, letterSpacing: "0.1em" }}>
+                    ③ PREDICTION
+                  </div>
+                  <div className="text-[10px] mb-1" style={{ color: C.textSub }}>未來會怎樣 · AI 預測</div>
+                  <div className="text-sm font-bold leading-tight" style={{ color: C.text }}>{adv.aiVerdict}</div>
+                  <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px]">
+                    <span style={{ color: C.textSub }}>30 天</span>
+                    <span className="text-right font-mono font-bold" style={{ color: C.red }}>
+                      ${Math.round(lastPrice * 1.05).toLocaleString()} <span className="text-[9px]">↑5%</span>
+                    </span>
+                    <span style={{ color: C.textSub }}>90 天</span>
+                    <span className="text-right font-mono font-bold" style={{ color: C.red }}>
+                      ${Math.round(lastPrice * 1.08).toLocaleString()} <span className="text-[9px]">↑8%</span>
+                    </span>
+                    <span style={{ color: C.textSub }}>180 天</span>
+                    <span className="text-right font-mono font-bold" style={{ color: C.red }}>
+                      ${Math.round(lastPrice * 1.12).toLocaleString()} <span className="text-[9px]">↑12%</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* 4. 要怎麼做 Action */}
+                <div className="rounded-md p-3 border" style={{ background: "#ffffff", borderColor: C.border, borderTop: `3px solid ${C.primary}` }}>
+                  <div className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: C.primary, letterSpacing: "0.1em" }}>
+                    ④ ACTION
+                  </div>
+                  <div className="text-[10px] mb-1" style={{ color: C.textSub }}>要怎麼做 · AI 建議</div>
+                  <div className="text-sm font-bold leading-tight" style={{ color: C.primary }}>{adv.recommendation}</div>
+                  <ul className="mt-2 space-y-1 text-[10px]" style={{ color: C.text }}>
+                    <li>✓ 立即鎖價 <b className="font-mono">100 MT</b></li>
+                    <li>✓ 啟動替代規格評估</li>
+                    <li>✓ 預估擋損 <b className="font-mono" style={{ color: C.primary }}>+95 萬</b></li>
+                  </ul>
+                  <button className="w-full mt-2 py-1.5 rounded text-[10px] font-bold text-white" style={{ background: C.primary }}>
+                    建立採購策略
+                  </button>
                 </div>
               </div>
             </div>
