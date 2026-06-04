@@ -89,6 +89,79 @@ export const commodities: Commodity[] = [
 ];
 
 // ============================================================
+// 真實年度統計（依公司 Excel 計算，UCL/LCL = 年平均 ± 1.5σ）
+// 來源：銅/鋁 LME，鋼 中鋼 HRC 國際熱軋
+// ============================================================
+export type YearStats = {
+  year: number;
+  yearTW: string;
+  months: number;
+  min: number;
+  avg: number;
+  max: number;
+  sigma: number;
+  ucl: number;
+  lcl: number;
+  unit: string;
+};
+
+export const COMMODITY_YEAR_STATS: Record<string, YearStats[]> = {
+  CU: [
+    { year: 2022, yearTW: "111年", months: 12, min: 7528.38,  avg: 8812.95,  max: 10235.80, sigma: 1054.02, ucl: 10393.98, lcl: 7231.91, unit: "USD/MT" },
+    { year: 2023, yearTW: "112年", months: 12, min: 7938.82,  avg: 8482.13,  max: 8998.76,  sigma:  337.94, ucl:  8989.04, lcl: 7975.22, unit: "USD/MT" },
+    { year: 2024, yearTW: "113年", months: 12, min: 8309.36,  avg: 9142.88,  max: 10127.76, sigma:  539.68, ucl:  9952.40, lcl: 8333.36, unit: "USD/MT" },
+    { year: 2025, yearTW: "114年", months: 12, min: 8976.86,  avg: 9938.03,  max: 11801.79, sigma:  796.41, ucl: 11132.65, lcl: 8743.42, unit: "USD/MT" },
+    { year: 2026, yearTW: "115年", months:  5, min: 12966.48, avg: 13026.89, max: 13087.29, sigma:   85.43, ucl: 13155.02, lcl: 12898.75,unit: "USD/MT" },
+  ],
+  AL: [
+    { year: 2022, yearTW: "111年", months: 12, min: 2229.11,  avg: 2696.60,  max: 3536.72,  sigma:  462.32, ucl:  3390.08, lcl: 2003.11, unit: "USD/MT" },
+    { year: 2023, yearTW: "112年", months: 12, min: 2133.41,  avg: 2250.85,  max: 2488.17,  sigma:  112.55, ucl:  2419.67, lcl: 2082.02, unit: "USD/MT" },
+    { year: 2024, yearTW: "113年", months: 12, min: 2181.90,  avg: 2418.02,  max: 2597.46,  sigma:  154.62, ucl:  2649.95, lcl: 2186.10, unit: "USD/MT" },
+    { year: 2025, yearTW: "114年", months: 12, min: 2380.55,  avg: 2629.37,  max: 2874.81,  sigma:  147.33, ucl:  2850.36, lcl: 2408.38, unit: "USD/MT" },
+    { year: 2026, yearTW: "115年", months:  2, min: 3064.53,  avg: 3106.04,  max: 3147.55,  sigma:   58.70, ucl:  3194.10, lcl: 3017.98, unit: "USD/MT" },
+  ],
+  STEEL: [
+    { year: 2022, yearTW: "111年", months: 12, min: 24147,    avg: 26843,    max: 29700,    sigma:    0,    ucl: 26843,    lcl: 26843,   unit: "NTD/MT" },
+    { year: 2023, yearTW: "112年", months: 12, min: 26800,    avg: 28575,    max: 31800,    sigma:    0,    ucl: 28575,    lcl: 28575,   unit: "NTD/MT" },
+    { year: 2024, yearTW: "113年", months: 12, min: 20200,    avg: 22233.33, max: 28300,    sigma:    0,    ucl: 22233.33, lcl: 22233.33,unit: "NTD/MT" },
+    { year: 2025, yearTW: "114年", months:  7, min: 19100,    avg: 20650,    max: 22300,    sigma:    0,    ucl: 20650,    lcl: 20650,   unit: "NTD/MT" },
+    { year: 2026, yearTW: "115年", months:  4, min: 16500,    avg: 17808.33, max: 20000,    sigma:    0,    ucl: 17808.33, lcl: 17808.33,unit: "NTD/MT" },
+  ],
+};
+
+// 全期合計 stats
+export const COMMODITY_PERIOD_STATS: Record<string, YearStats> = {
+  CU:    { year: 0, yearTW: "全期合計", months: 50, min: 7528.38, avg: 9251.31,  max: 13087.29, sigma: 1172.65, ucl: 11010.29, lcl: 7492.34, unit: "USD/MT" },
+  AL:    { year: 0, yearTW: "全期合計", months: 50, min: 2133.41, avg: 2523.00,  max: 3536.72,  sigma:  325.58, ucl:  3011.37, lcl: 2034.64, unit: "USD/MT" },
+  STEEL: { year: 0, yearTW: "全期合計", months: 11, min: 16500,   avg: 23221.93, max: 31800,    sigma:    0,    ucl: 23221.93, lcl: 23221.93,unit: "NTD/MT" },
+};
+
+// 2021 年度基期 + 2026/Q1 漲跌幅
+export type BaselineRow = {
+  itemTW: string;
+  itemEn: string;
+  unit: string;
+  avg2021: number;
+  avg2026Q1: number;
+  pctChange: number;
+};
+
+export const BASELINE_2021: BaselineRow[] = [
+  { itemTW: "銅 (LME)",      itemEn: "Copper",     unit: "USD/T", avg2021:  9143.4, avg2026Q1: 12851.2, pctChange:  41 },
+  { itemTW: "鋁 (LME)",      itemEn: "Aluminum",   unit: "USD/T", avg2021:  2239.8, avg2026Q1:  3244.4, pctChange:  45 },
+  { itemTW: "鋼 (中鋼)",     itemEn: "Steel (CSC)",unit: "NTD/T", avg2021: 26843.3, avg2026Q1: 18366.7, pctChange: -32 },
+  { itemTW: "鐵 (台灣混鐵)", itemEn: "TW Pig Iron",unit: "NTD/kg",avg2021:    29.7, avg2026Q1:    32.6, pctChange:  10 },
+  { itemTW: "鐵 (越南混鐵)", itemEn: "VN Pig Iron",unit: "NTD/kg",avg2021:    22.6, avg2026Q1:    29.4, pctChange:  30 },
+];
+
+// 對應 commodity code → BaselineRow
+export const BASELINE_BY_CODE: Record<string, BaselineRow | undefined> = {
+  CU:    BASELINE_2021[0],
+  AL:    BASELINE_2021[1],
+  STEEL: BASELINE_2021[2],
+};
+
+// ============================================================
 // 4 區判斷（AI 不是只看漲跌，而是判斷現在進入哪一區）
 //   · 低檔區：價格 < Mean - σ → 適合囤貨
 //   · 危險區：價格 > Mean + 2σ → 已過熱，避免追高

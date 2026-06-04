@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { commodities, priceZone, procurementAdvice, type Commodity } from "@/lib/erp/commodities";
+import { commodities, priceZone, procurementAdvice, type Commodity,
+  COMMODITY_YEAR_STATS, COMMODITY_PERIOD_STATS, BASELINE_2021, BASELINE_BY_CODE } from "@/lib/erp/commodities";
 
 // 設計 token（依 Stitch DESIGN.md）
 const C = {
@@ -35,12 +36,12 @@ const RANGES: { key: string; months: number }[] = [
   { key: "AI Prediction", months: 24 },
 ];
 
-// 資料來源（每個商品對應的權威報價源）
-const DATA_SOURCE: Record<string, string> = {
-  CU:      "LME 倫敦金屬交易所（real-time API）· 上海有色網 SMM · 中國有色金屬工業協會",
-  STEEL:   "中鋼牌價 CSC · Fastmarkets HRC 國際熱軋 · MySteel 國內鋼材指數",
-  AL:      "LME 倫敦金屬交易所 · SHFE 上海期貨 · 國際鋁業協會 IAI",
-  PLASTIC: "Brent 原油現貨 · Platts 塑料報價 · ICIS 亞洲樹脂 (油價聯動)",
+// 資料來源（每個商品對應的權威報價源 + URL）
+const DATA_SOURCE: Record<string, { label: string; url?: string }> = {
+  CU:      { label: "LME 倫敦金屬交易所 (Copper Grade A spot) · INSEE 法國國家統計局",     url: "https://www.insee.fr/en/statistiques/serie/010002052" },
+  AL:      { label: "LME 倫敦金屬交易所 (Aluminum spot) · INSEE 法國國家統計局",            url: "https://www.insee.fr/en/statistiques/serie/010002052" },
+  STEEL:   { label: "中鋼牌價 CSC (HRC 熱軋鋼捲) · MoneyDJ 鋼鐵類股",                       url: "https://concords.moneydj.com/z/ze/zeq/zeqa_D0200110.djhtm" },
+  PLASTIC: { label: "Brent 原油現貨 · Platts 塑料報價 · ICIS 亞洲樹脂 (油價聯動)" },
 };
 
 // 突兀峰值說明（對應 commodities.ts 的 spikeIdx + 真實事件）
@@ -245,18 +246,42 @@ export default function ProfitDefensePage() {
               {/* SVG Chart */}
               <div className="overflow-x-auto">
                 <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} className="block" style={{ maxWidth: "100%" }}>
-                  {/* Grid */}
+                  {/* Grid + Y-axis（顯示完整千分位數字，不縮寫） */}
                   {yTicks.map((tick, i) => {
                     const y = scaleY(tick);
                     return (
                       <g key={i}>
                         <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y} stroke={C.border} strokeWidth="1" strokeDasharray="2,4" />
                         <text x={PAD_L - 8} y={y + 4} textAnchor="end" fontSize="10" fill={C.textSub}>
-                          ${tick >= 1000 ? `${(tick / 1000).toFixed(1)}k` : tick.toFixed(0)}
+                          {Math.round(tick).toLocaleString()}
                         </text>
                       </g>
                     );
                   })}
+
+                  {/* UCL / LCL 管制上下限（依全期合計）*/}
+                  {(() => {
+                    const ps = COMMODITY_PERIOD_STATS[c.code];
+                    if (!ps || ps.ucl === ps.lcl) return null;
+                    const yUCL = scaleY(ps.ucl);
+                    const yLCL = scaleY(ps.lcl);
+                    const yAvg = scaleY(ps.avg);
+                    return (
+                      <g>
+                        {/* 管制帶 (UCL → LCL) */}
+                        <rect x={PAD_L} y={Math.min(yUCL, yLCL)} width={innerW} height={Math.abs(yLCL - yUCL)} fill={C.primary} opacity="0.04" />
+                        {/* UCL line */}
+                        <line x1={PAD_L} y1={yUCL} x2={W - PAD_R} y2={yUCL} stroke={C.primary} strokeWidth="1" strokeDasharray="6,3" opacity="0.6" />
+                        <text x={W - PAD_R + 2} y={yUCL + 3} fontSize="9" fontWeight="600" fill={C.primary}>UCL {Math.round(ps.ucl).toLocaleString()}</text>
+                        {/* 全期平均 line */}
+                        <line x1={PAD_L} y1={yAvg} x2={W - PAD_R} y2={yAvg} stroke="#8a7176" strokeWidth="1" strokeDasharray="2,4" opacity="0.5" />
+                        <text x={W - PAD_R + 2} y={yAvg + 3} fontSize="9" fill="#8a7176">μ {Math.round(ps.avg).toLocaleString()}</text>
+                        {/* LCL line */}
+                        <line x1={PAD_L} y1={yLCL} x2={W - PAD_R} y2={yLCL} stroke={C.primary} strokeWidth="1" strokeDasharray="6,3" opacity="0.6" />
+                        <text x={W - PAD_R + 2} y={yLCL + 3} fontSize="9" fontWeight="600" fill={C.primary}>LCL {Math.round(ps.lcl).toLocaleString()}</text>
+                      </g>
+                    );
+                  })()}
 
                   {/* X labels */}
                   {xLabels.map((l, i) => (
@@ -308,9 +333,9 @@ export default function ProfitDefensePage() {
                       <g>
                         <circle cx={sx} cy={sy} r="6" fill="#fbbf24" stroke={C.red} strokeWidth="2" />
                         <line x1={sx} y1={sy - 6} x2={sx} y2={sy - 32} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="3,3" />
-                        <rect x={sx - 64} y={sy - 56} width="128" height="22" rx="3" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1" />
+                        <rect x={sx - 70} y={sy - 56} width="140" height="22" rx="3" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1" />
                         <text x={sx} y={sy - 41} textAnchor="middle" fontSize="10" fontWeight="600" fill="#92400e">
-                          ⚠ 歷史高點 {sp.month}
+                          ⚠ ${Math.round(sp.price).toLocaleString()} / {c.unit.split("/")[1] ?? "MT"}
                         </text>
                       </g>
                     );
@@ -331,13 +356,24 @@ export default function ProfitDefensePage() {
                 <span className="flex items-center gap-1.5">
                   <span className="w-3 h-3 rounded-full" style={{ background: "#fbbf24", border: `1px solid ${C.red}` }} /> 歷史突兀點
                 </span>
+                {COMMODITY_PERIOD_STATS[c.code] && (
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-4 h-2" style={{ background: C.primary, opacity: 0.15 }} /> UCL/LCL 管制帶（μ±1.5σ）
+                  </span>
+                )}
               </div>
 
               {/* 數據來源 + 突兀點說明 */}
               <div className="mt-3 pt-3 border-t grid sm:grid-cols-2 gap-3 text-[11px]" style={{ borderColor: C.border }}>
                 <div>
                   <div className="font-bold mb-1" style={{ color: C.text }}>📡 數據來源</div>
-                  <div style={{ color: C.textSub }}>{DATA_SOURCE[c.code] ?? c.source}</div>
+                  <div style={{ color: C.textSub }}>{DATA_SOURCE[c.code]?.label ?? c.source}</div>
+                  {DATA_SOURCE[c.code]?.url && (
+                    <a href={DATA_SOURCE[c.code]!.url} target="_blank" rel="noopener noreferrer"
+                       className="block mt-1 text-[10px] hover:underline break-all" style={{ color: C.blue }}>
+                      🔗 {DATA_SOURCE[c.code]!.url}
+                    </a>
+                  )}
                   <div className="mt-1 text-[10px]" style={{ color: C.outline }}>同步頻率：每日 08:00 自動拉取 · 即時 API（盤中 5min refresh）</div>
                 </div>
                 <div>
@@ -345,6 +381,109 @@ export default function ProfitDefensePage() {
                   <div style={{ color: C.text }}><b>{SPIKE_CAUSES[c.code]?.reason}</b></div>
                   <div className="mt-0.5" style={{ color: C.textSub }}>{SPIKE_CAUSES[c.code]?.detail}</div>
                 </div>
+              </div>
+            </div>
+
+            {/* 年度區間管制分析（依公司 Excel 真實月度數據） */}
+            {COMMODITY_YEAR_STATS[c.code] && (
+              <div className="rounded-lg border bg-white p-5" style={{ borderColor: C.border }}>
+                <div className="flex items-baseline justify-between flex-wrap gap-2 mb-2">
+                  <h3 className="text-base font-bold">📊 年度區間管制分析（{c.name}）</h3>
+                  <span className="text-[10px]" style={{ color: C.textSub }}>UCL = 年平均 + 1.5σ ・ LCL = 年平均 − 1.5σ ・ 樣本標準差 (n-1)</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs min-w-[640px]">
+                    <thead>
+                      <tr className="text-left border-b" style={{ borderColor: C.border, color: C.textSub }}>
+                        <th className="py-2 font-semibold uppercase tracking-widest text-[9px]">年度</th>
+                        <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">資料月數</th>
+                        <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">最小值</th>
+                        <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">年平均 μ</th>
+                        <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">最大值</th>
+                        <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">σ</th>
+                        <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">UCL</th>
+                        <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">LCL</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {COMMODITY_YEAR_STATS[c.code].map((y) => (
+                        <tr key={y.year} className="border-b" style={{ borderColor: C.border }}>
+                          <td className="py-2">
+                            <span className="font-semibold" style={{ color: C.text }}>{y.year}</span>
+                            <span className="text-[10px] ml-1" style={{ color: C.textSub }}>{y.yearTW}</span>
+                          </td>
+                          <td className="py-2 text-right font-mono">{y.months}</td>
+                          <td className="py-2 text-right font-mono" style={{ background: "#fef3c7" }}>{y.min.toLocaleString()}</td>
+                          <td className="py-2 text-right font-mono font-semibold" style={{ color: C.text }}>{y.avg.toLocaleString()}</td>
+                          <td className="py-2 text-right font-mono" style={{ background: "#fef3c7" }}>{y.max.toLocaleString()}</td>
+                          <td className="py-2 text-right font-mono" style={{ color: C.textSub }}>{y.sigma.toLocaleString()}</td>
+                          <td className="py-2 text-right font-mono" style={{ color: C.primary }}>{y.ucl.toLocaleString()}</td>
+                          <td className="py-2 text-right font-mono" style={{ color: C.primary }}>{y.lcl.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                      {COMMODITY_PERIOD_STATS[c.code] && (() => {
+                        const p = COMMODITY_PERIOD_STATS[c.code];
+                        return (
+                          <tr style={{ background: "#fef3c7" }}>
+                            <td className="py-2 font-bold" style={{ color: C.text }}>{p.yearTW}</td>
+                            <td className="py-2 text-right font-mono font-bold">{p.months}</td>
+                            <td className="py-2 text-right font-mono font-bold">{p.min.toLocaleString()}</td>
+                            <td className="py-2 text-right font-mono font-bold" style={{ color: C.text }}>{p.avg.toLocaleString()}</td>
+                            <td className="py-2 text-right font-mono font-bold">{p.max.toLocaleString()}</td>
+                            <td className="py-2 text-right font-mono font-bold">{p.sigma.toLocaleString()}</td>
+                            <td className="py-2 text-right font-mono font-bold" style={{ color: C.primary }}>{p.ucl.toLocaleString()}</td>
+                            <td className="py-2 text-right font-mono font-bold" style={{ color: C.primary }}>{p.lcl.toLocaleString()}</td>
+                          </tr>
+                        );
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-2 text-[10px]" style={{ color: C.textSub }}>
+                  資料單位：{COMMODITY_YEAR_STATS[c.code][0]?.unit ?? "—"}　·　基於實際月度資料計算　·　黃色 = 該年區間極值
+                </div>
+              </div>
+            )}
+
+            {/* 2021 基期 + 2026/Q1 漲跌幅 */}
+            <div className="rounded-lg border bg-white p-5" style={{ borderColor: C.border }}>
+              <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
+                <h3 className="text-base font-bold">📈 2021 基期 vs 2026/Q1 漲跌幅</h3>
+                <span className="text-[10px]" style={{ color: C.textSub }}>計算公式：(2026/1~3 月均價 − 2021 年均價) / 2021 年均價 × 100%</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs min-w-[600px]">
+                  <thead>
+                    <tr className="text-left border-b" style={{ borderColor: C.border, color: C.textSub }}>
+                      <th className="py-2 font-semibold uppercase tracking-widest text-[9px]">品項</th>
+                      <th className="py-2 font-semibold uppercase tracking-widest text-[9px]">幣別/單位</th>
+                      <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">2021 年均</th>
+                      <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">2026/1~3 月均</th>
+                      <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">漲幅</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {BASELINE_2021.map((b) => {
+                      const isCurrent = BASELINE_BY_CODE[c.code]?.itemTW === b.itemTW;
+                      const tone = b.pctChange > 0 ? C.red : C.primary;
+                      return (
+                        <tr key={b.itemTW} className="border-b" style={{ borderColor: C.border, background: isCurrent ? "#fef3c7" : undefined }}>
+                          <td className="py-2 font-semibold" style={{ color: C.text }}>{b.itemTW}</td>
+                          <td className="py-2 text-[10px]" style={{ color: C.textSub }}>{b.unit}</td>
+                          <td className="py-2 text-right font-mono">{b.avg2021.toLocaleString()}</td>
+                          <td className="py-2 text-right font-mono">{b.avg2026Q1.toLocaleString()}</td>
+                          <td className="py-2 text-right font-mono font-bold" style={{ color: tone }}>
+                            {b.pctChange > 0 ? "+" : ""}{b.pctChange}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-2 text-[10px] leading-relaxed" style={{ color: C.textSub }}>
+                <div>• 台灣混鐵配方 = 45% 鐵礦石 + 30% 廢鋼 + 25% 鋼胚 + 10% CRU 鋼價指數</div>
+                <div>• 越南混鐵配方 = 45% 鐵礦石 + 20% 廢鋼 + 25% 東南亞鋼胚 + 10% 海運成本</div>
               </div>
             </div>
 
