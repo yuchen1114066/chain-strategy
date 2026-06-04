@@ -13,12 +13,47 @@ export default function L5MarketPage() {
         <header>
           <div className="text-[13px] font-bold uppercase tracking-widest" style={{ color: SC.blue, letterSpacing: "0.12em" }}>L5 Market Intelligence</div>
           <h1 className="text-4xl sm:text-5xl font-semibold mt-1">全球市場情報中心</h1>
-          <p className="text-base mt-1" style={{ color: SC.textSub }}>10 區塊 · 全方位市場 + AI Copilot + Why 解釋</p>
+          <p className="text-base mt-1" style={{ color: SC.textSub }}>以 6 個關鍵問題的角度設計 · 每個區塊都在回答其中一題</p>
         </header>
 
-        {/* 區塊 1 — Commodity Dashboard */}
+        {/* ❓ L5 應回答的 6 個關鍵問題 — 頂部導覽（點任一問題跳到對應區塊） */}
         <Card accent={SC.primary}>
-          <Header n="1" title="Commodity Dashboard · 原物料儀表" />
+          <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
+            <h2 className="text-lg font-semibold">❓ L5 應回答的 6 個關鍵問題</h2>
+            <span className="text-[11px]" style={{ color: SC.textSub }}>採購／CEO／供應鏈每天問的最重要問題</span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {[
+              { q: "市場正在發生什麼？",   anchor: "#q1", chip: "1", target: "區塊 1·10",  desc: "Commodity / Volatility", tone: SC.blue },
+              { q: "未來會發生什麼？",     anchor: "#q2", chip: "2", target: "區塊 5·7·8·9",desc: "AI Why / 匯率 / 運費 / 能源", tone: SC.red },
+              { q: "我該買嗎？",            anchor: "#q3", chip: "3", target: "區塊 3·4",   desc: "Action Queue / Copilot",  tone: "#d97706" },
+              { q: "何時買？",              anchor: "#q4", chip: "4", target: "區塊 4",     desc: "AI 鎖價時機建議",          tone: "#d97706" },
+              { q: "漲價合理嗎？",          anchor: "#q5", chip: "5", target: "區塊 2·6",   desc: "Profit Impact / Product",  tone: SC.amber },
+              { q: "供應商是否說謊？",      anchor: "#q6", chip: "6", target: "區塊 15",    desc: "Supplier Truth Check",     tone: SC.primary },
+            ].map((x) => (
+              <a key={x.q} href={x.anchor} className="block rounded-md border p-3 hover:shadow-sm transition-shadow"
+                 style={{ borderColor: SC.border, background: SC.surface, borderLeft: `4px solid ${x.tone}` }}>
+                <div className="flex items-baseline gap-2">
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white"
+                        style={{ background: x.tone }}>{x.chip}</span>
+                  <span className="text-sm font-bold" style={{ color: SC.text }}>{x.q}</span>
+                </div>
+                <div className="mt-1 flex items-baseline justify-between text-[11px]">
+                  <span style={{ color: SC.textSub }}>→ {x.target}</span>
+                  <span className="font-mono" style={{ color: SC.outline }}>{x.desc}</span>
+                </div>
+              </a>
+            ))}
+          </div>
+        </Card>
+
+        {/* 區塊 1 — Commodity Dashboard ❓ Q1 */}
+        <div id="q1" />
+        <Card accent={SC.primary}>
+          <div className="flex items-baseline justify-between mb-2 flex-wrap gap-2">
+            <Header n="1" title="Commodity Dashboard · 原物料儀表" />
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded text-white" style={{ background: SC.blue }}>❓Q1 市場正在發生什麼</span>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
             {commodities.slice(0, 4).map((c) => {
               const last = c.prices[c.prices.length - 1]?.price ?? 0;
@@ -44,7 +79,8 @@ export default function L5MarketPage() {
 
         {/* 區塊 2 / 3 並排 */}
         <div className="grid md:grid-cols-2 gap-5">
-          {/* 區塊 2 — Profit Impact Center */}
+          <div id="q5" />
+        {/* 區塊 2 — Profit Impact Center */}
           <Card accent={SC.red}>
             <Header n="2" title="Profit Impact Center · 成本衝擊排行" />
             <ul className="space-y-2 mt-2">
@@ -65,7 +101,8 @@ export default function L5MarketPage() {
             </ul>
           </Card>
 
-          {/* 區塊 3 — AI Action Queue */}
+          <div id="q3" />
+        {/* 區塊 3 — AI Action Queue */}
           <Card accent={SC.blue}>
             <Header n="3" title="AI Action Queue · 優先動作" />
             <ol className="space-y-2 mt-2">
@@ -86,6 +123,7 @@ export default function L5MarketPage() {
           </Card>
         </div>
 
+        <div id="q4" />
         {/* 區塊 4 — AI Procurement Copilot */}
         <Card accent={SC.primary}>
           <Header n="4" title="AI Procurement Copilot · 採購副駕" />
@@ -100,6 +138,7 @@ export default function L5MarketPage() {
           </div>
         </Card>
 
+        <div id="q2" />
         {/* 區塊 5 — AI Why */}
         <Card accent={SC.blue}>
           <Header n="5" title="AI Why · 推理解釋" />
@@ -114,6 +153,7 @@ export default function L5MarketPage() {
           </div>
         </Card>
 
+        <div id="q5" />
         {/* 區塊 6 — Product Impact */}
         <Card accent={SC.amber}>
           <Header n="6" title="Product Impact · 產品線衝擊" />
@@ -133,7 +173,8 @@ export default function L5MarketPage() {
           </div>
         </Card>
 
-        {/* 區塊 7 / 8 / 9 並排 */}
+<div id="q2-detail" />
+        {/* 區塊 7 / 8 / 9 並排（Q2 未來會發生什麼 — 匯率/運費/能源） */}
         <div className="grid md:grid-cols-3 gap-5">
           <Card accent={SC.blue}>
             <Header n="7" title="Currency Dashboard · 匯率" />
@@ -193,6 +234,7 @@ export default function L5MarketPage() {
           </Card>
         </div>
 
+        <div id="q1" />
         {/* 區塊 10 — Market Volatility */}
         <Card accent={SC.red}>
           <Header n="10" title="Market Volatility · 市場波動指數" />
@@ -455,6 +497,86 @@ export default function L5MarketPage() {
 
           <div className="text-[10px] text-center" style={{ color: SC.textSub }}>
             💡 4 個模組組合起來 = Knowledge Graph 看「影響什麼」+ Root Cause Tree 看「為什麼」+ One Click Action 看「怎麼做」+ Autonomous Workflow 看「自動做」
+          </div>
+        </Card>
+
+        {/* ❓ Q6 區塊 15 — Supplier Truth Check 供應商透明度檢查 */}
+        <div id="q6" />
+        <Card accent={SC.primary}>
+          <div className="flex items-baseline justify-between mb-2 flex-wrap gap-2">
+            <Header n="15" title="Supplier Truth Check · 供應商透明度檢查" />
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded text-white" style={{ background: SC.primary }}>❓Q6 供應商是否說謊</span>
+          </div>
+          <div className="text-[11px] mb-3" style={{ color: SC.textSub }}>把供應商報價跟 LME / 中鋼 / 市場合理價對比 — AI 判斷誰在講真話</div>
+
+          {/* 供應商真話檢查表 */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[760px]">
+              <thead>
+                <tr className="text-left border-b" style={{ borderColor: SC.border, color: SC.textSub }}>
+                  <th className="py-2 text-[10px] font-bold uppercase tracking-widest">供應商</th>
+                  <th className="py-2 text-[10px] font-bold uppercase tracking-widest">料件</th>
+                  <th className="py-2 text-[10px] font-bold uppercase tracking-widest text-right">本期報價</th>
+                  <th className="py-2 text-[10px] font-bold uppercase tracking-widest text-right">市場合理價</th>
+                  <th className="py-2 text-[10px] font-bold uppercase tracking-widest text-right">落差</th>
+                  <th className="py-2 text-[10px] font-bold uppercase tracking-widest text-center">歷史誠信</th>
+                  <th className="py-2 text-[10px] font-bold uppercase tracking-widest">AI 判定</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { sup: "A 銅業",     part: "FB64-WIRE",  quote: 100, fair:  98, deltaPct:  +2, trust: 98, verdict: "合理（誠信佳）",   tone: SC.primary },
+                  { sup: "B 線材",     part: "FB64-WIRE",  quote: 118, fair: 101, deltaPct: +17, trust: 62, verdict: "🚨 高於市場 17%，連 3 月偏高 — 建議稽核", tone: SC.red },
+                  { sup: "C 線材",     part: "FB64-WIRE",  quote:  97, fair:  98, deltaPct:  -1, trust: 88, verdict: "合理（市場行情內）", tone: SC.primary },
+                  { sup: "AX 金屬",    part: "FB64-FRM",   quote: 145, fair: 142, deltaPct:  +2, trust: 95, verdict: "合理（中鋼跟漲）",   tone: SC.primary },
+                  { sup: "鋼鋒",       part: "FB64-FRM",   quote: 168, fair: 142, deltaPct: +18, trust: 55, verdict: "🚨 偏高 18%，與 CR 鋼價走勢背離", tone: SC.red },
+                  { sup: "電源廠 D",   part: "FB64-PSU",   quote: 320, fair: 318, deltaPct:  +1, trust: 92, verdict: "合理",               tone: SC.primary },
+                ].map((r) => (
+                  <tr key={r.sup + r.part} className="border-b align-top" style={{ borderColor: SC.border, background: r.deltaPct > 10 ? "#fef3c7" : undefined }}>
+                    <td className="py-2 font-semibold" style={{ color: SC.text }}>{r.sup}</td>
+                    <td className="py-2 font-mono text-xs" style={{ color: SC.textSub }}>{r.part}</td>
+                    <td className="py-2 text-right font-mono">{r.quote}</td>
+                    <td className="py-2 text-right font-mono" style={{ color: SC.textSub }}>{r.fair}</td>
+                    <td className="py-2 text-right font-mono font-bold" style={{ color: r.deltaPct > 10 ? SC.red : r.deltaPct > 3 ? "#d97706" : SC.primary }}>
+                      {r.deltaPct >= 0 ? "+" : ""}{r.deltaPct}%
+                    </td>
+                    <td className="py-2 text-center">
+                      <span className="font-mono font-bold" style={{ color: r.trust >= 85 ? SC.primary : r.trust >= 70 ? "#d97706" : SC.red }}>
+                        {r.trust}%
+                      </span>
+                    </td>
+                    <td className="py-2 text-xs font-semibold" style={{ color: r.tone }}>{r.verdict}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 紅旗摘要 */}
+          <div className="mt-3 grid sm:grid-cols-3 gap-3">
+            <div className="rounded-md p-3" style={{ background: `${SC.red}10`, border: `1px solid ${SC.red}30` }}>
+              <div className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: SC.red }}>🚩 紅旗供應商</div>
+              <div className="text-2xl font-extrabold" style={{ color: SC.red }}>2</div>
+              <div className="text-[10px]" style={{ color: SC.textSub }}>B 線材 / 鋼鋒</div>
+            </div>
+            <div className="rounded-md p-3" style={{ background: "#fef3c7", border: "1px solid #f59e0b" }}>
+              <div className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "#92400e" }}>⚠ 觀察名單</div>
+              <div className="text-2xl font-extrabold" style={{ color: "#92400e" }}>1</div>
+              <div className="text-[10px]" style={{ color: SC.textSub }}>連續 2 月偏高 &gt; 5%</div>
+            </div>
+            <div className="rounded-md p-3" style={{ background: `${SC.primary}10`, border: `1px solid ${SC.primary}30` }}>
+              <div className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: SC.primary }}>✓ 誠信良好</div>
+              <div className="text-2xl font-extrabold" style={{ color: SC.primary }}>4</div>
+              <div className="text-[10px]" style={{ color: SC.textSub }}>跟隨市場行情</div>
+            </div>
+          </div>
+
+          {/* AI 演算法說明 */}
+          <div className="mt-3 rounded-md p-3 text-[11px]" style={{ background: SC.surfaceDim, color: SC.textSub }}>
+            <div className="font-bold mb-1" style={{ color: SC.text }}>📐 AI 判定演算法</div>
+            <div>合理價 = LME / 中鋼 / INSEE 市場指數 × 該料件金屬佔比 × 製造加工係數（業界常數 1.2-1.5x）</div>
+            <div>誠信度 = 過去 12 個月「報價跟市場走勢」相關係數（&gt;85% 良好 / 70-85 觀察 / &lt;70 紅旗）</div>
+            <div>連續 3 月偏高 &gt; 10%（且金屬價無對應上漲）= 自動標 🚨</div>
           </div>
         </Card>
 
