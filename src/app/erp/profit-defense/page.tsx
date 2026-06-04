@@ -337,7 +337,7 @@ export default function ProfitDefensePage() {
                     />
                   )}
 
-                  {/* 突兀峰值標註（含原因 callout — 放在圖表空白角落） */}
+                  {/* 突兀峰值標註（圖內只留小標籤，詳細說明移到圖外） */}
                   {(() => {
                     if (realPoints.length === 0) return null;
                     const maxP = Math.max(...realPoints.map((p) => p.price));
@@ -346,44 +346,15 @@ export default function ProfitDefensePage() {
                     const sp = realPoints[idx];
                     const sx = scaleX(idx, allPoints.length);
                     const sy = scaleY(sp.price);
-                    const cause = SPIKE_CAUSES[c.code];
-                    // Callout 尺寸
-                    const boxW = 230;
-                    const boxH = 60;
-                    // 策略：把 box 放在離 dot 最遠的「上方角落」（通常空白區）
-                    //  - 點在右半 → box 放左上
-                    //  - 點在左半 → box 放右上
-                    //  - 若點本身在上半且垂直距離不夠 → box 改放下方角落
-                    const cornerLeft = sx >= (PAD_L + (W - PAD_R)) / 2;
-                    const cornerTop = sy >= (PAD_T + (H - PAD_B)) / 2;
-                    const boxX = cornerLeft
-                      ? PAD_L + 8
-                      : W - PAD_R - boxW - 8;
-                    const boxY = cornerTop
-                      ? PAD_T + 8
-                      : H - PAD_B - boxH - 8;
-                    // box 朝向 dot 的錨點（用於連接線）
-                    const boxAnchorX = cornerLeft ? boxX + boxW : boxX;
-                    const boxAnchorY = boxY + boxH / 2;
+                    // 小標籤位置：點旁邊（左右擇空）
+                    const onLeft = sx > (PAD_L + (W - PAD_R)) / 2;
+                    const labelX = onLeft ? sx - 8 : sx + 8;
                     return (
                       <g>
-                        {/* dot */}
                         <circle cx={sx} cy={sy} r="6" fill="#fbbf24" stroke={C.red} strokeWidth="2" />
-                        {/* 斜虛線：box 邊緣 → dot */}
-                        <line x1={boxAnchorX} y1={boxAnchorY} x2={sx} y2={sy} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="3,3" />
-                        {/* callout 框 */}
-                        <rect x={boxX} y={boxY} width={boxW} height={boxH} rx="4" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1.2" />
-                        {/* 價格 */}
-                        <text x={boxX + 8} y={boxY + 17} fontSize="11" fontWeight="700" fill="#92400e">
-                          ⚠ ${Math.round(sp.price).toLocaleString()} / {c.unit.split("/")[1] ?? "MT"} 歷史高點（{cause?.yearMonth}）
-                        </text>
-                        {/* 原因 */}
-                        <text x={boxX + 8} y={boxY + 34} fontSize="10" fontWeight="600" fill="#92400e">
-                          {cause?.reason}
-                        </text>
-                        {/* 細節 */}
-                        <text x={boxX + 8} y={boxY + 50} fontSize="9" fill="#7c2d12">
-                          {cause?.detail && cause.detail.length > 36 ? cause.detail.slice(0, 36) + "…" : cause?.detail}
+                        <text x={labelX} y={sy - 12} textAnchor={onLeft ? "end" : "start"}
+                              fontSize="11" fontWeight="700" fill="#92400e">
+                          ⚠ ${Math.round(sp.price).toLocaleString()}
                         </text>
                       </g>
                     );
@@ -411,17 +382,28 @@ export default function ProfitDefensePage() {
                 )}
               </div>
 
-              {/* 數據來源（突兀點原因已移到圖內 callout） */}
-              <div className="mt-3 pt-3 border-t text-[11px]" style={{ borderColor: C.border }}>
-                <div className="font-bold mb-1" style={{ color: C.text }}>📡 數據來源</div>
-                <div style={{ color: C.textSub }}>{DATA_SOURCE[c.code]?.label ?? c.source}</div>
-                {DATA_SOURCE[c.code]?.url && (
-                  <a href={DATA_SOURCE[c.code]!.url} target="_blank" rel="noopener noreferrer"
-                     className="block mt-1 text-[10px] hover:underline break-all" style={{ color: C.blue }}>
-                    🔗 {DATA_SOURCE[c.code]!.url}
-                  </a>
-                )}
-                <div className="mt-1 text-[10px]" style={{ color: C.outline }}>同步頻率：每日 08:00 自動拉取 · 即時 API（盤中 5min refresh）</div>
+              {/* 圖外資訊：突兀點原因 + 數據來源（雙欄並排，不再蓋住折線圖） */}
+              <div className="mt-3 pt-3 border-t grid sm:grid-cols-2 gap-3 text-[11px]" style={{ borderColor: C.border }}>
+                {/* 左：突兀點原因 */}
+                <div className="rounded-md p-3" style={{ background: "#fef3c7", border: `1px solid #f59e0b` }}>
+                  <div className="font-bold mb-1" style={{ color: "#92400e" }}>
+                    ⚠ 歷史突兀點 · {SPIKE_CAUSES[c.code]?.yearMonth}
+                  </div>
+                  <div className="text-sm font-bold" style={{ color: "#92400e" }}>{SPIKE_CAUSES[c.code]?.reason}</div>
+                  <div className="mt-1" style={{ color: "#7c2d12" }}>{SPIKE_CAUSES[c.code]?.detail}</div>
+                </div>
+                {/* 右：數據來源 */}
+                <div>
+                  <div className="font-bold mb-1" style={{ color: C.text }}>📡 數據來源</div>
+                  <div style={{ color: C.textSub }}>{DATA_SOURCE[c.code]?.label ?? c.source}</div>
+                  {DATA_SOURCE[c.code]?.url && (
+                    <a href={DATA_SOURCE[c.code]!.url} target="_blank" rel="noopener noreferrer"
+                       className="block mt-1 text-[10px] hover:underline break-all" style={{ color: C.blue }}>
+                      🔗 {DATA_SOURCE[c.code]!.url}
+                    </a>
+                  )}
+                  <div className="mt-1 text-[10px]" style={{ color: C.outline }}>同步頻率：每日 08:00 自動拉取 · 即時 API（盤中 5min refresh）</div>
+                </div>
               </div>
             </div>
 
@@ -621,67 +603,120 @@ export default function ProfitDefensePage() {
               <span style={{ color: C.textSub }}>v0.3 · 12 個變數 / 預測模型已熱身</span>
             </div>
 
-            {/* 成本敏感度 Cost Sensitivity（取代原 Profit Impact Center） */}
+            {/* 成本敏感度分析 Cost Sensitivity Intelligence（Executive 版） */}
             <div className="rounded-lg border bg-white p-4" style={{ borderColor: C.border, borderLeft: `4px solid ${C.primary}` }}>
               <div className="flex items-baseline justify-between mb-1">
-                <h3 className="text-base font-bold">成本敏感度 <span className="text-[11px] font-normal" style={{ color: C.textSub }}>Cost Sensitivity</span></h3>
+                <h3 className="text-base font-bold">成本敏感度分析</h3>
                 <span className="text-[9px] font-bold px-2 py-0.5 rounded" style={{ background: C.primary, color: "#fff" }}>L4·EXECUTIVE</span>
               </div>
-              <div className="text-[11px] mb-3" style={{ color: C.textSub }}>Commodity Risk Index · 原料風險指數 ／ 各產品線</div>
+              <div className="text-[11px] mb-3" style={{ color: C.textSub }}>Cost Sensitivity Intelligence</div>
 
-              {/* 產品線風險表 */}
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-left border-b" style={{ borderColor: C.border, color: C.textSub }}>
-                    <th className="py-1.5 text-[9px] font-bold uppercase tracking-widest">產品線</th>
-                    <th className="py-1.5 text-[9px] font-bold uppercase tracking-widest text-right">毛利率</th>
-                    <th className="py-1.5 text-[9px] font-bold uppercase tracking-widest text-right">Profit at Risk</th>
-                    <th className="py-1.5 text-[9px] font-bold uppercase tracking-widest text-right">原料風險</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    { line: "跑步機", margin: 22.1, par: "+80 萬",  parTone: C.primary, risk: "低", riskColor: "#059669" },
-                    { line: "飛輪車", margin: 18.4, par: "-120 萬", parTone: C.red,     risk: "中", riskColor: "#d97706" },
-                    { line: "橢圓機", margin: 13.2, par: "-320 萬", parTone: C.red,     risk: "高", riskColor: C.red },
-                    { line: "重訓",   margin: 16.7, par: "-95 萬",  parTone: C.red,     risk: "中", riskColor: "#d97706" },
-                  ].map((p) => (
-                    <tr key={p.line} className="border-b" style={{ borderColor: C.border }}>
-                      <td className="py-2 font-semibold" style={{ color: C.text }}>{p.line}</td>
-                      <td className="py-2 text-right font-mono">{p.margin.toFixed(1)}%</td>
-                      <td className="py-2 text-right font-mono font-semibold" style={{ color: p.parTone }}>{p.par}</td>
-                      <td className="py-2 text-right">
-                        <span className="font-bold" style={{ color: p.riskColor }}>● {p.risk}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {/* 原料風險分析（drill-down） */}
-              <div className="mt-3 pt-3 border-t" style={{ borderColor: C.border }}>
-                <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.textSub }}>原料風險分析（成本佔比）</div>
-                <div className="space-y-1.5">
-                  {[
-                    { name: "銅材", pct: 42, tone: C.red },
-                    { name: "鋼材", pct: 18, tone: "#d97706" },
-                    { name: "IC",   pct: 12, tone: C.blue },
-                    { name: "塑膠", pct:  8, tone: "#059669" },
-                    { name: "其他", pct: 20, tone: C.outline },
-                  ].map((r) => (
-                    <div key={r.name} className="flex items-center gap-2 text-[11px]">
-                      <span className="w-10 shrink-0" style={{ color: C.text }}>{r.name}</span>
-                      <span className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: C.surfaceDim }}>
-                        <span className="block h-full rounded-full" style={{ width: `${r.pct}%`, background: r.tone }} />
+              {/* 區塊 1 — 產品線風險排行（依 PAR 由壞到好排序） */}
+              <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.textSub, letterSpacing: "0.08em" }}>
+                ▎產品線風險排行
+              </div>
+              <ul className="text-xs mb-4">
+                {[
+                  { line: "橢圓機", par: -320, risk: "高", riskColor: C.red },
+                  { line: "飛輪車", par: -120, risk: "中", riskColor: "#d97706" },
+                  { line: "重訓",   par:  -95, risk: "中", riskColor: "#d97706" },
+                  { line: "跑步機", par:  +80, risk: "低", riskColor: "#059669" },
+                ].map((p) => (
+                  <li key={p.line} className="flex items-baseline justify-between border-b py-1.5 last:border-0" style={{ borderColor: C.border }}>
+                    <span className="font-semibold" style={{ color: C.text }}>{p.line}</span>
+                    <span className="flex items-baseline gap-3">
+                      <span className="font-mono font-semibold" style={{ color: p.par < 0 ? C.red : "#059669" }}>
+                        {p.par > 0 ? "+" : ""}{p.par} 萬
                       </span>
-                      <span className="w-10 text-right font-mono font-semibold" style={{ color: r.tone }}>{r.pct}%</span>
-                    </div>
-                  ))}
+                      <span className="text-xs font-bold w-6 text-right" style={{ color: p.riskColor }}>● {p.risk}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              {/* 區塊 2 — 成本構成 */}
+              <div className="text-[10px] font-bold uppercase tracking-widest mb-2 pt-3 border-t" style={{ color: C.textSub, borderColor: C.border, letterSpacing: "0.08em" }}>
+                ▎成本構成
+              </div>
+              <div className="space-y-1 mb-4">
+                {[
+                  { name: "銅材", pct: 42, tone: C.red },
+                  { name: "鋼材", pct: 18, tone: "#d97706" },
+                  { name: "IC",   pct: 12, tone: C.blue },
+                  { name: "塑膠", pct:  8, tone: "#059669" },
+                  { name: "其他", pct: 20, tone: C.outline },
+                ].map((r) => (
+                  <div key={r.name} className="flex items-center gap-2 text-[11px]">
+                    <span className="w-10 shrink-0" style={{ color: C.text }}>{r.name}</span>
+                    <span className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: C.surfaceDim }}>
+                      <span className="block h-full rounded-full" style={{ width: `${r.pct}%`, background: r.tone }} />
+                    </span>
+                    <span className="w-10 text-right font-mono font-semibold" style={{ color: r.tone }}>{r.pct}%</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* 區塊 3 — 成本敏感度（金屬漲 X% → 毛利 Y%） */}
+              <div className="text-[10px] font-bold uppercase tracking-widest mb-2 pt-3 border-t" style={{ color: C.textSub, borderColor: C.border, letterSpacing: "0.08em" }}>
+                ▎成本敏感度
+              </div>
+              <ul className="space-y-1.5 mb-4 text-xs">
+                {[
+                  { metal: "銅材", up: "+5%", margin: "-2.1%", tone: C.red },
+                  { metal: "鋁材", up: "+5%", margin: "-0.9%", tone: "#d97706" },
+                  { metal: "鋼材", up: "+3%", margin: "-0.4%", tone: "#d97706" },
+                ].map((s) => (
+                  <li key={s.metal} className="flex items-baseline justify-between">
+                    <span className="flex items-baseline gap-2">
+                      <span className="font-semibold" style={{ color: C.text }}>{s.metal}</span>
+                      <span className="font-mono" style={{ color: s.tone }}>{s.up}</span>
+                    </span>
+                    <span className="flex items-baseline gap-1">
+                      <span style={{ color: C.textSub }}>毛利</span>
+                      <span className="font-mono font-bold" style={{ color: s.tone }}>{s.margin}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              {/* 區塊 4 — AI 預測 */}
+              <div className="text-[10px] font-bold uppercase tracking-widest mb-2 pt-3 border-t" style={{ color: C.textSub, borderColor: C.border, letterSpacing: "0.08em" }}>
+                ▎AI 預測
+              </div>
+              <div className="rounded-md p-3 mb-4" style={{ background: C.surfaceDim }}>
+                <div className="text-[10px]" style={{ color: C.textSub }}>未來 30 天</div>
+                <div className="flex items-baseline gap-2 mt-0.5">
+                  <span className="text-sm font-semibold" style={{ color: C.text }}>銅材</span>
+                  <span className="text-base font-bold" style={{ color: C.red }}>↑</span>
                 </div>
-                <div className="mt-2 text-[10px]" style={{ color: C.textSub }}>
-                  ※ 銅材佔比 42% 為最高風險 — 銅價每漲 5% 直接影響整體成本 +2.1%
+                <div className="mt-1.5 text-[11px]" style={{ color: C.textSub }}>
+                  相關毛利 <span className="font-mono" style={{ color: C.textSub }}>13.2%</span>
+                  <span className="mx-1" style={{ color: C.red }}>↓</span>
+                  <span className="font-mono font-bold" style={{ color: C.red }}>11.8%</span>
                 </div>
               </div>
+
+              {/* 區塊 5 — AI 建議 */}
+              <div className="text-[10px] font-bold uppercase tracking-widest mb-2 pt-3 border-t" style={{ color: C.textSub, borderColor: C.border, letterSpacing: "0.08em" }}>
+                ▎AI 建議
+              </div>
+              <ul className="space-y-1.5 text-xs">
+                {[
+                  { title: "提前採購銅",       saving: "+95 萬" },
+                  { title: "啟動替代規格",     saving: "+60 萬" },
+                  { title: "議價／避險方案",   saving: "+25 萬" },
+                ].map((a) => (
+                  <li key={a.title} className="flex items-baseline justify-between">
+                    <span className="flex items-baseline gap-1.5" style={{ color: C.text }}>
+                      <span style={{ color: C.primary }}>✓</span>
+                      <span>{a.title}</span>
+                    </span>
+                    <span className="text-[10px]" style={{ color: C.textSub }}>
+                      可省 <span className="font-mono font-bold" style={{ color: C.primary }}>{a.saving}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
 
           </aside>
