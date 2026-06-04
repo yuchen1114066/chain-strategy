@@ -320,7 +320,7 @@ export default function ProfitDefensePage() {
                     />
                   )}
 
-                  {/* 突兀峰值標註 */}
+                  {/* 突兀峰值標註（含原因 callout） */}
                   {(() => {
                     if (realPoints.length === 0) return null;
                     const maxP = Math.max(...realPoints.map((p) => p.price));
@@ -329,13 +329,32 @@ export default function ProfitDefensePage() {
                     const sp = realPoints[idx];
                     const sx = scaleX(idx, allPoints.length);
                     const sy = scaleY(sp.price);
+                    const cause = SPIKE_CAUSES[c.code];
+                    // Callout 尺寸
+                    const boxW = 230;
+                    const boxH = 60;
+                    // 位置：優先放在點上方，邊界 clamp 避免出圖
+                    const boxX = Math.max(PAD_L + 4, Math.min(W - PAD_R - boxW - 4, sx - boxW / 2));
+                    const boxY = Math.max(PAD_T + 4, sy - boxH - 14);
                     return (
                       <g>
+                        {/* dot */}
                         <circle cx={sx} cy={sy} r="6" fill="#fbbf24" stroke={C.red} strokeWidth="2" />
-                        <line x1={sx} y1={sy - 6} x2={sx} y2={sy - 32} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="3,3" />
-                        <rect x={sx - 70} y={sy - 56} width="140" height="22" rx="3" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1" />
-                        <text x={sx} y={sy - 41} textAnchor="middle" fontSize="10" fontWeight="600" fill="#92400e">
-                          ⚠ ${Math.round(sp.price).toLocaleString()} / {c.unit.split("/")[1] ?? "MT"}
+                        {/* 連接線 */}
+                        <line x1={sx} y1={sy - 6} x2={sx} y2={boxY + boxH} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="3,3" />
+                        {/* callout 框 */}
+                        <rect x={boxX} y={boxY} width={boxW} height={boxH} rx="4" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1.2" />
+                        {/* 價格 */}
+                        <text x={boxX + 8} y={boxY + 17} fontSize="11" fontWeight="700" fill="#92400e">
+                          ⚠ ${Math.round(sp.price).toLocaleString()} / {c.unit.split("/")[1] ?? "MT"} 歷史高點（{cause?.yearMonth}）
+                        </text>
+                        {/* 原因 */}
+                        <text x={boxX + 8} y={boxY + 34} fontSize="10" fontWeight="600" fill="#92400e">
+                          {cause?.reason}
+                        </text>
+                        {/* 細節 */}
+                        <text x={boxX + 8} y={boxY + 50} fontSize="9" fill="#7c2d12">
+                          {cause?.detail && cause.detail.length > 36 ? cause.detail.slice(0, 36) + "…" : cause?.detail}
                         </text>
                       </g>
                     );
@@ -363,24 +382,17 @@ export default function ProfitDefensePage() {
                 )}
               </div>
 
-              {/* 數據來源 + 突兀點說明 */}
-              <div className="mt-3 pt-3 border-t grid sm:grid-cols-2 gap-3 text-[11px]" style={{ borderColor: C.border }}>
-                <div>
-                  <div className="font-bold mb-1" style={{ color: C.text }}>📡 數據來源</div>
-                  <div style={{ color: C.textSub }}>{DATA_SOURCE[c.code]?.label ?? c.source}</div>
-                  {DATA_SOURCE[c.code]?.url && (
-                    <a href={DATA_SOURCE[c.code]!.url} target="_blank" rel="noopener noreferrer"
-                       className="block mt-1 text-[10px] hover:underline break-all" style={{ color: C.blue }}>
-                      🔗 {DATA_SOURCE[c.code]!.url}
-                    </a>
-                  )}
-                  <div className="mt-1 text-[10px]" style={{ color: C.outline }}>同步頻率：每日 08:00 自動拉取 · 即時 API（盤中 5min refresh）</div>
-                </div>
-                <div>
-                  <div className="font-bold mb-1" style={{ color: "#92400e" }}>⚠ 突兀點原因（{SPIKE_CAUSES[c.code]?.yearMonth}）</div>
-                  <div style={{ color: C.text }}><b>{SPIKE_CAUSES[c.code]?.reason}</b></div>
-                  <div className="mt-0.5" style={{ color: C.textSub }}>{SPIKE_CAUSES[c.code]?.detail}</div>
-                </div>
+              {/* 數據來源（突兀點原因已移到圖內 callout） */}
+              <div className="mt-3 pt-3 border-t text-[11px]" style={{ borderColor: C.border }}>
+                <div className="font-bold mb-1" style={{ color: C.text }}>📡 數據來源</div>
+                <div style={{ color: C.textSub }}>{DATA_SOURCE[c.code]?.label ?? c.source}</div>
+                {DATA_SOURCE[c.code]?.url && (
+                  <a href={DATA_SOURCE[c.code]!.url} target="_blank" rel="noopener noreferrer"
+                     className="block mt-1 text-[10px] hover:underline break-all" style={{ color: C.blue }}>
+                    🔗 {DATA_SOURCE[c.code]!.url}
+                  </a>
+                )}
+                <div className="mt-1 text-[10px]" style={{ color: C.outline }}>同步頻率：每日 08:00 自動拉取 · 即時 API（盤中 5min refresh）</div>
               </div>
             </div>
 
