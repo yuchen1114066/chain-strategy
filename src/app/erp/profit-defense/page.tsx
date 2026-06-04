@@ -350,15 +350,23 @@ export default function ProfitDefensePage() {
                     // Callout 尺寸
                     const boxW = 230;
                     const boxH = 60;
-                    // 位置：優先放在點上方，邊界 clamp 避免出圖
+                    const VGAP = 28;   // box 與 dot 的垂直間距（避免壓到點）
+                    // X 位置：點上方 / clamp 不出邊界
                     const boxX = Math.max(PAD_L + 4, Math.min(W - PAD_R - boxW - 4, sx - boxW / 2));
-                    const boxY = Math.max(PAD_T + 4, sy - boxH - 14);
+                    // Y 位置：優先上方；若上方空間不夠則翻到下方
+                    const placeAbove = sy - boxH - VGAP >= PAD_T + 4;
+                    const boxY = placeAbove
+                      ? sy - boxH - VGAP
+                      : Math.min(H - PAD_B - boxH - 4, sy + VGAP);
+                    // 連接線端點
+                    const lineY1 = placeAbove ? sy - 8 : sy + 8;
+                    const lineY2 = placeAbove ? boxY + boxH : boxY;
                     return (
                       <g>
                         {/* dot */}
                         <circle cx={sx} cy={sy} r="6" fill="#fbbf24" stroke={C.red} strokeWidth="2" />
-                        {/* 連接線 */}
-                        <line x1={sx} y1={sy - 6} x2={sx} y2={boxY + boxH} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="3,3" />
+                        {/* 連接虛線（不再壓到點） */}
+                        <line x1={sx} y1={lineY1} x2={sx} y2={lineY2} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="3,3" />
                         {/* callout 框 */}
                         <rect x={boxX} y={boxY} width={boxW} height={boxH} rx="4" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1.2" />
                         {/* 價格 */}
