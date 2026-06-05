@@ -19,6 +19,24 @@ export default function L3ProcurementPage() {
           <p className="text-sm mt-1" style={{ color: SC.textSub }}>實時採購最有情情資面</p>
         </header>
 
+        {/* AI Quotation Analyzer — 新模組入口 */}
+        <Link
+          href="/erp/quotation-analyzer"
+          className="block rounded-xl border-2 p-5 transition-shadow hover:shadow-lg"
+          style={{ borderColor: "#76b900", background: "linear-gradient(135deg, #f0f7e4 0%, #ffffff 100%)" }}
+        >
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <span className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded text-white" style={{ background: "#0c1908", letterSpacing: "0.12em" }}>NEW MODULE</span>
+            <h2 className="text-xl font-bold" style={{ color: "#0c1908" }}>✦ AI Quotation Analyzer</h2>
+            <span className="text-xs" style={{ color: "#4d7c0f" }}>關鍵不是報價，而是 Cost Breakdown</span>
+            <span className="flex-1" />
+            <span className="text-xs font-mono" style={{ color: "#4d7c0f" }}>進入模組 →</span>
+          </div>
+          <p className="text-xs mt-2" style={{ color: SC.textSub }}>
+            OCR 抽欄位 → BOM Match → Commodity Engine → Should-Cost Engine → Negotiation Copilot · 6 子模組
+          </p>
+        </Link>
+
         {/* PO Dashboard */}
         <Card accent={SC.primary}>
           <h2 className="text-base font-semibold mb-3">PO Dashboard</h2>
