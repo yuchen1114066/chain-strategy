@@ -311,42 +311,80 @@ export default function QuotationAnalyzerPage() {
 
         {/* ──────────────────────────── 4-step pipeline ──────────────────────────── */}
 
-        {/* Step 1 · OCR */}
-        <StepHeader badge="STEP 1" title="供應商上傳報價" en="Supplier uploads quote → AI OCR" desc="PDF / JPG / Excel 都可，AI 自動讀取表格" />
+        {/* Step 1 · 報價單合理性查詢 */}
+        <StepHeader badge="STEP 1" title="報價單合理性查詢" en="Quote Reasonableness Check · upload → AI OCR" desc="點下方任一格式上傳供應商報價單，AI 自動讀取並比對 Should-Cost 合理上限" />
         <Card>
           <div className="grid lg:grid-cols-[260px,1fr] gap-5">
             <div>
               <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 8 }}>
-                ① UPLOAD · 可接受格式
+                ① 上傳報價單 · 點下方任一格式
               </div>
               <div className="space-y-2">
                 {[
-                  { fmt: "PDF",   icon: "📄", note: "完整報價單 / 議價表" },
-                  { fmt: "JPG",   icon: "📷", note: "拍照 / 截圖也可" },
-                  { fmt: "Excel", icon: "📊", note: "供應商標準 quote 表" },
+                  { fmt: "PDF",   icon: "📄", note: "完整報價單 / 議價表",  accept: ".pdf,application/pdf" },
+                  { fmt: "JPG",   icon: "📷", note: "拍照 / 截圖也可",      accept: "image/jpeg,image/jpg,image/png" },
+                  { fmt: "Excel", icon: "📊", note: "供應商標準 quote 表",  accept: ".xlsx,.xls,.csv" },
                 ].map((f) => (
-                  <div key={f.fmt} className="rounded-[10px] p-3 flex items-center gap-3" style={{ background: BR.greenSoft, border: `1px solid ${BR.greenLine}` }}>
+                  <label
+                    key={f.fmt}
+                    className="rounded-[10px] p-3 flex items-center gap-3 cursor-pointer transition-shadow"
+                    style={{ background: BR.greenSoft, border: `1px solid ${BR.greenLine}` }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLLabelElement).style.boxShadow = "0 2px 8px rgba(76,124,15,.18)"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLLabelElement).style.boxShadow = "none"; }}
+                  >
+                    <input
+                      type="file"
+                      accept={f.accept}
+                      hidden
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        showToast(`📂 ${f.fmt} 上傳中：${file.name} （${(file.size / 1024).toFixed(0)} KB）`);
+                        setTimeout(() => {
+                          showToast(`✓ AI OCR 已完成讀取 ${file.name} — 抽出 1 筆報價、6 個關鍵欄位（demo · 結果已合併至下方分析）`);
+                        }, 900);
+                        e.target.value = ""; // 允許重複上傳同一檔案
+                      }}
+                    />
                     <span style={{ fontSize: 22 }}>{f.icon}</span>
                     <div className="flex-1">
                       <div style={{ fontFamily: FONT_MONO, fontWeight: 700, fontSize: 13, color: BR.greenInk }}>{f.fmt}</div>
                       <div style={{ fontSize: 10.5, color: BR.greenDeep }}>{f.note}</div>
                     </div>
-                  </div>
+                    <span style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.greenDeep }}>＋上傳</span>
+                  </label>
                 ))}
               </div>
               <div className="mt-4 rounded-[10px] p-3" style={{ background: BR.greenInk, color: "#fff" }}>
-                <div style={{ fontFamily: FONT_MONO, fontSize: 9.5, color: "#9aa78d", letterSpacing: "0.1em" }}>AI OCR 已抽出</div>
+                <div style={{ fontFamily: FONT_MONO, fontSize: 9.5, color: "#9aa78d", letterSpacing: "0.1em" }}>AI 自動辨識結果</div>
                 <div style={{ fontFamily: FONT_MONO, fontSize: 22, fontWeight: 700, color: BR.green, marginTop: 4 }}>
-                  3 列 / 6 欄位
+                  3 筆報價　·　6 欄位
                 </div>
-                <div style={{ fontSize: 10.5, color: "#aebba0", marginTop: 4 }}>供應商 · 料號 · 舊價 · 新價 · 漲幅 · 原因</div>
+                <div style={{ fontSize: 10.5, color: "#aebba0", marginTop: 4 }}>欄位：供應商 · 料號 · 舊單價 · 新單價 · 漲幅 · 原因</div>
               </div>
             </div>
 
             <div>
-              <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 8 }}>
-                ② AI 自動讀取結果
+              <div className="flex items-baseline justify-between flex-wrap gap-2 mb-2">
+                <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>
+                  ② OCR 抽出的報價清單 · 點任一列查看合理性
+                </div>
+                <span style={{ fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700, color: "#fff", background: BR.purple, padding: "2px 7px", borderRadius: 4, letterSpacing: "0.06em" }}>
+                  DEMO · 已預載 3 筆近期報價
+                </span>
               </div>
+
+              {/* 說明這 3 筆是什麼 */}
+              <div className="mb-3 rounded-[8px] p-2.5 text-xs leading-relaxed" style={{ background: BR.greenSoft, border: `1px solid ${BR.greenLine}`, color: "#3c4a2e" }}>
+                <b style={{ color: BR.greenInk }}>這 3 筆是什麼？</b>
+                為 demo 預載「近期收到的 3 份供應商調價通知」OCR 結果：<b>企能</b>（你目前的供應商）對
+                <b className="mono"> P03M3001</b> 與 <b className="mono">P03M3009</b> 兩個料號同時調漲、
+                <b>茂晟</b>則送來 <b className="mono">F18-COIL</b> 的漲價單。預設選中第 1 列
+                <b className="mono"> P03M3001</b> 進入 STEP 2–4 的 BOM / Should-Cost / 議價分析。
+                <br/>
+                <b style={{ color: BR.greenInk }}>正式版</b>會自動串接「待簽核報價」資料夾，每收到一封新報價自動跑這個流程。
+              </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full text-sm" style={{ borderCollapse: "collapse", minWidth: 580 }}>
                   <thead>
