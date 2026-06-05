@@ -119,6 +119,58 @@ const AFFECTED_PARTS: Record<string, AffectedPart[]> = {
   ],
 };
 
+// ────────────────────────────────────────────────────────────
+// 影響摘要 + 供應商曝險（per commodity）
+// 對應「AI 六步框架」的 ③ IMPACT 卡 以及 Impact Tree 下方的 Supplier Exposure
+// ────────────────────────────────────────────────────────────
+const IMPACT_SUMMARY: Record<string, { products: number; customers: number; orders: number; lossMan: number }> = {
+  CU:       { products: 4, customers: 3, orders: 12, lossMan: 100 },
+  STEEL:    { products: 3, customers: 2, orders:  8, lossMan:  80 },
+  AL:       { products: 2, customers: 2, orders:  6, lossMan:  55 },
+  PLASTIC:  { products: 4, customers: 3, orders: 10, lossMan:  40 },
+  PIG_IRON: { products: 1, customers: 1, orders:  3, lossMan:  35 },
+};
+
+// 商品 → 供應商曝險（誰賣我們這個原料、買多少、影響哪條產品）
+const SUPPLIER_EXPOSURE: Record<string, { code: string; name: string; amountMan: number; product: string; share: number }[]> = {
+  CU: [
+    { code: "S-A", name: "Supplier A · 漆包銅線",   amountMan: 120, product: "橢圓機", share: 48 },
+    { code: "S-B", name: "Supplier B · 馬達線圈",   amountMan:  80, product: "飛輪車", share: 32 },
+    { code: "S-C", name: "Supplier C · 電源變壓器", amountMan:  45, product: "重訓",   share: 18 },
+  ],
+  STEEL: [
+    { code: "S-D", name: "Supplier D · 鋼板裁切", amountMan: 110, product: "橢圓機", share: 48 },
+    { code: "S-E", name: "Supplier E · 鋼管組件", amountMan:  70, product: "飛輪車", share: 30 },
+    { code: "S-F", name: "Supplier F · 軸件加工", amountMan:  35, product: "跑步機", share: 15 },
+  ],
+  AL: [
+    { code: "S-G", name: "Supplier G · 鋁錠供料", amountMan: 60, product: "飛輪車", share: 55 },
+    { code: "S-H", name: "Supplier H · 鋁件加工", amountMan: 40, product: "橢圓機", share: 36 },
+  ],
+  PLASTIC: [
+    { code: "S-I", name: "Supplier I · PE/PU 顆粒", amountMan: 35, product: "跑步機", share: 60 },
+    { code: "S-J", name: "Supplier J · 塑料外殼",   amountMan: 20, product: "橢圓機", share: 34 },
+  ],
+  PIG_IRON: [
+    { code: "S-K", name: "Supplier K · 鑄鐵塊",    amountMan: 55, product: "重訓", share: 80 },
+    { code: "S-L", name: "Supplier L · 越南鑄鐵",  amountMan: 12, product: "重訓", share: 18 },
+  ],
+};
+
+// Impact Tree cascade 用的供應商 + 客戶（per metal）
+const SCENARIO_PARTY: Record<string, { supplier: string; customer: string }> = {
+  銅:   { supplier: "Supplier A · 漆包銅線",       customer: "客戶 A · 北美健身房連鎖" },
+  鋼:   { supplier: "Supplier D · 鋼板裁切",       customer: "客戶 B · 北美零售品牌" },
+  鋁:   { supplier: "Supplier G · 鋁錠供料",       customer: "客戶 C · 歐洲品牌" },
+  塑料: { supplier: "Supplier I · PE/PU 顆粒",     customer: "客戶 D · 日本代理商" },
+  混鐵: { supplier: "Supplier K · 鑄鐵塊",         customer: "客戶 E · OEM 大廠" },
+  IC:   { supplier: "Supplier M · MCU/IC 模組",    customer: "客戶 F · 智能健身平台" },
+};
+
+const METAL_TO_CODE: Record<string, string> = {
+  銅: "CU", 鋼: "STEEL", 鋁: "AL", 塑料: "PLASTIC", 混鐵: "PIG_IRON", IC: "CU",
+};
+
 const USD_TWD = 31.5;
 
 export default function ProfitDefensePage() {
@@ -504,18 +556,19 @@ export default function ProfitDefensePage() {
             {/* Product Cost Intelligence · 產品成本情報（互動式 — 點產品線展開 BOM + 成本鏈） */}
             <ProductCostIntelligence />
 
-            {/* AI 判斷 — 4 步框架：Current / Why / Prediction / Action */}
+            {/* AI 判斷 — 6 步框架：Current / Why / Impact / Prediction / Recovery / Action */}
             <div className="rounded-lg border p-4" style={{ borderColor: C.border, background: `${C.blueLight}10` }}>
-              <div className="flex items-baseline justify-between mb-3">
+              <div className="flex items-baseline justify-between mb-3 flex-wrap gap-1">
                 <div className="flex items-baseline gap-2">
                   <span className="text-lg">✨</span>
-                  <h3 className="text-sm font-bold">AI 四步分析框架</h3>
+                  <h3 className="text-sm font-bold">AI 六步分析框架</h3>
                   <span className="text-[10px]" style={{ color: C.textSub }}>{c.name} ({c.nameEn})</span>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: C.blue, color: "#fff" }}>UPGRADED · +Impact +Recovery</span>
                 </div>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded" style={{ background: C.primary, color: "#fff" }}>信心 {adv.confidence}</span>
               </div>
 
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-2.5">
                 {/* 1. 現在發生什麼 Current */}
                 <div className="rounded-md p-3 border" style={{ background: "#ffffff", borderColor: C.border, borderTop: `3px solid ${C.blue}` }}>
                   <div className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: C.blue, letterSpacing: "0.1em" }}>
@@ -543,10 +596,34 @@ export default function ProfitDefensePage() {
                   </div>
                 </div>
 
-                {/* 3. 未來會怎樣 Prediction */}
+                {/* 3. 影響 Impact ── 衝擊範圍量化（新增） */}
+                {(() => {
+                  const imp = IMPACT_SUMMARY[c.code];
+                  const sups = SUPPLIER_EXPOSURE[c.code] ?? [];
+                  return (
+                    <div className="rounded-md p-3 border" style={{ background: "#ffffff", borderColor: C.border, borderTop: `3px solid #c026d3` }}>
+                      <div className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: "#c026d3", letterSpacing: "0.1em" }}>
+                        ③ IMPACT
+                      </div>
+                      <div className="text-[10px] mb-1" style={{ color: C.textSub }}>波及範圍量化</div>
+                      <div className="grid grid-cols-2 gap-1.5 mt-1.5">
+                        <Mini k="影響產品" v={`${imp?.products ?? 0} 項`} tone={C.text} />
+                        <Mini k="影響客戶" v={`${imp?.customers ?? 0} 家`} tone={C.text} />
+                        <Mini k="影響訂單" v={`${imp?.orders ?? 0} 筆`} tone={C.text} />
+                        <Mini k="影響供應商" v={`${sups.length} 家`} tone={C.text} />
+                      </div>
+                      <div className="mt-2 pt-2 border-t" style={{ borderColor: C.border }}>
+                        <div className="text-[10px]" style={{ color: C.textSub }}>預估毛利損失</div>
+                        <div className="text-lg font-extrabold tabular-nums" style={{ color: C.red }}>−{imp?.lossMan ?? 0} 萬</div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 4. 未來會怎樣 Prediction */}
                 <div className="rounded-md p-3 border" style={{ background: "#ffffff", borderColor: C.border, borderTop: `3px solid ${C.red}` }}>
                   <div className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: C.red, letterSpacing: "0.1em" }}>
-                    ③ PREDICTION
+                    ④ PREDICTION
                   </div>
                   <div className="text-[10px] mb-1" style={{ color: C.textSub }}>未來會怎樣 · AI 預測</div>
                   <div className="text-sm font-bold leading-tight" style={{ color: C.text }}>{adv.aiVerdict}</div>
@@ -566,10 +643,36 @@ export default function ProfitDefensePage() {
                   </div>
                 </div>
 
-                {/* 4. 要怎麼做 Action */}
+                {/* 5. 救援 Recovery ── 可回收金額 + 路徑（新增） */}
+                {(() => {
+                  const profile = PRODUCT_PROFILES.find((p) => p.sensitivity.some((s) => METAL_TO_CODE[s.metal] === c.code)) ?? PRODUCT_PROFILES[0];
+                  const recoverable = profile.recovery.reduce((s, r) => s + r.saving, 0);
+                  return (
+                    <div className="rounded-md p-3 border" style={{ background: "#ffffff", borderColor: C.border, borderTop: `3px solid #059669` }}>
+                      <div className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: "#059669", letterSpacing: "0.1em" }}>
+                        ⑤ RECOVERY
+                      </div>
+                      <div className="text-[10px] mb-1" style={{ color: C.textSub }}>挽救路徑 · 可回收金額</div>
+                      <div className="text-sm font-bold leading-tight" style={{ color: "#059669" }}>+{recoverable} 萬 可回收</div>
+                      <ul className="mt-2 space-y-0.5 text-[10px]" style={{ color: C.text }}>
+                        {profile.recovery.slice(0, 3).map((r) => (
+                          <li key={r.action} className="flex items-baseline justify-between gap-1.5">
+                            <span className="truncate">· {r.action}</span>
+                            <span className="font-mono font-bold shrink-0" style={{ color: "#059669" }}>+{r.saving}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="text-[9px] mt-2 pt-1.5 border-t" style={{ borderColor: C.border, color: C.textSub }}>
+                        ★ 難度 · % 成功率見下方 Recovery Plan
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 6. 要怎麼做 Action */}
                 <div className="rounded-md p-3 border" style={{ background: "#ffffff", borderColor: C.border, borderTop: `3px solid ${C.primary}` }}>
                   <div className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: C.primary, letterSpacing: "0.1em" }}>
-                    ④ ACTION
+                    ⑥ ACTION
                   </div>
                   <div className="text-[10px] mb-1" style={{ color: C.textSub }}>要怎麼做 · AI 建議</div>
                   <div className="text-sm font-bold leading-tight" style={{ color: C.primary }}>{adv.recommendation}</div>
@@ -1093,12 +1196,15 @@ function ProductCostIntelligence() {
         <div className="space-y-4">
           {/* 兩棵爆炸樹並排 */}
           <div className="grid lg:grid-cols-2 gap-3">
-            {/* ① Cost Explosion Tree — 互動 drill-down */}
+            {/* ① Cost Explosion Tree — 4 層全展開 */}
             <CostExplosionTree key={p.name} root={COST_TREES[p.name]} />
 
-            {/* ② Impact Explosion Tree — 多金屬 cascade */}
+            {/* ② Impact Explosion Tree — 多金屬 cascade（含 Supplier + Customer） */}
             <ImpactExplosionTree product={p} />
           </div>
+
+          {/* 區塊 C — Supplier Exposure · 供應商曝險（CEO 最後一定問：是哪一家供應商？） */}
+          <SupplierExposure product={p} />
 
           {/* 區塊 D — AI Recovery Plan（含執行難度 + 成功率） */}
           <div className="rounded-md border p-3" style={{ borderColor: C.border, borderLeft: `3px solid ${C.primary}`, background: `${C.primary}05` }}>
@@ -1304,81 +1410,63 @@ function metalColor(m?: string): string {
   }
 }
 
-// ─────────────── Cost Explosion Tree ───────────────
+// ─────────────── Cost Explosion Tree（4 層全展開：Product → Module → Component → Commodity）───────────────
 function CostExplosionTree({ root }: { root: CostNode }) {
-  const [path, setPath] = React.useState<string[]>([]);
-  // 根據 path 找到 current node
-  let current: CostNode = root;
-  const breadcrumb: CostNode[] = [root];
-  for (const seg of path) {
-    const next = current.children?.find((c) => c.name === seg);
-    if (!next) break;
-    current = next;
-    breadcrumb.push(next);
-  }
   const C2 = { primary: "#005245", red: "#ba1a1a", blue: "#005cba", text: "#1a1c1c", textSub: "#574146", border: "#e2e2e2", surfaceDim: "#f4f3f3", outline: "#8a7176" };
   return (
     <div className="rounded-md border p-3" style={{ borderColor: C2.border, background: C2.surfaceDim }}>
       <div className="flex items-baseline justify-between mb-2 flex-wrap gap-1">
         <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C2.textSub, letterSpacing: "0.08em" }}>
-          ▎💥 Cost Explosion Tree
+          ▎💥 Cost Explosion Tree · 4 層全展開
         </div>
-        <span className="text-[9px]" style={{ color: C2.outline }}>點任一節點 → 爆炸下一層</span>
+        <span className="text-[9px]" style={{ color: C2.outline }}>Product → Module → Component → Commodity</span>
       </div>
 
-      {/* Breadcrumb */}
-      <div className="flex flex-wrap items-baseline gap-1 mb-2 text-[10px]">
-        {breadcrumb.map((n, i) => (
-          <span key={i} className="flex items-baseline">
-            {i > 0 && <span className="mx-1" style={{ color: C2.outline }}>›</span>}
-            <button
-              onClick={() => setPath(path.slice(0, i))}
-              className="font-mono font-semibold hover:underline"
-              style={{ color: i === breadcrumb.length - 1 ? C2.primary : C2.blue }}
-            >
-              {n.name}
-            </button>
-          </span>
-        ))}
+      {/* Full tree */}
+      <div className="font-mono text-[11px] leading-relaxed" style={{ color: C2.text }}>
+        <TreeNode node={root} depth={0} prefix="" isLast={true} />
       </div>
 
-      {/* Current node + children */}
-      <div className="font-mono text-xs" style={{ color: C2.text }}>
-        <div className="font-bold mb-1">
-          <span style={{ color: C2.red }}>●</span> {current.name} <span style={{ color: C2.textSub }}>100%</span>
-        </div>
-        <div className="pl-2 space-y-0.5">
-          {(current.children ?? []).map((c, i, arr) => {
-            const isLast = i === arr.length - 1;
-            const drillable = !!c.children && c.children.length > 0;
-            return (
-              <div key={c.name} className="flex items-baseline">
-                <span className="w-4 shrink-0" style={{ color: C2.outline }}>{isLast ? "└" : "├"}</span>
-                {drillable ? (
-                  <button
-                    onClick={() => setPath([...path, c.name])}
-                    className="text-left hover:underline flex items-baseline gap-1.5"
-                    style={{ color: C2.blue }}
-                  >
-                    <span className="font-semibold">{c.name}</span>
-                    <span className="font-mono" style={{ color: C2.red }}>{c.pct}%</span>
-                    <span className="text-[9px]" style={{ color: C2.outline }}>▸</span>
-                  </button>
-                ) : (
-                  <span className="flex items-baseline gap-1.5">
-                    {c.metalType && (
-                      <span className="text-[9px] px-1 rounded font-mono" style={{ background: `${metalColor(c.metalType)}15`, color: metalColor(c.metalType) }}>{c.metalType}</span>
-                    )}
-                    <span style={{ color: C2.text }}>{c.name}</span>
-                    <span className="font-mono" style={{ color: C2.red }}>{c.pct}%</span>
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
+      {/* 4 層說明 */}
+      <div className="mt-3 pt-2 border-t flex flex-wrap items-center gap-x-3 gap-y-1 text-[9px]"
+           style={{ borderColor: C2.border, color: C2.textSub }}>
+        <span className="font-bold uppercase tracking-widest">層級：</span>
+        <span><span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: C2.primary }} />① Product 整機</span>
+        <span><span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: C2.blue }} />② Module 模組</span>
+        <span><span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: "#7a4fbf" }} />③ Component 零件</span>
+        <span><span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: "#d97706" }} />④ Commodity 原料</span>
       </div>
     </div>
+  );
+}
+
+function TreeNode({ node, depth, prefix, isLast }: { node: CostNode; depth: number; prefix: string; isLast: boolean }) {
+  const COLORS = ["#005245", "#005cba", "#7a4fbf", "#d97706"];
+  const tone = COLORS[Math.min(depth, COLORS.length - 1)];
+  const branch = depth === 0 ? "" : (isLast ? "└── " : "├── ");
+  const nextPrefix = depth === 0 ? "" : prefix + (isLast ? "    " : "│   ");
+  const isLeaf = !node.children || node.children.length === 0;
+  return (
+    <>
+      <div className="whitespace-pre flex items-baseline">
+        <span style={{ color: "#bec9c4" }}>{prefix}{branch}</span>
+        {node.metalType && (
+          <span className="text-[8px] px-1 mr-1 rounded font-mono"
+                style={{ background: `${metalColor(node.metalType)}20`, color: metalColor(node.metalType) }}>
+            {node.metalType}
+          </span>
+        )}
+        <span className={depth <= 1 ? "font-bold" : "font-semibold"} style={{ color: depth === 0 ? "#1c1b1b" : tone }}>
+          {node.name}
+        </span>
+        <span className="ml-1.5 font-mono" style={{ color: isLeaf ? "#ba1a1a" : "#1c1b1b", fontWeight: isLeaf ? 700 : 500 }}>
+          {node.pct}%
+        </span>
+      </div>
+      {node.children?.map((c, i, arr) => (
+        <TreeNode key={c.name} node={c} depth={depth + 1} prefix={nextPrefix} isLast={i === arr.length - 1} />
+      ))}
+    </>
   );
 }
 
@@ -1421,7 +1509,7 @@ function ImpactExplosionTree({ product }: { product: ProductProfile }) {
         })}
       </div>
 
-      {/* Deep Cascade: 原料 → 料件 → 零件 → 系統 → 整機 → 毛利 → 損失 */}
+      {/* Deep Cascade: 原料 → 供應商 → 料件 → 零件 → 系統 → 整機 → 客戶 → 毛利 → 損失 */}
       <div className="font-mono text-xs" style={{ color: C2.text }}>
         {/* 原料起點 */}
         <div className="rounded px-2 py-1.5 mb-1" style={{ background: `${metalColor(s.metal)}15`, border: `1px solid ${metalColor(s.metal)}` }}>
@@ -1431,7 +1519,27 @@ function ImpactExplosionTree({ product }: { product: ProductProfile }) {
           </div>
         </div>
 
-        {/* 多層 cascade 鏈 */}
+        {/* 供應商節點（新增） */}
+        {(() => {
+          const party = SCENARIO_PARTY[s.metal];
+          if (!party) return null;
+          return (
+            <>
+              <div className="text-[10px] pl-2" style={{ color: C2.blue }}>↓</div>
+              <div className="rounded px-2 py-1.5 mb-1" style={{ background: "#fff5f8", border: `1px dashed #c026d3` }}>
+                <div className="flex items-baseline justify-between">
+                  <span>
+                    <span className="text-[9px] px-1 py-0.5 rounded mr-1.5 text-white" style={{ background: "#c026d3" }}>供應商</span>
+                    <span className="font-semibold" style={{ color: C2.text }}>{party.supplier}</span>
+                  </span>
+                  <span className="font-bold font-mono" style={{ color: "#c026d3" }}>+{s.pct}%</span>
+                </div>
+              </div>
+            </>
+          );
+        })()}
+
+        {/* 多層 cascade 鏈（料件 / 零件 / 系統 / 整機） */}
         {s.cascade.map((step, i) => (
           <React.Fragment key={i}>
             <div className="text-[10px] pl-2" style={{ color: C2.blue }}>↓</div>
@@ -1448,6 +1556,26 @@ function ImpactExplosionTree({ product }: { product: ProductProfile }) {
             </div>
           </React.Fragment>
         ))}
+
+        {/* 客戶節點（新增 — CEO 最後一定問：是哪家客戶？） */}
+        {(() => {
+          const party = SCENARIO_PARTY[s.metal];
+          if (!party) return null;
+          return (
+            <>
+              <div className="text-[10px] pl-2" style={{ color: C2.blue }}>↓</div>
+              <div className="rounded px-2 py-1.5 mb-1" style={{ background: "#eff6ff", border: `1px dashed #005cba` }}>
+                <div className="flex items-baseline justify-between">
+                  <span>
+                    <span className="text-[9px] px-1 py-0.5 rounded mr-1.5 text-white" style={{ background: "#005cba" }}>客戶</span>
+                    <span className="font-semibold" style={{ color: C2.text }}>{party.customer}</span>
+                  </span>
+                  <span className="font-mono text-[10px]" style={{ color: C2.textSub }}>承受漲價</span>
+                </div>
+              </div>
+            </>
+          );
+        })()}
 
         {/* 毛利衝擊 */}
         <div className="text-[10px] pl-2" style={{ color: C2.blue }}>↓</div>
@@ -1475,6 +1603,69 @@ function ImpactExplosionTree({ product }: { product: ProductProfile }) {
   );
 }
 
+// ─────────────── Supplier Exposure · 供應商曝險 ───────────────
+// CEO 最後一定問：是哪一家供應商？立刻能變成 Supplier Intelligence
+function SupplierExposure({ product }: { product: ProductProfile }) {
+  const C2 = { primary: "#005245", red: "#ba1a1a", blue: "#005cba", text: "#1a1c1c", textSub: "#574146", border: "#e2e2e2", surfaceDim: "#f4f3f3", outline: "#8a7176" };
+  // 彙整：把所有 sensitivity 涉及的金屬 → 拉出對應的供應商曝險
+  const rows = product.sensitivity.flatMap((sn) => {
+    const code = METAL_TO_CODE[sn.metal];
+    return (SUPPLIER_EXPOSURE[code] ?? []).map((sup) => ({ ...sup, metal: sn.metal }));
+  });
+  // 去重（同一供應商可能多次出現）
+  const seen = new Set<string>();
+  const uniq = rows.filter((r) => (seen.has(r.code) ? false : (seen.add(r.code), true)));
+  const total = uniq.reduce((s, r) => s + r.amountMan, 0);
+  return (
+    <div className="rounded-md border p-3" style={{ borderColor: C2.border, borderLeft: `3px solid #c026d3`, background: "#fff5fa" }}>
+      <div className="flex items-baseline justify-between mb-2 flex-wrap gap-1">
+        <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#c026d3", letterSpacing: "0.08em" }}>
+          ▎👥 Supplier Exposure · 供應商曝險
+        </div>
+        <span className="text-[9px]" style={{ color: C2.outline }}>CEO 最後一定問：是哪家供應商？</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-left border-b" style={{ borderColor: C2.border, color: C2.textSub }}>
+              <th className="py-1.5 text-[9px] font-bold uppercase tracking-widest">供應商</th>
+              <th className="py-1.5 text-[9px] font-bold uppercase tracking-widest">原料</th>
+              <th className="py-1.5 text-[9px] font-bold uppercase tracking-widest">影響產品</th>
+              <th className="py-1.5 text-[9px] font-bold uppercase tracking-widest text-right">曝險金額</th>
+              <th className="py-1.5 text-[9px] font-bold uppercase tracking-widest text-right">佔比</th>
+            </tr>
+          </thead>
+          <tbody>
+            {uniq.map((r) => (
+              <tr key={r.code} className="border-b" style={{ borderColor: C2.border }}>
+                <td className="py-1.5 font-semibold" style={{ color: C2.text }}>{r.name}</td>
+                <td className="py-1.5">
+                  <span className="text-[9px] px-1 rounded font-mono" style={{ background: `${metalColor(r.metal)}15`, color: metalColor(r.metal) }}>
+                    {r.metal}
+                  </span>
+                </td>
+                <td className="py-1.5" style={{ color: C2.text }}>{r.product}</td>
+                <td className="py-1.5 text-right font-mono font-bold" style={{ color: "#c026d3" }}>{r.amountMan} 萬</td>
+                <td className="py-1.5 text-right font-mono" style={{ color: C2.textSub }}>{r.share}%</td>
+              </tr>
+            ))}
+            <tr>
+              <td className="py-1.5 text-[10px] font-bold" style={{ color: C2.textSub }} colSpan={3}>合計</td>
+              <td className="py-1.5 text-right font-mono font-extrabold text-sm" style={{ color: "#c026d3" }}>{total} 萬</td>
+              <td />
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-2 pt-2 border-t text-[10px] flex items-center justify-between flex-wrap gap-1"
+           style={{ borderColor: C2.border, color: C2.textSub }}>
+        <span>立刻能變成 <span className="font-bold" style={{ color: "#c026d3" }}>Supplier Intelligence</span> — 看單一供應商歷史報價、議價空間、可替代性</span>
+        <Link href="/erp/procurement" className="font-semibold" style={{ color: C2.blue }}>→ 進入供應商視角</Link>
+      </div>
+    </div>
+  );
+}
+
 function ImpactRow({ label, value, tone, bold, indent = 0 }: { label: string; value: string; tone: string; bold?: boolean; indent?: number }) {
   return (
     <div className="flex items-baseline justify-between" style={{ paddingLeft: indent * 12 }}>
@@ -1485,4 +1676,13 @@ function ImpactRow({ label, value, tone, bold, indent = 0 }: { label: string; va
 }
 function ImpactArrow({ indent = 0 }: { indent?: number }) {
   return <div className="text-[10px]" style={{ paddingLeft: indent * 12 + 4, color: "#005cba" }}>↓</div>;
+}
+
+function Mini({ k, v, tone }: { k: string; v: string; tone: string }) {
+  return (
+    <div className="rounded px-1.5 py-1" style={{ background: "#f4f3f3" }}>
+      <div className="text-[9px]" style={{ color: "#574146" }}>{k}</div>
+      <div className="text-sm font-extrabold tabular-nums" style={{ color: tone }}>{v}</div>
+    </div>
+  );
 }
