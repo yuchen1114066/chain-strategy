@@ -166,7 +166,8 @@ export default function QuotationAnalyzerPage() {
   const [toast, setToast] = useState<string | null>(null);
   // 使用者上傳的報價單會自動加進 allRows（demo OCR 模擬）
   const [uploadedRows, setUploadedRows] = useState<OcrRow[]>([]);
-  const allRows: OcrRow[] = [...OCR_ROWS, ...uploadedRows];
+  // 使用者上傳後直接「換掉」demo 種子，避免頁面殘留無關報價單
+  const allRows: OcrRow[] = uploadedRows.length > 0 ? uploadedRows : OCR_ROWS;
   // 報價單清單選擇（可點列、↑↓ 鍵切換、上傳完自動選新列 — 下方所有分析隨之同步）
   const [selectedIdx, setSelectedIdx] = useState(0);
   const SELECTED = allRows[selectedIdx] ?? allRows[0];
@@ -466,7 +467,8 @@ export default function QuotationAnalyzerPage() {
                           setUploadedRows((arr) => {
                             const next = [...arr, newRow];
                             // 自動切換到新上傳的這一列
-                            const newIdx = OCR_ROWS.length + next.length - 1;
+                            // allRows 已經切到 uploadedRows，所以 idx 直接是 next.length - 1
+                            const newIdx = next.length - 1;
                             setSelectedIdx(newIdx);
                             return next;
                           });
@@ -494,7 +496,7 @@ export default function QuotationAnalyzerPage() {
                   待查詢報價單
                 </div>
                 <div style={{ fontSize: 10.5, color: "#aebba0", marginTop: 4 }}>
-                  {allRows.length} 筆{uploadedRows.length > 0 ? `（含 ${uploadedRows.length} 筆剛上傳）` : ""} · 欄位：供應商 / 料號 / 舊單價 / 新單價 / 漲幅 / 原因
+                  {allRows.length} 筆{uploadedRows.length > 0 ? " · 自上傳報價（demo 種子已隱藏）" : " · demo 種子"} · 欄位：供應商 / 料號 / 舊單價 / 新單價 / 漲幅 / 原因
                 </div>
               </div>
 
@@ -533,9 +535,24 @@ export default function QuotationAnalyzerPage() {
                 <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>
                   ② 待查詢報價單清單 · 一份報價單可含多筆料號 · 點任一列或按 ↑↓ 切換
                 </div>
-                <span style={{ fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700, color: BR.greenDeep, background: BR.greenSoft, padding: "2px 7px", borderRadius: 4, letterSpacing: "0.06em", border: `1px solid ${BR.greenLine}` }}>
-                  已選 {selectedIdx + 1} / {allRows.length}
-                </span>
+                <div className="flex items-baseline gap-2">
+                  {uploadedRows.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => { setUploadedRows([]); setSelectedIdx(0); showToast("✓ 已清空上傳報價，還原 demo 種子"); }}
+                      style={{
+                        fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700, color: BR.red,
+                        background: "#fff", border: `1px solid ${BR.red}40`, borderRadius: 4,
+                        padding: "2px 7px", letterSpacing: "0.06em", cursor: "pointer",
+                      }}
+                    >
+                      ✕ 清空上傳 / 還原 demo
+                    </button>
+                  )}
+                  <span style={{ fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700, color: BR.greenDeep, background: BR.greenSoft, padding: "2px 7px", borderRadius: 4, letterSpacing: "0.06em", border: `1px solid ${BR.greenLine}` }}>
+                    已選 {selectedIdx + 1} / {allRows.length}
+                  </span>
+                </div>
               </div>
 
               <div
@@ -2217,11 +2234,15 @@ function AlternativeSupplierCard({ buffered, selected }: { buffered: number; sel
     { name: "鼎能精密", quote: baseLowPrice,     leadWeeks: 5, qualityScore: 92, onTime: 88, status: "次選 · 報價最低" },
     { name: "力豐電子", quote: baseFastPrice,    leadWeeks: 3, qualityScore: 95, onTime: 93, status: "急單備案 · 交期最快" },
     { name: "新竹 EFG", quote: baseObservePrice, leadWeeks: 4, qualityScore: 89, onTime: 85, status: "觀察 · 品質次之" },
-  ].map((s) => ({
-    ...s,
-    deltaVsCurrent: +(((s.quote - currentPrice) / currentPrice) * 100).toFixed(1),
-  }));
-  const top = dyn[0];
+  ]
+    // 不要把現任供應商當成替代候選（會邏輯錯亂）
+    .filter((s) => s.name !== selected.supplier)
+    .map((s) => ({
+      ...s,
+      deltaVsCurrent: +(((s.quote - currentPrice) / currentPrice) * 100).toFixed(1),
+    }));
+  // 推薦取最便宜（quote 最低）的那家
+  const top = dyn.length > 0 ? [...dyn].sort((a, b) => a.quote - b.quote)[0] : dyn[0];
   const currentPct = +(((currentPrice - selected.oldPrice) / selected.oldPrice) * 100).toFixed(1);
   const savingPct  = +(((currentPrice - top.quote) / currentPrice) * 100).toFixed(1);
 
@@ -2296,7 +2317,7 @@ function AlternativeSupplierCard({ buffered, selected }: { buffered: number; sel
           <div className="rounded-[10px] p-4" style={{ background: BR.greenSoft, border: `1.5px solid ${BR.green}` }}>
             <div className="flex items-baseline justify-between flex-wrap gap-1">
               <span style={{ fontFamily: FONT_HEAD, fontSize: 16, fontWeight: 700, color: BR.greenInk }}>
-                {top.name}（SUP-CY）
+                {top.name}{top.name === "重邑" ? "（SUP-CY）" : ""}
               </span>
               <span style={{ fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: "#fff", color: BR.greenDeep, border: `1px solid ${BR.greenLine}` }}>
                 ERP 已登錄 · 本地
@@ -2312,15 +2333,22 @@ function AlternativeSupplierCard({ buffered, selected }: { buffered: number; sel
               </div>
             </div>
             {(() => {
-              const rfqSubject = `[RFQ] ${selected.partNo} 報價邀請 — ${top.name} · 沿用原供應商`;
+              const isExistingSupplier = top.name === "重邑";
+              const rfqSubject = isExistingSupplier
+                ? `[RFQ] ${selected.partNo} 報價邀請 — ${top.name} · 沿用原供應商`
+                : `[RFQ] ${selected.partNo} 報價邀請 — ${top.name}`;
               const rfqBody = [
                 `Dear ${top.name} 業務 先進，`,
                 "",
-                "貴司目前已是本公司登錄供應商（ERP 編號 SUP-CY，過往合作料件含 P03SB155 軸心、M14AC001 自攻螺絲）。",
+                isExistingSupplier
+                  ? "貴司目前已是本公司登錄供應商（ERP 編號 SUP-CY，過往合作料件含 P03SB155 軸心、M14AC001 自攻螺絲）。"
+                  : `本公司正評估 ${selected.partNo} 之替代供應商，貴司由 AI Quotation Analyzer 評分為前列候選。`,
                 `本次因 ${selected.supplier} 報價由 ${selected.oldPrice.toFixed(2)} 元調漲至 ${selected.newPrice.toFixed(2)} 元（+${currentPct}%），超出 AI Should-Cost 合理上限，`,
-                `故擬將 ${selected.partNo} 之常態大貨採購回歸貴司。`,
+                `故擬將 ${selected.partNo} 之常態大貨採購${isExistingSupplier ? "回歸貴司" : "轉至貴司"}。`,
                 "",
-                `經比對歷史進貨記錄，貴司本料維持 ${top.quote.toFixed(2)} 元（多年未調漲），AI 評分為首選備案。`,
+                isExistingSupplier
+                  ? `經比對歷史進貨記錄，貴司本料維持 ${top.quote.toFixed(2)} 元（多年未調漲），AI 評分為首選備案。`
+                  : `AI 推估貴司本料合理價格約 ${top.quote.toFixed(2)} 元，敬請正式回覆。`,
                 "",
                 "詢價需求：",
                 `・料號：${selected.partNo}`,
