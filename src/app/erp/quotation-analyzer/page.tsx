@@ -2082,17 +2082,33 @@ function CostIntelligenceCenterCard() {
   );
 }
 
-// ============================================================
-// ② L0 Executive Intelligence Layer · Board Decision Card（1 頁）
-// 五排架構：
-//   排 1  AI Verdict + Confidence + Decision Risk（合併一條）
-//   排 2  供應商漲幅 / 合理上限 / 超出 / 目標價
-//   排 3  年損失 / 可節省 / 毛利影響 / 供應風險
-//   排 4  建議
-//   排 5  簽核三選一
-// Decision Risk 拆成 價格 / 供應 / 品質（不只 HIGH）
-// 新增 Gross Margin Impact（董事長最在意「賺多少」）
-// ============================================================
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║ 🔒 LOCKED · v4 · SCORE 100/100 · DO NOT MODIFY                       ║
+// ║                                                                      ║
+// ║ User decision (2026-06-05):                                          ║
+// ║   "這版已經不是一般 ERP 報表了 — 而是真正的:                          ║
+// ║    L0 Executive Intelligence Layer · Board Decision Card             ║
+// ║    我會給：100                                                        ║
+// ║    這份報告請鎖定不再修改，除非之後要再增加，再做開鎖。"              ║
+// ║                                                                      ║
+// ║ Rules for future agents (including future me):                       ║
+// ║   ✘ 不要做小幅修改（typo / 顏色 / 用字微調都算）                      ║
+// ║   ✘ 不要移走 / 不要刪除                                              ║
+// ║   ✘ 不要重新命名                                                     ║
+// ║   ✓ 如使用者明確要求「請解鎖 / unlock / 重新打開 L0 Board Card」      ║
+// ║     並具體說明要加什麼，才可以動。                                   ║
+// ║   ✓ 動之前，先把這段 LOCKED block 也一起更新（解鎖原因 + 新版本號）   ║
+// ╠══════════════════════════════════════════════════════════════════════╣
+// ║ ② L0 Executive Intelligence Layer · Board Decision Card（1 頁）      ║
+// ║ 五排架構：                                                           ║
+// ║   排 1  AI Verdict + Confidence + Overall Risk（一條合併）           ║
+// ║   排 2  供應商漲幅 / 合理上限 / 超出 / 目標價                        ║
+// ║   排 3  年損失 / 可節省 / 毛利影響 / Risk Radar 4 維度               ║
+// ║   排 4  建議（含目標價 + 預估可回收 + 替代供應商 + 完成時程）        ║
+// ║   排 5  簽核 Option A / B / C（A = 拒絕 + 啟動鼎能 RFQ 同一決策）    ║
+// ║                                                                      ║
+// ║ 4 層架構說明位於頁尾：L0 (本頁) / L1 / L2 / L3                       ║
+// ╚══════════════════════════════════════════════════════════════════════╝
 function buildBoardReportHtml(args: {
   partNo: string;
   supplier: string;
