@@ -82,6 +82,7 @@ function computeShouldCost() {
 
 export default function QuotationAnalyzerPage() {
   const [activeSub, setActiveSub] = useState("ocr");
+  const [toast, setToast] = useState<string | null>(null);
   const sc = computeShouldCost();
 
   // 真實的 supplier claim 漲幅
@@ -96,6 +97,100 @@ export default function QuotationAnalyzerPage() {
     supplierClaim <= sc.buffered * 1.5 ? { tone: BR.amber, label: "⚠ 偏高 · 要求重議", bg: BR.amberSoft } :
                                           { tone: BR.red,    label: "🚨 嚴重超出 · 強力議價", bg: BR.redSoft };
 
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3200);
+  };
+
+  // ── ① 產出 Should-Cost 報告 (PDF) — 開新分頁印成 PDF ──
+  const handleGenerateReport = () => {
+    const reportHtml = buildShouldCostReportHtml({
+      partNo: SELECTED.partNo,
+      supplier: SELECTED.supplier,
+      oldPrice: SELECTED.oldPrice,
+      newPrice: SELECTED.newPrice,
+      supplierClaim,
+      supplierExcess,
+      sc,
+      bom: BOM_BREAKDOWN,
+      moves: COMMODITY_MOVES,
+    });
+    const win = window.open("", "_blank", "noopener,noreferrer,width=900,height=1100");
+    if (!win) {
+      showToast("⚠ 請允許彈出視窗以產出 PDF");
+      return;
+    }
+    win.document.open();
+    win.document.write(reportHtml);
+    win.document.close();
+    // 讓字體載入再印
+    setTimeout(() => { try { win.focus(); win.print(); } catch {} }, 700);
+    showToast("✓ Should-Cost 報告已開啟 — 列印對話框會自動跳出");
+  };
+
+  // ── ② 發送議價會議邀請 — mailto ──
+  const handleSendMeetingInvite = () => {
+    const subject = `[議價會議] ${SELECTED.partNo} 報價調整 — Should-Cost 結果說明`;
+    const body = [
+      `Dear ${SELECTED.supplier} 先進，`,
+      ``,
+      `關於 ${SELECTED.partNo}（${SELECTED.oldPrice.toFixed(2)} → ${SELECTED.newPrice.toFixed(2)}，喊漲 +${supplierClaim.toFixed(1)}%）`,
+      `本公司 AI Should-Cost Engine 反推合理上限為 +${sc.buffered.toFixed(1)}%（緩衝後），`,
+      `差距 +${overByActual.toFixed(1)}%。`,
+      ``,
+      `謹邀請貴司就以下重點議價：`,
+      `1. 銅佔 58%、LME 只漲 5%，該欄合理 +2.9%`,
+      `2. 電鍍 10%、+12%，該欄合理 +1.2%`,
+      `3. 加工 15%、+8%，該欄合理 +1.2%`,
+      `4. 運費 5%、+7%，該欄合理 +0.4%`,
+      `合計 +5.7%，緩衝後上限 +${sc.buffered.toFixed(1)}%`,
+      ``,
+      `會議時間：請貴司於 3 個工作日內回覆可配合時段。`,
+      `會議形式：Google Meet / Teams 皆可，敝公司可主辦。`,
+      ``,
+      `會中將提供完整 Should-Cost 報告 (PDF) 作為依據。`,
+      ``,
+      `祺驊股份有限公司 · CHI HUA AI Supply Chain OS`,
+      `(此信由 L3 AI Quotation Analyzer 自動草擬)`,
+    ].join("\n");
+    const href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = href;
+    showToast("✓ 議價會議邀請已開啟郵件草稿");
+  };
+
+  // ── ③ 退單通知供應商 — mailto ──
+  const handleSendReject = () => {
+    const subject = `[退單] ${SELECTED.partNo} 報價超出合理區間 — 需重新報價`;
+    const body = [
+      `Dear ${SELECTED.supplier} 先進，`,
+      ``,
+      `關於 ${SELECTED.partNo}，貴司此次調整：`,
+      `舊價 ${SELECTED.oldPrice.toFixed(2)} → 新價 ${SELECTED.newPrice.toFixed(2)}`,
+      `喊漲幅度 +${supplierClaim.toFixed(1)}%`,
+      ``,
+      `經本公司 AI Should-Cost Engine 依當前各成分波動拆解：`,
+      `- 銅 58% × +5%  = +2.9%`,
+      `- 電鍍 10% × +12% = +1.2%`,
+      `- 加工 15% × +8% = +1.2%`,
+      `- 運費 5% × +7%  = +0.4%`,
+      `合理上限（含 10% 緩衝）= +${sc.buffered.toFixed(1)}%`,
+      ``,
+      `貴司報價超出合理上限 +${overByActual.toFixed(1)}%，`,
+      `本公司無法於現有條件下接受此份報價，敬請於 7 個工作日內：`,
+      ``,
+      `1. 提供超出部分的明確成本依據；或`,
+      `2. 重新提交至合理上限 +${sc.buffered.toFixed(1)}% 以內的報價。`,
+      ``,
+      `逾期未回覆將啟動備案供應商評估。`,
+      ``,
+      `祺驊股份有限公司 · 採購中心`,
+      `(此信由 L3 AI Quotation Analyzer 依據 Should-Cost 拆解自動產出)`,
+    ].join("\n");
+    const href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = href;
+    showToast("✓ 退單通知已開啟郵件草稿");
+  };
+
   return (
     <div
       style={{
@@ -105,6 +200,21 @@ export default function QuotationAnalyzerPage() {
         minHeight: "100vh", fontFamily: FONT, color: BR.ink,
       }}
     >
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: "fixed", top: 20, right: 20, zIndex: 100,
+          background: BR.greenInk, color: "#fff",
+          padding: "12px 18px", borderRadius: 10,
+          fontSize: 13, fontWeight: 600,
+          boxShadow: "0 8px 28px rgba(12,18,8,.18)",
+          border: `1px solid ${BR.green}`,
+          maxWidth: 380,
+        }}>
+          {toast}
+        </div>
+      )}
+
       <div className="max-w-[1440px] mx-auto px-9 py-7 space-y-6">
 
         {/* Top bar / breadcrumb */}
@@ -455,23 +565,29 @@ export default function QuotationAnalyzerPage() {
                 ③ 一鍵動作
               </div>
               <div className="space-y-2">
-                <button style={{
-                  width: "100%", background: BR.green, color: "#fff",
-                  border: "none", borderRadius: 9, padding: "10px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer",
-                  display: "flex", alignItems: "center", gap: 8,
-                }}>
+                <button
+                  onClick={handleGenerateReport}
+                  style={{
+                    width: "100%", background: BR.green, color: "#fff",
+                    border: "none", borderRadius: 9, padding: "10px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 8,
+                  }}>
                   📑 產出 Should-Cost 報告 (PDF)
                 </button>
-                <button style={{
-                  width: "100%", background: "rgba(255,255,255,.08)", color: "#fff",
-                  border: "1px solid rgba(255,255,255,.16)", borderRadius: 9, padding: "10px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer",
-                }}>
+                <button
+                  onClick={handleSendMeetingInvite}
+                  style={{
+                    width: "100%", background: "rgba(255,255,255,.08)", color: "#fff",
+                    border: "1px solid rgba(255,255,255,.16)", borderRadius: 9, padding: "10px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                  }}>
                   📨 發送議價會議邀請
                 </button>
-                <button style={{
-                  width: "100%", background: "rgba(255,255,255,.08)", color: "#fff",
-                  border: "1px solid rgba(255,255,255,.16)", borderRadius: 9, padding: "10px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer",
-                }}>
+                <button
+                  onClick={handleSendReject}
+                  style={{
+                    width: "100%", background: "rgba(255,255,255,.08)", color: "#fff",
+                    border: "1px solid rgba(255,255,255,.16)", borderRadius: 9, padding: "10px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                  }}>
                   📝 退單通知供應商
                 </button>
               </div>
@@ -558,4 +674,131 @@ function StepHeader({ badge, title, en, desc, tone = BR.green }: {
       <span style={{ fontSize: 12, color: BR.inkSoft }}>{desc}</span>
     </div>
   );
+}
+
+// ============================================================
+// 產出 Should-Cost 報告（HTML，於新分頁列印或存 PDF）
+// ============================================================
+function buildShouldCostReportHtml(args: {
+  partNo: string;
+  supplier: string;
+  oldPrice: number;
+  newPrice: number;
+  supplierClaim: number;
+  supplierExcess: number;
+  sc: { rows: { k: string; weight: number; delta: number; contrib: number }[]; total: number; buffered: number };
+  bom: { k: string; pct: number; tone: string; mapTo: string }[];
+  moves: { k: string; delta: number; source: string }[];
+}): string {
+  const today = new Date().toLocaleDateString("zh-TW", { year: "numeric", month: "long", day: "numeric" });
+  const overByActual = +(args.supplierClaim - args.sc.buffered).toFixed(1);
+  const overByExcess = +(args.supplierExcess - args.sc.buffered).toFixed(1);
+  const verdict = args.supplierClaim > args.sc.buffered * 1.5 ? "🚨 嚴重超出 · 強力議價"
+                : args.supplierClaim > args.sc.buffered ? "⚠ 偏高 · 要求重議"
+                                                        : "✓ 合理 · 可接受";
+  const verdictColor = args.supplierClaim > args.sc.buffered * 1.5 ? "#d4351c"
+                     : args.supplierClaim > args.sc.buffered ? "#b8860b" : "#4d7c0f";
+
+  return `<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<title>Should-Cost 報告 · ${args.partNo}</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  body { font-family: "Noto Sans TC", "Sora", system-ui, sans-serif; color: #0c1208; margin: 0; padding: 24px; line-height: 1.6; }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+  h1 { font-size: 22px; font-weight: 800; margin: 0 0 4px; color: #0c1908; }
+  h2 { font-size: 14px; font-weight: 700; margin: 22px 0 8px; padding: 6px 10px; background: #f0f7e4; border-left: 4px solid #76b900; color: #0c1908; }
+  .sub { color: #5b6356; font-size: 12px; margin-bottom: 18px; }
+  .meta { font-size: 11px; color: #9aa291; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  th, td { padding: 7px 8px; border-bottom: 1px solid #e9ece3; font-size: 12px; vertical-align: top; }
+  th { background: #fbfcfa; color: #5b6356; text-align: left; font-weight: 600; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
+  td.r, th.r { text-align: right; }
+  .verdict { padding: 14px 18px; border-radius: 10px; border: 2px solid ${verdictColor}; background: ${verdictColor}10; margin: 14px 0; }
+  .verdict h3 { margin: 0 0 8px; font-size: 16px; color: ${verdictColor}; }
+  .verdict .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; font-size: 13px; }
+  .verdict .grid b { display: block; font-size: 18px; margin-top: 4px; }
+  ul { margin: 6px 0 12px 20px; padding: 0; }
+  ul li { margin: 2px 0; font-size: 13px; }
+  .footer { margin-top: 30px; padding-top: 12px; border-top: 1px solid #e9ece3; font-size: 10.5px; color: #9aa291; }
+  .red { color: #d4351c; font-weight: 700; }
+  .green { color: #4d7c0f; font-weight: 700; }
+  .purple { color: #c026d3; font-weight: 700; }
+</style>
+</head>
+<body>
+  <div class="meta">CHI HUA AI · L3 AI Quotation Analyzer · Should-Cost Report</div>
+  <h1>Should-Cost 漲價合理性報告</h1>
+  <div class="sub">料號 <b class="mono">${args.partNo}</b> · 供應商 <b>${args.supplier}</b> · 報告日期 ${today}</div>
+
+  <h2>① 報價變化</h2>
+  <table>
+    <tr><th>項目</th><th class="r">數值</th></tr>
+    <tr><td>舊單價</td><td class="r mono">${args.oldPrice.toFixed(2)}</td></tr>
+    <tr><td>新單價（供應商喊）</td><td class="r mono red">${args.newPrice.toFixed(2)}</td></tr>
+    <tr><td>實際漲幅</td><td class="r mono red">+${args.supplierClaim.toFixed(1)}%</td></tr>
+  </table>
+
+  <h2>② Should-Cost 拆解（BOM 結構）</h2>
+  <table>
+    <thead><tr><th>成分</th><th class="r">佔成本</th><th>對應商品 / 指數</th></tr></thead>
+    <tbody>
+      ${args.bom.map((b) => `<tr><td>${b.k}</td><td class="r mono">${b.pct}%</td><td>${b.mapTo}</td></tr>`).join("")}
+    </tbody>
+  </table>
+
+  <h2>③ AI 抓的目前商品價格波動</h2>
+  <table>
+    <thead><tr><th>商品 / 指數</th><th class="r">當前變動</th><th>來源</th></tr></thead>
+    <tbody>
+      ${args.moves.map((m) => `<tr><td>${m.k}</td><td class="r mono ${m.delta > 5 ? "red" : ""}">+${m.delta.toFixed(1)}%</td><td>${m.source}</td></tr>`).join("")}
+    </tbody>
+  </table>
+
+  <h2>④ Should-Cost Engine 計算</h2>
+  <table>
+    <thead><tr><th>成分</th><th class="r">BOM 權重</th><th class="r">當前變動</th><th class="r">合理貢獻</th></tr></thead>
+    <tbody>
+      ${args.sc.rows.map((r) => `<tr><td>${r.k}</td><td class="r mono">${r.weight}%</td><td class="r mono">+${r.delta}%</td><td class="r mono green">+${r.contrib.toFixed(2)}%</td></tr>`).join("")}
+      <tr style="background:#f0f7e4"><td colspan="3"><b>合理上限（加總）</b></td><td class="r mono"><b>+${args.sc.total.toFixed(1)}%</b></td></tr>
+      <tr style="background:#f0f7e4"><td colspan="3"><b>緩衝後（×1.10）</b></td><td class="r mono"><b>+${args.sc.buffered.toFixed(1)}%</b></td></tr>
+    </tbody>
+  </table>
+
+  <div class="verdict">
+    <h3>${verdict}</h3>
+    <div class="grid">
+      <div>合理上限 <b class="green">+${args.sc.buffered.toFixed(1)}%</b></div>
+      <div>供應商喊 <b class="red">+${args.supplierClaim.toFixed(1)}%</b></div>
+      <div>${overByActual > 0 ? "超出" : "差距"} <b class="purple">${overByActual > 0 ? "+" : ""}${overByActual.toFixed(1)}%</b></div>
+    </div>
+  </div>
+
+  <h2>⑤ 議價會議重點清單（可會中直接念出）</h2>
+  <ul>
+    <li>銅佔 <b>58%</b>、銅只漲 <b>5%</b> → 該欄合理 <b class="green">+2.9%</b></li>
+    <li>電鍍佔 <b>10%</b>、+12% → 該欄合理 <b class="green">+1.2%</b></li>
+    <li>加工佔 <b>15%</b>、+8% → 該欄合理 <b class="green">+1.2%</b></li>
+    <li>運費佔 <b>5%</b>、+7% → 該欄合理 <b class="green">+0.4%</b></li>
+    <li>加總 +5.7%，緩衝後上限 <b class="green">+${args.sc.buffered.toFixed(1)}%</b></li>
+    <li>貴司喊 <b class="red">+${args.supplierClaim.toFixed(1)}%</b> → 超出 <b class="purple">+${overByActual.toFixed(1)}%</b></li>
+  </ul>
+
+  <h2>⑥ 我方立場</h2>
+  <ul>
+    <li>接受 Should-Cost 上限 <b class="green">+${args.sc.buffered.toFixed(1)}%</b></li>
+    <li>超出部分需供應商明確說明（原料 / 工資 / 運費 對應證據）</li>
+    <li>逾期未說明，<b class="red">退單重議</b></li>
+  </ul>
+
+  <div class="footer">
+    本報告由 CHI HUA AI Supply Chain OS · L3 AI Quotation Analyzer 自動產出，
+    Should-Cost 模型 = 各成分 BOM 權重 × 當前商品波動 × 1.10 緩衝係數。
+    資料來源：ERP BOM、LME、Brent、中鋼牌價、BoT 工資 / 匯率。
+    <br />列印日：${today}
+  </div>
+</body>
+</html>`;
 }
