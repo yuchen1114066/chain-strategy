@@ -167,7 +167,7 @@ export default function QuotationAnalyzerPage() {
       supplierClaim, supplierExcess, sc, bom: BOM_BREAKDOWN, moves: COMMODITY_MOVES,
     });
     openOrDownload(html, `L1-executive-${SELECTED.partNo}.html`,
-      "✓ L1 Executive Report（3 頁列印 · 4 段內容）已開啟 — Verdict 改為精簡 chip / Financial + Supply Risk 合併同頁");
+      "✓ L1 Executive Report v4（3 頁列印 · 4 段內容）已開啟 — Supply Risk 表已補入 重邑 SUP-CY（6.96 凍漲 · 首選）");
   };
 
   // ── ④ 發送議價會議邀請 — mailto link（預先組好 href） ──
@@ -2562,10 +2562,11 @@ function buildPurchasingReportHtml(args: {
   const grossMarginBefore = 21.4;
   const grossMarginAfter  = 12.45;
 
-  // 替代供應商精選
+  // 替代供應商精選 — 對齊真實 ERP / 報價單資料（v3：補入 重邑 SUP-CY）
   const suppliers = [
-    { name: "鼎能精密",  quote: 6.90, leadWeeks: 5, quality: "A+", otd: 97, riskScore: 92, recommend: "首選" },
-    { name: "力豐電子",  quote: 7.10, leadWeeks: 3, quality: "A+", otd: 95, riskScore: 88, recommend: "備案" },
+    { name: "重邑",      quote: 6.96, leadWeeks: 6, quality: "A",  otd: 87, riskScore: 90, recommend: "首選 · 凍漲" },
+    { name: "鼎能精密",  quote: 6.90, leadWeeks: 5, quality: "A+", otd: 97, riskScore: 92, recommend: "次選 · 急單" },
+    { name: "力豐電子",  quote: 7.10, leadWeeks: 3, quality: "A+", otd: 95, riskScore: 88, recommend: "急單備案" },
     { name: "新竹 EFG",  quote: 7.30, leadWeeks: 4, quality: "A",  otd: 89, riskScore: 76, recommend: "觀察" },
   ];
 
@@ -2810,9 +2811,9 @@ function buildPurchasingReportHtml(args: {
   </table>
 
   <div class="note">
-    <b>備案明確</b> · 首選 <b class="green">鼎能精密 Risk 92/100</b>（${suppliers[0].quote.toFixed(2)} 元 / ${suppliers[0].leadWeeks} 週 / OTD ${suppliers[0].otd}% / 品質 ${suppliers[0].quality}）
-    年省 NT$ ${annualImpactSwitch.toLocaleString()}。<br/>
-    <b>風險可控</b> · 雙廠 SOS（70% 鼎能 + 30% 力豐）即可消除單一供應商依賴。
+    <b>備案明確</b> · 首選 <b class="green">${suppliers[0].name} Risk ${suppliers[0].riskScore}/100</b>（${suppliers[0].quote.toFixed(2)} 元 / ${suppliers[0].leadWeeks} 週 / OTD ${suppliers[0].otd}% / 品質 ${suppliers[0].quality}）
+    年省 NT$ ${annualImpactSwitch.toLocaleString()}。重邑為 ERP 已登錄供應商（SUP-CY），多年凍漲、無重新驗證成本。<br/>
+    <b>風險可控</b> · 雙廠 SOS（70% ${suppliers[0].name} 常態大貨 + 30% ${suppliers[1].name} 急單支援）即可消除單一供應商依賴。
   </div>
 
   <h3>Supplier Risk Score 評分維度（共 4 項，加總 100）</h3>
@@ -2838,14 +2839,14 @@ function buildPurchasingReportHtml(args: {
     <tbody>
       <tr style="background:#fdecea">
         <td><span class="chip r">P1 · 立即</span></td>
-        <td><b>拒退報價 + 啟動鼎能 RFQ</b><br/><span class="muted">月化 NT$ ${monthlyImpactSwitch.toLocaleString()}</span></td>
+        <td><b>拒退報價 + 啟動 ${suppliers[0].name} RFQ</b><br/><span class="muted">月化 NT$ ${monthlyImpactSwitch.toLocaleString()}</span></td>
         <td>採購</td>
         <td>48 小時</td>
         <td class="r mono red">擋損 NT$ ${annualImpactSwitch.toLocaleString()}/年</td>
       </tr>
       <tr style="background:#fffaf0">
         <td><span class="chip a">P2 · 短期</span></td>
-        <td><b>建立雙廠 SOS 機制</b><br/><span class="muted">70% 鼎能 + 30% 現任</span></td>
+        <td><b>建立雙廠 SOS 機制</b><br/><span class="muted">70% ${suppliers[0].name}（常態大貨）+ 30% ${suppliers[1].name}（急單支援）</span></td>
         <td>採購 + 生管</td>
         <td>14 天</td>
         <td class="r mono amber">分散風險</td>
@@ -2872,7 +2873,7 @@ function buildPurchasingReportHtml(args: {
       <span class="rec">RECOMMENDED</span>
       <div class="cb">☐</div>
       <div class="h">RFQ Alternative</div>
-      <div class="d">啟動鼎能精密 RFQ，5 週交期、Risk Score 92/100。</div>
+      <div class="d">啟動 ${suppliers[0].name} RFQ，${suppliers[0].leadWeeks} 週交期、Risk Score ${suppliers[0].riskScore}/100。</div>
     </div>
     <div class="decision-card survey">
       <div class="cb">☐</div>
@@ -2891,7 +2892,7 @@ function buildPurchasingReportHtml(args: {
     <div class="lead">CEO 勾選後，系統<span class="em">自動執行</span>下列任務，無需人工重打：</div>
     <ul>
       <li><b>Reject</b> → 自動寄出 <span class="mono">退單通知</span> + 觸發 <span class="mono">議價任務 NEG-${args.partNo}</span></li>
-      <li><b>RFQ Alternative</b> → 自動建立 <span class="mono">RFQ-${args.partNo}</span> + 寄送鼎能 / 力豐 + 設 14 天回覆鬧鐘</li>
+      <li><b>RFQ Alternative</b> → 自動建立 <span class="mono">RFQ-${args.partNo}</span> + 寄送 ${suppliers[0].name} / ${suppliers[1].name} + 設 14 天回覆鬧鐘</li>
       <li><b>Send Survey</b> → 推送 Supplier Portal 問卷（已附 Should-Cost 拆解 PDF）</li>
       <li><b>Approve</b> → 觸發 <span class="mono">PO 簽核流程</span>（含風險警示與年化損失警告）</li>
     </ul>
@@ -2903,7 +2904,7 @@ function buildPurchasingReportHtml(args: {
   </div>
 
   <div class="footer">
-    CHI HUA AI · L1 Executive Report v3 · 為總經理 / 採購主管設計 · 3 頁列印（4 段內容，Financial Impact + Supply Risk 合併同頁）<br/>
+    CHI HUA AI · L1 Executive Report v4 · 為總經理 / 採購主管設計 · 3 頁列印（4 段內容，Financial Impact + Supply Risk 合併同頁）· 替代廠商：${suppliers[0].name} 凍漲首選 + ${suppliers[1].name} 急單備案<br/>
     回答 4 個問題：為什麼不合理？影響多少？有沒有備案？風險多高？<br/>
     資料來源：ERP BOM v3.2 · LME · IPCEI · 中鋼 · BDI · 勞動部　·　列印日：${today}
   </div>
