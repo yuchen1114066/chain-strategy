@@ -88,12 +88,23 @@ function computeShouldCost() {
   return { rows, total, buffered };
 }
 
+type OcrRow = {
+  supplier: string; partNo: string; oldPrice: number; newPrice: number; reasonText: string;
+  uploadedAt?: number;             // 使用者上傳的報價單會有時間戳
+  previewUrl?: string;             // JPG/PNG 預覽圖（object URL）
+  fileName?: string;
+  fmt?: string;
+};
+
 export default function QuotationAnalyzerPage() {
   const [activeSub, setActiveSub] = useState("ocr");
   const [toast, setToast] = useState<string | null>(null);
-  // 報價單清單選擇（可點列、↑↓ 鍵切換 — 下方所有分析隨之同步）
+  // 使用者上傳的報價單會自動加進 allRows（demo OCR 模擬）
+  const [uploadedRows, setUploadedRows] = useState<OcrRow[]>([]);
+  const allRows: OcrRow[] = [...OCR_ROWS, ...uploadedRows];
+  // 報價單清單選擇（可點列、↑↓ 鍵切換、上傳完自動選新列 — 下方所有分析隨之同步）
   const [selectedIdx, setSelectedIdx] = useState(0);
-  const SELECTED = OCR_ROWS[selectedIdx];
+  const SELECTED = allRows[selectedIdx] ?? allRows[0];
   const sc = computeShouldCost();
 
   // 真實的 supplier claim 漲幅
@@ -342,9 +353,44 @@ export default function QuotationAnalyzerPage() {
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
-                        showToast(`📂 ${f.fmt} 上傳中：${file.name} （${(file.size / 1024).toFixed(0)} KB）`);
+                        const sizeKB = (file.size / 1024).toFixed(0);
+                        showToast(`📂 ${f.fmt} 上傳中：${file.name}（${sizeKB} KB）· AI OCR 處理中…`);
+                        // 為圖片產生預覽 URL（PDF/Excel 無）
+                        const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
+
+                        // 從檔名抽供應商 / 料號（demo heuristic）
+                        const base = file.name.replace(/\.[^.]+$/, "");
+                        const supMatch  = base.match(/(企能|企龍|茂晟|重邑|鼎能|力豐|新竹\s?EFG|[一-龥]{2,4})/);
+                        const partMatch = base.match(/[A-Z][A-Z0-9]{3,}[-]?[A-Z0-9]*/);
+                        const newSupplier = supMatch?.[1] ?? "新供應商";
+                        const newPartNo   = partMatch?.[0] ?? `OCR-${Date.now().toString().slice(-6)}`;
+
+                        // 合理範圍的 demo 價格（小幅變動，模擬「另一筆報價」）
+                        const oldP = +(6 + Math.random() * 4).toFixed(2);   // 6.00–10.00
+                        const hike = +(0.05 + Math.random() * 0.2).toFixed(3); // +5%–25%
+                        const newP = +(oldP * (1 + hike)).toFixed(2);
+
+                        const newRow: OcrRow = {
+                          supplier: newSupplier,
+                          partNo: newPartNo,
+                          oldPrice: oldP,
+                          newPrice: newP,
+                          reasonText: "自上傳檔案 OCR · 等待 STEP 2–4 分析",
+                          uploadedAt: Date.now(),
+                          previewUrl,
+                          fileName: file.name,
+                          fmt: f.fmt,
+                        };
+
                         setTimeout(() => {
-                          showToast(`✓ AI OCR 已完成讀取 ${file.name} — 抽出 1 筆報價、6 個關鍵欄位（demo · 結果已合併至下方分析）`);
+                          setUploadedRows((arr) => {
+                            const next = [...arr, newRow];
+                            // 自動切換到新上傳的這一列
+                            const newIdx = OCR_ROWS.length + next.length - 1;
+                            setSelectedIdx(newIdx);
+                            return next;
+                          });
+                          showToast(`✓ AI OCR 完成 · 已加入第 ${OCR_ROWS.length + uploadedRows.length + 1} 列：${newSupplier} ${newPartNo}（+${(hike * 100).toFixed(1)}%）— 下方分析自動切換到此筆`);
                         }, 900);
                         e.target.value = ""; // 允許重複上傳同一檔案
                       }}
@@ -363,7 +409,9 @@ export default function QuotationAnalyzerPage() {
                 <div style={{ fontFamily: FONT_MONO, fontSize: 22, fontWeight: 700, color: BR.green, marginTop: 4 }}>
                   待查詢報價單
                 </div>
-                <div style={{ fontSize: 10.5, color: "#aebba0", marginTop: 4 }}>{OCR_ROWS.length} 筆 · 欄位：供應商 / 料號 / 舊單價 / 新單價 / 漲幅 / 原因</div>
+                <div style={{ fontSize: 10.5, color: "#aebba0", marginTop: 4 }}>
+                  {allRows.length} 筆{uploadedRows.length > 0 ? `（含 ${uploadedRows.length} 筆剛上傳）` : ""} · 欄位：供應商 / 料號 / 舊單價 / 新單價 / 漲幅 / 原因
+                </div>
               </div>
 
               {/* 廠商報價歷史資料夾 · 年度評核資料庫 */}
@@ -402,7 +450,7 @@ export default function QuotationAnalyzerPage() {
                   ② 待查詢報價單 · 點任一列或按 ↑↓ 切換，下方所有分析自動更換
                 </div>
                 <span style={{ fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700, color: BR.greenDeep, background: BR.greenSoft, padding: "2px 7px", borderRadius: 4, letterSpacing: "0.06em", border: `1px solid ${BR.greenLine}` }}>
-                  已選 {selectedIdx + 1} / {OCR_ROWS.length}
+                  已選 {selectedIdx + 1} / {allRows.length}
                 </span>
               </div>
 
@@ -410,7 +458,7 @@ export default function QuotationAnalyzerPage() {
                 className="overflow-x-auto"
                 tabIndex={0}
                 onKeyDown={(e) => {
-                  if (e.key === "ArrowDown") { e.preventDefault(); setSelectedIdx((i) => Math.min(i + 1, OCR_ROWS.length - 1)); }
+                  if (e.key === "ArrowDown") { e.preventDefault(); setSelectedIdx((i) => Math.min(i + 1, allRows.length - 1)); }
                   if (e.key === "ArrowUp")   { e.preventDefault(); setSelectedIdx((i) => Math.max(i - 1, 0)); }
                 }}
                 style={{ outline: "none" }}
@@ -428,33 +476,45 @@ export default function QuotationAnalyzerPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {OCR_ROWS.map((r, i) => {
+                    {allRows.map((r, i) => {
                       const pct = ((r.newPrice - r.oldPrice) / r.oldPrice) * 100;
                       const selected = i === selectedIdx;
+                      const isUploaded = !!r.uploadedAt;
                       return (
                         <tr
-                          key={i}
+                          key={`${r.partNo}-${i}`}
                           onClick={() => setSelectedIdx(i)}
                           style={{
                             borderBottom: `1px solid #f3f5ef`,
-                            background: selected ? BR.greenSoft : "transparent",
+                            background: selected ? BR.greenSoft : isUploaded ? "#fdf4ff" : "transparent",
                             cursor: "pointer",
-                            borderLeft: selected ? `3px solid ${BR.green}` : "3px solid transparent",
+                            borderLeft: selected ? `3px solid ${BR.green}` : isUploaded ? `3px solid ${BR.purple}` : "3px solid transparent",
                           }}
-                          onMouseEnter={(e) => { if (!selected) (e.currentTarget as HTMLTableRowElement).style.background = "#fbfcfa"; }}
-                          onMouseLeave={(e) => { if (!selected) (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}
+                          onMouseEnter={(e) => { if (!selected) (e.currentTarget as HTMLTableRowElement).style.background = isUploaded ? "#f9e8fb" : "#fbfcfa"; }}
+                          onMouseLeave={(e) => { if (!selected) (e.currentTarget as HTMLTableRowElement).style.background = isUploaded ? "#fdf4ff" : "transparent"; }}
                         >
                           <td style={{ padding: "12px 8px", fontWeight: 700 }}>
                             {selected && <span style={{ color: BR.green, marginRight: 6, fontFamily: FONT_MONO, fontSize: 11 }}>▶</span>}
                             {r.supplier}
+                            {isUploaded && <span style={{ fontFamily: FONT_MONO, fontSize: 9, marginLeft: 6, color: "#fff", background: BR.purple, padding: "1px 5px", borderRadius: 3, letterSpacing: ".04em" }}>NEW</span>}
                           </td>
-                          <td style={{ padding: "12px 8px", fontFamily: FONT_MONO, fontWeight: 700, color: selected ? BR.greenDeep : BR.ink }}>{r.partNo}</td>
+                          <td style={{ padding: "12px 8px", fontFamily: FONT_MONO, fontWeight: 700, color: selected ? BR.greenDeep : BR.ink }}>
+                            {r.partNo}
+                            {r.previewUrl && (
+                              <a href={r.previewUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ marginLeft: 6, fontSize: 10, color: BR.purple, textDecoration: "underline" }}>
+                                看圖
+                              </a>
+                            )}
+                          </td>
                           <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, color: BR.inkSoft }}>{r.oldPrice.toFixed(2)}</td>
                           <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700 }}>↗ {r.newPrice.toFixed(2)}</td>
                           <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 800, color: BR.red }}>
                             +{pct.toFixed(1)}%
                           </td>
-                          <td style={{ padding: "12px 8px", fontSize: 12, color: BR.inkSoft }}>{r.reasonText}</td>
+                          <td style={{ padding: "12px 8px", fontSize: 12, color: BR.inkSoft }}>
+                            {r.reasonText}
+                            {isUploaded && r.fileName && <div style={{ fontSize: 10, color: BR.purple, marginTop: 2 }}>📎 {r.fileName}</div>}
+                          </td>
                         </tr>
                       );
                     })}
