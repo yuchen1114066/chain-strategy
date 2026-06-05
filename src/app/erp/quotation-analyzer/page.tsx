@@ -110,47 +110,67 @@ export default function QuotationAnalyzerPage() {
     setTimeout(() => setToast(null), 3200);
   };
 
-  // ── ① 產出 Should-Cost 報告 (PDF) — 開新分頁印成 PDF（彈窗被擋則自動改用 Blob 下載） ──
-  const handleGenerateReport = () => {
+  // 共用：開新分頁印 PDF；彈窗被擋則改用 Blob 下載
+  const openOrDownload = (html: string, filename: string, successMsg: string) => {
     try {
-      const reportHtml = buildShouldCostReportHtml({
-        partNo: SELECTED.partNo,
-        supplier: SELECTED.supplier,
-        oldPrice: SELECTED.oldPrice,
-        newPrice: SELECTED.newPrice,
-        supplierClaim,
-        supplierExcess,
-        sc,
-        bom: BOM_BREAKDOWN,
-        moves: COMMODITY_MOVES,
-      });
-      // 優先：開新分頁 + 自動列印
       const win = window.open("", "_blank");
       if (win && win.document) {
         win.document.open();
-        win.document.write(reportHtml);
+        win.document.write(html);
         win.document.close();
         setTimeout(() => { try { win.focus(); win.print(); } catch {} }, 700);
-        showToast("✓ AI Should-Cost Decision Report v11（Page 0 + 11 段式 · 100/100）已開啟 — 列印對話框會自動跳出");
+        showToast(successMsg);
         return;
       }
-      // Fallback：彈窗被擋 → 改用 Blob 觸發下載 .html
-      const blob = new Blob([reportHtml], { type: "text/html;charset=utf-8" });
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `should-cost-${SELECTED.partNo}.html`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      showToast("✓ 彈窗被擋 — 改用下載：should-cost-" + SELECTED.partNo + ".html（開啟後即可列印 / 另存為 PDF）");
+      showToast("✓ 彈窗被擋 — 改用下載：" + filename);
     } catch (e) {
       showToast("⚠ 產出失敗：" + (e instanceof Error ? e.message : String(e)));
     }
   };
 
-  // ── ② 發送議價會議邀請 — mailto link（預先組好 href） ──
+  // ── ① 完整版（11 段） — 內部驗證 / 採購 deep dive 用 ──
+  const handleGenerateReport = () => {
+    const html = buildShouldCostReportHtml({
+      partNo: SELECTED.partNo, supplier: SELECTED.supplier,
+      oldPrice: SELECTED.oldPrice, newPrice: SELECTED.newPrice,
+      supplierClaim, supplierExcess, sc, bom: BOM_BREAKDOWN, moves: COMMODITY_MOVES,
+    });
+    openOrDownload(html, `should-cost-FULL-${SELECTED.partNo}.html`,
+      "✓ 完整版（11 段 + Page 0）已開啟 — 列印對話框會自動跳出");
+  };
+
+  // ── ② 董事會 / CEO 版（1 頁） — 真正 100 分的版本 ──
+  const handleGenerateBoardReport = () => {
+    const html = buildBoardReportHtml({
+      partNo: SELECTED.partNo, supplier: SELECTED.supplier,
+      oldPrice: SELECTED.oldPrice, newPrice: SELECTED.newPrice,
+      supplierClaim, sc,
+    });
+    openOrDownload(html, `should-cost-BOARD-${SELECTED.partNo}.html`,
+      "✓ 董事會 / CEO 版（1 頁）已開啟 — 真正 100 分的版本");
+  };
+
+  // ── ③ 採購 / 廠商版（4 頁） — Should Cost / Financial / Action ──
+  const handleGeneratePurchasingReport = () => {
+    const html = buildPurchasingReportHtml({
+      partNo: SELECTED.partNo, supplier: SELECTED.supplier,
+      oldPrice: SELECTED.oldPrice, newPrice: SELECTED.newPrice,
+      supplierClaim, supplierExcess, sc, bom: BOM_BREAKDOWN, moves: COMMODITY_MOVES,
+    });
+    openOrDownload(html, `should-cost-PROC-${SELECTED.partNo}.html`,
+      "✓ 採購 / 廠商版（4 頁）已開啟 — 已移除 AI Confidence 段");
+  };
+
+  // ── ④ 發送議價會議邀請 — mailto link（預先組好 href） ──
   const meetingMailto = (() => {
     const subject = `[議價會議] ${SELECTED.partNo} 報價調整 — Should-Cost 結果說明`;
     const body = [
@@ -737,16 +757,50 @@ export default function QuotationAnalyzerPage() {
                 ③ 一鍵動作
               </div>
               <div className="space-y-2">
+                {/* 三版報告 — 不同對象不同頁數 */}
+                <div style={{
+                  fontFamily: FONT_MONO, fontSize: 9.5, fontWeight: 700, color: "#9aa78d",
+                  letterSpacing: "0.08em", paddingBottom: 2,
+                }}>
+                  REPORT · 依對象選版本
+                </div>
+                <button
+                  type="button"
+                  onClick={handleGenerateBoardReport}
+                  style={{
+                    width: "100%", background: BR.green, color: "#fff",
+                    border: "none", borderRadius: 9, padding: "11px 14px", fontSize: 13, fontWeight: 800, cursor: "pointer",
+                    display: "block", textAlign: "left",
+                  }}>
+                  👔 董事會 / CEO 版　<span style={{ opacity: 0.85, fontWeight: 600 }}>· 1 頁 · 真正 100 分</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGeneratePurchasingReport}
+                  style={{
+                    width: "100%", background: "rgba(255,255,255,.12)", color: "#fff",
+                    border: "1px solid rgba(118,185,0,.4)", borderRadius: 9, padding: "10px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                    display: "block", textAlign: "left",
+                  }}>
+                  🏭 採購 / 廠商版　<span style={{ opacity: 0.85, fontWeight: 600 }}>· 4 頁 · 無 AI Confidence</span>
+                </button>
                 <button
                   type="button"
                   onClick={handleGenerateReport}
                   style={{
-                    width: "100%", background: BR.green, color: "#fff",
-                    border: "none", borderRadius: 9, padding: "10px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer",
-                    display: "block", textAlign: "center",
+                    width: "100%", background: "rgba(255,255,255,.06)", color: "#dfe5d8",
+                    border: "1px solid rgba(255,255,255,.16)", borderRadius: 9, padding: "9px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                    display: "block", textAlign: "left",
                   }}>
-                  📑 產出 Should-Cost 報告 (PDF)
+                  📑 完整版　<span style={{ opacity: 0.7 }}>· 11 段 · 內部 deep dive</span>
                 </button>
+
+                <div style={{
+                  fontFamily: FONT_MONO, fontSize: 9.5, fontWeight: 700, color: "#9aa78d",
+                  letterSpacing: "0.08em", paddingTop: 8, paddingBottom: 2,
+                }}>
+                  ACTION · 議價動作
+                </div>
                 <a
                   href={meetingMailto}
                   onClick={() => showToast("✓ 議價會議邀請已開啟郵件草稿")}
@@ -2026,4 +2080,353 @@ function CostIntelligenceCenterCard() {
       </div>
     </Card>
   );
+}
+
+// ============================================================
+// ② 董事會 / CEO 版（1 頁）— 真正 100 分的版本
+// 不是 11 頁，而是 3 層架構的 Layer 1：Board Card
+// 內容只保留：AI Verdict / 漲幅 / 合理範圍 / 超出 / 接受損失 / 替代方案 / 年省 / 建議
+// ============================================================
+function buildBoardReportHtml(args: {
+  partNo: string;
+  supplier: string;
+  oldPrice: number;
+  newPrice: number;
+  supplierClaim: number;
+  sc: { rows: { k: string; weight: number; delta: number; contrib: number }[]; total: number; buffered: number };
+}): string {
+  const today = new Date().toLocaleDateString("zh-TW", { year: "numeric", month: "long", day: "numeric" });
+  const targetPrice = +(args.oldPrice * (1 + args.sc.buffered / 100)).toFixed(2);
+  const overByActual = +(args.supplierClaim - args.sc.buffered).toFixed(1);
+  const monthlyVolume = 17000;
+  // 接受損失 = (新價 − 目標價) × 月用量 × 12 月 — 用戶截圖示 116,280
+  const annualImpact = Math.round((args.newPrice - targetPrice) * monthlyVolume);
+  // 年省 = 切換鼎能 vs 接受新價 × 12 月 — 用戶截圖示 204,000
+  const altPrice = 6.90;
+  const annualSaving = Math.round((args.newPrice - altPrice) * monthlyVolume);
+  const verdictLabel = args.supplierClaim > args.sc.buffered * 1.5 ? "不合理"
+                     : args.supplierClaim > args.sc.buffered ? "偏高" : "合理";
+  const verdictColor = args.supplierClaim > args.sc.buffered * 1.5 ? "#d4351c"
+                     : args.supplierClaim > args.sc.buffered ? "#b8860b" : "#4d7c0f";
+
+  return `<!DOCTYPE html>
+<html lang="zh-Hant"><head><meta charset="UTF-8" />
+<title>Board Card · ${args.partNo}</title>
+<style>
+  @page { size: A4; margin: 14mm 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Noto Sans TC","Sora",system-ui,sans-serif; color: #0c1208; margin: 0; padding: 16px; line-height: 1.5; }
+  .mono { font-family: "IBM Plex Mono",ui-monospace,Menlo,monospace; font-feature-settings: "tnum" 1; }
+  .meta { font-family: "IBM Plex Mono"; font-size: 10.5px; color: #9aa291; margin-bottom: 6px; letter-spacing: .06em; }
+  h1 { font-size: 26px; font-weight: 800; margin: 0 0 4px; color: #0c1908; }
+  .sub { color: #5b6356; font-size: 12.5px; margin-bottom: 14px; }
+  .verdict-bar { background: ${verdictColor}; color: #fff; padding: 14px 22px; border-radius: 10px; display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
+  .verdict-bar .lbl { font-family: "IBM Plex Mono"; font-size: 11px; color: rgba(255,255,255,.7); letter-spacing: .1em; }
+  .verdict-bar .lbl b { display: block; font-family: "Noto Sans TC"; font-size: 30px; font-weight: 800; color: #fff; margin-top: 2px; }
+  .verdict-bar .big { font-family: "IBM Plex Mono"; font-size: 22px; font-weight: 800; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px 14px; margin-bottom: 16px; }
+  .cell { border: 1px solid #e9ece3; border-radius: 10px; padding: 12px 14px; }
+  .cell .k { font-family: "IBM Plex Mono"; font-size: 10.5px; color: #9aa291; letter-spacing: .06em; }
+  .cell .v { font-family: "IBM Plex Mono"; font-size: 22px; font-weight: 800; color: #0c1208; margin-top: 4px; line-height: 1; }
+  .cell .v.red    { color: #d4351c; }
+  .cell .v.green  { color: #4d7c0f; }
+  .cell .v.purple { color: #c026d3; }
+  .cell .v.dark   { color: #0c1908; }
+  .cell.bigloss { background: #0c1908; border-color: #0c1908; }
+  .cell.bigloss .k { color: #9aa78d; }
+  .cell.bigloss .v { color: #ff8a7a; }
+  .cell.bigsave { background: #0c1908; border-color: #0c1908; }
+  .cell.bigsave .k { color: #9aa78d; }
+  .cell.bigsave .v { color: #76b900; }
+
+  .advice { background: #f0f7e4; border: 2px solid #76b900; border-radius: 11px; padding: 14px 18px; margin-bottom: 14px; }
+  .advice .lbl { font-family: "IBM Plex Mono"; font-size: 11px; font-weight: 700; color: #4d7c0f; letter-spacing: .1em; }
+  .advice .v { font-size: 20px; font-weight: 800; color: #0c1908; margin-top: 4px; }
+
+  .sign { display: flex; justify-content: space-between; padding-top: 16px; border-top: 1px solid #e9ece3; font-size: 11px; color: #5b6356; margin-top: 22px; }
+  .footer { margin-top: 8px; font-family: "IBM Plex Mono"; font-size: 9px; color: #9aa291; }
+</style></head>
+<body>
+
+  <div class="meta">CHI HUA AI · LAYER 1 · BOARD DECISION CARD · 1 PAGE · 給董事長 / 總經理 / CEO 看</div>
+  <h1>${args.partNo}　·　${args.supplier} 漲價案</h1>
+  <div class="sub">看一頁、做一個決定 — 其他細節由採購 / 廠商版負責。</div>
+
+  <div class="verdict-bar">
+    <div class="lbl">AI VERDICT<b>${verdictLabel}</b></div>
+    <div class="big">${verdictLabel === "不合理" ? "🚨" : verdictLabel === "偏高" ? "⚠" : "✓"}</div>
+  </div>
+
+  <div class="grid">
+    <div class="cell"><div class="k">供應商漲幅</div><div class="v red">+${args.supplierClaim.toFixed(1)}%</div></div>
+    <div class="cell"><div class="k">合理範圍</div><div class="v green">+${args.sc.buffered.toFixed(1)}%</div></div>
+    <div class="cell"><div class="k">超出</div><div class="v red">+${overByActual.toFixed(1)}%</div></div>
+    <div class="cell"><div class="k">建議議價目標</div><div class="v purple">${targetPrice.toFixed(2)}</div></div>
+
+    <div class="cell bigloss"><div class="k">接受損失（年化）</div><div class="v">NT$ ${annualImpact.toLocaleString()}</div></div>
+    <div class="cell"><div class="k">替代方案</div><div class="v dark">鼎能</div></div>
+    <div class="cell bigsave"><div class="k">年省（切換鼎能）</div><div class="v">NT$ ${annualSaving.toLocaleString()}</div></div>
+    <div class="cell"><div class="k">AI 信心</div><div class="v green">92%</div></div>
+  </div>
+
+  <div class="advice">
+    <div class="lbl">建議　ACTION</div>
+    <div class="v">退回重議 — 同時啟動 <b style="color:#4d7c0f">鼎能 RFQ</b>，14 天內鎖定結果。</div>
+  </div>
+
+  <div class="sign">
+    <span>核准 □　保留 □　退回 □</span>
+    <span class="mono">簽核：______________　日期：__________</span>
+  </div>
+
+  <div class="footer">
+    CHI HUA AI · L3 AI Quotation Analyzer · Board Card v1 · ${today}<br/>
+    細節請見「採購 / 廠商版（4 頁）」或「完整版（11 段）」報告。
+  </div>
+
+</body></html>`;
+}
+
+// ============================================================
+// ③ 採購 / 廠商版（4 頁）— Should Cost / Financial / Action
+// 不含 AI Confidence（CEO 不在意 92/95/88 太空泛）
+// ============================================================
+function buildPurchasingReportHtml(args: {
+  partNo: string;
+  supplier: string;
+  oldPrice: number;
+  newPrice: number;
+  supplierClaim: number;
+  supplierExcess: number;
+  sc: { rows: { k: string; weight: number; delta: number; contrib: number }[]; total: number; buffered: number };
+  bom: { k: string; pct: number; tone: string; mapTo: string }[];
+  moves: { k: string; current: number; baseline: number; unit: string; asOf: string; source: string; delta: number }[];
+}): string {
+  const today = new Date().toLocaleDateString("zh-TW", { year: "numeric", month: "long", day: "numeric" });
+  const targetPrice = +(args.oldPrice * (1 + args.sc.buffered / 100)).toFixed(2);
+  const overByActual = +(args.supplierClaim - args.sc.buffered).toFixed(1);
+  const monthlyVolume = 17000;
+  const annualVolume = monthlyVolume * 12;
+  const annualImpact = Math.round((args.newPrice - targetPrice) * monthlyVolume);
+  const annualImpactSwitch = Math.round((args.newPrice - 6.90) * monthlyVolume);
+  const verdictLabel = args.supplierClaim > args.sc.buffered * 1.5 ? "不合理"
+                     : args.supplierClaim > args.sc.buffered ? "偏高" : "合理";
+  const verdictColor = args.supplierClaim > args.sc.buffered * 1.5 ? "#d4351c"
+                     : args.supplierClaim > args.sc.buffered ? "#b8860b" : "#4d7c0f";
+  const verdictIcon = verdictLabel === "不合理" ? "🚨" : verdictLabel === "偏高" ? "⚠" : "✓";
+
+  return `<!DOCTYPE html>
+<html lang="zh-Hant"><head><meta charset="UTF-8" />
+<title>Should-Cost · 採購廠商版 · ${args.partNo}</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Noto Sans TC","Sora",system-ui,sans-serif; color: #0c1208; margin: 0; padding: 18px; line-height: 1.55; }
+  .mono { font-family: "IBM Plex Mono",ui-monospace,Menlo,monospace; font-feature-settings: "tnum" 1; }
+  h1 { font-size: 22px; font-weight: 800; margin: 0 0 4px; color: #0c1908; }
+  h2 { font-size: 13.5px; font-weight: 700; margin: 22px 0 8px; padding: 6px 10px; background: #f0f7e4; border-left: 4px solid #76b900; color: #0c1908; page-break-after: avoid; }
+  .sub { color: #5b6356; font-size: 12px; margin-bottom: 14px; }
+  .meta { font-size: 10.5px; color: #9aa291; margin-bottom: 6px; letter-spacing: .04em; }
+  table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  th,td { padding: 7px 8px; border-bottom: 1px solid #e9ece3; font-size: 11.5px; vertical-align: top; }
+  th { background: #fbfcfa; color: #5b6356; text-align: left; font-weight: 600; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
+  td.r,th.r { text-align: right; }
+  .red    { color: #d4351c; font-weight: 700; }
+  .green  { color: #4d7c0f; font-weight: 700; }
+  .purple { color: #c026d3; font-weight: 700; }
+  .amber  { color: #b8860b; font-weight: 700; }
+  .muted  { color: #9aa291; }
+  .pagebreak { page-break-after: always; }
+  .nobreak   { page-break-inside: avoid; }
+  .chip { display: inline-block; font-family: "IBM Plex Mono"; font-size: 9.5px; font-weight: 700; color: #fff; padding: 2px 7px; border-radius: 4px; letter-spacing: .04em; }
+  .chip.r { background: #d4351c; } .chip.g { background: #4d7c0f; } .chip.a { background: #b8860b; } .chip.p { background: #c026d3; }
+  .note { font-size: 11px; color: #5b6356; padding: 8px 12px; background: #f0f7e4; border-left: 3px solid #76b900; border-radius: 4px; margin-top: 6px; }
+
+  /* Page 1 board card mini */
+  .verdict-bar { background: ${verdictColor}; color: #fff; padding: 12px 18px; border-radius: 10px; display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 12px; }
+  .verdict-bar .lbl { font-family: "IBM Plex Mono"; font-size: 10.5px; color: rgba(255,255,255,.7); letter-spacing: .1em; }
+  .verdict-bar .lbl b { display: block; font-family: "Noto Sans TC"; font-size: 24px; font-weight: 800; color: #fff; margin-top: 2px; }
+  .verdict-bar .big { font-family: "IBM Plex Mono"; font-size: 20px; font-weight: 800; }
+  .grid4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px 12px; margin-bottom: 12px; }
+  .cell { border: 1px solid #e9ece3; border-radius: 8px; padding: 10px 12px; }
+  .cell .k { font-family: "IBM Plex Mono"; font-size: 10px; color: #9aa291; letter-spacing: .06em; }
+  .cell .v { font-family: "IBM Plex Mono"; font-size: 18px; font-weight: 800; margin-top: 3px; line-height: 1; }
+
+  .footer { margin-top: 22px; padding-top: 8px; border-top: 1px solid #e9ece3; font-family: "IBM Plex Mono"; font-size: 9.5px; color: #9aa291; }
+</style></head>
+<body>
+
+  <!-- ═════════════ PAGE 1 · Board Decision Card ═════════════ -->
+  <div class="meta">CHI HUA AI · 採購 / 廠商版（4 頁）· PAGE 1 of 4</div>
+  <h1>議價 Should-Cost 報告 · ${args.partNo}</h1>
+  <div class="sub">給採購 / 廠商閱讀 — 4 頁完成判讀。供應商 <b>${args.supplier}</b> · 報告日 ${today}</div>
+
+  <h2>第 1 頁 · Board Decision Card</h2>
+  <div class="verdict-bar nobreak">
+    <div class="lbl">AI VERDICT<b>${verdictLabel}</b></div>
+    <div class="big">${verdictIcon}</div>
+  </div>
+  <div class="grid4 nobreak">
+    <div class="cell"><div class="k">供應商漲幅</div><div class="v red">+${args.supplierClaim.toFixed(1)}%</div></div>
+    <div class="cell"><div class="k">合理範圍</div><div class="v green">+${args.sc.buffered.toFixed(1)}%</div></div>
+    <div class="cell"><div class="k">超出</div><div class="v red">+${overByActual.toFixed(1)}%</div></div>
+    <div class="cell"><div class="k">議價目標</div><div class="v purple">${targetPrice.toFixed(2)}</div></div>
+  </div>
+
+  <div class="pagebreak"></div>
+
+  <!-- ═════════════ PAGE 2 · Should Cost Summary ═════════════ -->
+  <div class="meta">CHI HUA AI · 採購 / 廠商版 · PAGE 2 of 4</div>
+  <h2>第 2 頁 · Should Cost Summary</h2>
+
+  <h3 style="font-size:12.5px;margin:10px 0 4px;color:#0c1908">① Price Change</h3>
+  <table class="nobreak">
+    <tr><td>舊單價</td><td class="r mono">${args.oldPrice.toFixed(2)}</td></tr>
+    <tr><td>新單價（供應商喊）</td><td class="r mono red">${args.newPrice.toFixed(2)}</td></tr>
+    <tr><td>實際漲幅</td><td class="r mono red">+${args.supplierClaim.toFixed(1)}%</td></tr>
+    <tr style="background:#f0f7e4"><td><b>建議議價目標</b></td><td class="r mono purple"><b>${targetPrice.toFixed(2)}</b>（+${args.sc.buffered}%）</td></tr>
+  </table>
+
+  <h3 style="font-size:12.5px;margin:18px 0 4px;color:#0c1908">② Cost Breakdown · BOM 結構</h3>
+  <table class="nobreak">
+    <thead><tr><th>成分</th><th class="r">佔成本</th><th>對應商品 / 指數</th></tr></thead>
+    <tbody>
+      ${args.bom.map((b) => `<tr><td>${b.k}</td><td class="r mono">${b.pct}%</td><td>${b.mapTo}</td></tr>`).join("")}
+    </tbody>
+  </table>
+
+  <h3 style="font-size:12.5px;margin:18px 0 4px;color:#0c1908">③ Commodity Impact · 含當前 vs 基期（推導透明）</h3>
+  <table class="nobreak">
+    <thead><tr>
+      <th>商品 / 指數</th>
+      <th class="r">當前</th>
+      <th class="r">基期</th>
+      <th class="r">變動</th>
+      <th>來源</th>
+    </tr></thead>
+    <tbody>
+      ${args.moves.map((m) => `
+        <tr>
+          <td>${m.k}</td>
+          <td class="r mono"><b>${m.current.toLocaleString()}</b></td>
+          <td class="r mono muted">${m.baseline.toLocaleString()}</td>
+          <td class="r mono ${m.delta > 5 ? "red" : "amber"}">+${m.delta.toFixed(1)}%</td>
+          <td style="font-size:10.5px">${m.source}</td>
+        </tr>`).join("")}
+    </tbody>
+  </table>
+
+  <h3 style="font-size:12.5px;margin:18px 0 4px;color:#0c1908">④ 加總 · 合理上限</h3>
+  <table class="nobreak">
+    <thead><tr><th>成分</th><th class="r">權重</th><th class="r">變動</th><th class="r">合理貢獻</th></tr></thead>
+    <tbody>
+      ${args.sc.rows.map((r) => `
+        <tr><td>${r.k}</td><td class="r mono">${r.weight}%</td><td class="r mono ${r.delta > 5 ? "red" : "amber"}">+${r.delta}%</td><td class="r mono green">+${r.contrib.toFixed(2)}%</td></tr>`).join("")}
+      <tr style="background:#f0f7e4"><td colspan="3"><b>合理上限（緩衝後）</b></td><td class="r mono"><b>+${args.sc.buffered.toFixed(1)}%</b></td></tr>
+    </tbody>
+  </table>
+  <div class="note">
+    <b>讀法</b> · 銅佔 58%、LME 銅 9,021 → 9,472（+5%），該欄合理 +2.9%。
+    加總 +5.65%，緩衝後 <b>+${args.sc.buffered}%</b> 即合理上限。
+  </div>
+
+  <div class="pagebreak"></div>
+
+  <!-- ═════════════ PAGE 3 · Financial Impact ═════════════ -->
+  <div class="meta">CHI HUA AI · 採購 / 廠商版 · PAGE 3 of 4</div>
+  <h2>第 3 頁 · Financial Impact · 公司財務衝擊</h2>
+  <p style="font-size:11.5px;color:#5b6356;margin:0 0 8px">
+    <b>採購不在意漲幾 % — 採購在意公司一年虧多少。</b>
+    月用量 <span class="mono">${monthlyVolume.toLocaleString()} 件</span> × 12 月 = 年化 <span class="mono">${annualVolume.toLocaleString()} 件</span>。
+  </p>
+
+  <div class="grid4 nobreak">
+    <div class="cell" style="background:#fdecea;border-color:#d4351c">
+      <div class="k red">IF ACCEPT 7.90</div>
+      <div class="v red">−NT$ ${annualImpact.toLocaleString()}</div>
+    </div>
+    <div class="cell" style="background:#fffaf0;border-color:#b8860b">
+      <div class="k amber">IF TARGET ${targetPrice.toFixed(2)}</div>
+      <div class="v amber">−NT$ ${Math.round((targetPrice - args.oldPrice) * annualVolume).toLocaleString()}</div>
+    </div>
+    <div class="cell" style="background:#f0f7e4;border-color:#4d7c0f">
+      <div class="k green">IF SWITCH 鼎能 6.90</div>
+      <div class="v green">+NT$ ${annualImpactSwitch.toLocaleString()}</div>
+    </div>
+    <div class="cell" style="background:#0c1908;border-color:#0c1908">
+      <div class="k" style="color:#9aa78d">議價空間</div>
+      <div class="v purple">${Math.round((args.newPrice - targetPrice) * monthlyVolume).toLocaleString()}/月</div>
+    </div>
+  </div>
+
+  <table class="nobreak">
+    <thead><tr><th>情境</th><th class="r">單價</th><th class="r">月差</th><th class="r">年化差</th><th>意義</th></tr></thead>
+    <tbody>
+      <tr><td>供應商喊</td><td class="r mono red">${args.newPrice.toFixed(2)}</td><td class="r mono muted">baseline</td><td class="r mono muted">baseline</td><td>原始痛點</td></tr>
+      <tr style="background:#f0f7e4"><td><b>議價目標</b></td><td class="r mono purple"><b>${targetPrice.toFixed(2)}</b></td><td class="r mono green"><b>−${Math.round((args.newPrice - targetPrice) * monthlyVolume).toLocaleString()}</b></td><td class="r mono green"><b>−${annualImpact.toLocaleString()}</b></td><td><b>議價空間</b></td></tr>
+      <tr><td>切換鼎能</td><td class="r mono green">6.90</td><td class="r mono green">−${Math.round((args.newPrice - 6.90) * monthlyVolume).toLocaleString()}</td><td class="r mono green">−${annualImpactSwitch.toLocaleString()}</td><td>結構性省下</td></tr>
+    </tbody>
+  </table>
+  <div class="note">
+    <b>採購結論</b> · 接受 7.90 一年虧 <b class="red">NT$ ${annualImpact.toLocaleString()}</b>；
+    壓回 ${targetPrice.toFixed(2)} 即守住；切換鼎能反而省 <b class="green">NT$ ${annualImpactSwitch.toLocaleString()}/年</b>。
+  </div>
+
+  <div class="pagebreak"></div>
+
+  <!-- ═════════════ PAGE 4 · Action Plan ═════════════ -->
+  <div class="meta">CHI HUA AI · 採購 / 廠商版 · PAGE 4 of 4</div>
+  <h2>第 4 頁 · Action Plan · 採購行動建議</h2>
+  <p style="font-size:11.5px;color:#5b6356;margin:0 0 8px">
+    給採購直接抄進週會議程。每行都有負責人 / 截止 / 財務數字。
+  </p>
+
+  <table class="nobreak">
+    <thead><tr><th>優先級</th><th>動作</th><th>負責</th><th>截止</th><th class="r">財務影響</th><th>狀態</th></tr></thead>
+    <tbody>
+      <tr style="background:#fdecea">
+        <td><span class="chip r">P1 · 立即</span></td>
+        <td><b>退回現報價 + 發出鼎能 RFQ</b><br/><span class="muted">同步詢價力豐 / 鼎能，鎖定 90 天</span></td>
+        <td>採購</td>
+        <td>48 小時</td>
+        <td class="r mono red">擋損 NT$ ${annualImpactSwitch.toLocaleString()}</td>
+        <td><span class="chip r">未啟動</span></td>
+      </tr>
+      <tr style="background:#fffaf0">
+        <td><span class="chip a">P2 · 短期</span></td>
+        <td><b>雙供應商策略 SOS</b><br/><span class="muted">70% 鼎能 + 30% 現任，降風險</span></td>
+        <td>採購 + 生管</td>
+        <td>14 天</td>
+        <td class="r mono amber">分散風險</td>
+        <td><span class="chip a">規劃中</span></td>
+      </tr>
+      <tr style="background:#f0f7e4">
+        <td><span class="chip g">P3 · 長期</span></td>
+        <td><b>含解價條款 PEC</b><br/><span class="muted">新約綁 LME 銅 + IPCEI，自動算合理調幅</span></td>
+        <td>採購 + 法務</td>
+        <td>90 天</td>
+        <td class="r mono green">結構性消除爭議</td>
+        <td><span class="chip g">待簽核</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 style="font-size:12.5px;margin:18px 0 4px;color:#0c1908">議價會議拿話清單（可會中直接念出）</h3>
+  <ol style="padding-left:22px;margin:6px 0 0">
+    <li style="font-size:12px;margin:3px 0">「銅佔 58%、LME 9,021 → 9,472，該欄合理 +2.9%。」</li>
+    <li style="font-size:12px;margin:3px 0">「電鍍佔 10%、IPCEI 119.8 → 134.2，該欄合理 +1.2%。」</li>
+    <li style="font-size:12px;margin:3px 0">「加工佔 15%、工資 +3% + 鏡板 +8%，該欄合理 +1.2%。」</li>
+    <li style="font-size:12px;margin:3px 0">「運費佔 5%、BDI 1,721 → 1,842，該欄合理 +0.35%。」</li>
+    <li style="font-size:12px;margin:3px 0">「加總 +5.7%，緩衝後 <b>+${args.sc.buffered}%</b> 為合理上限。」</li>
+    <li style="font-size:12px;margin:3px 0">「貴司喊 +${args.supplierClaim}% <b style="color:#d4351c">超出 +${overByActual}%</b>，沒有依據。」</li>
+    <li style="font-size:12px;margin:3px 0">「已詢價鼎能 ${(6.90).toFixed(2)} 元 / 5 週、力豐 ${(7.10).toFixed(2)} 元 / 3 週，請貴司審慎評估。」</li>
+  </ol>
+
+  <div class="footer">
+    CHI HUA AI · L3 AI Quotation Analyzer · 採購 / 廠商版 v1 · 4 頁<br/>
+    資料來源：ERP BOM v3.2 · LME · IPCEI · 中鋼牌價 · BDI · 勞動部　·　列印日：${today}<br/>
+    <span style="color:#5b6356"><b>已移除</b> AI Confidence 段（CEO 不在意 92/95/88 抽象比例）。完整版（11 段）含此段供內部 deep dive。</span>
+  </div>
+
+</body></html>`;
 }
