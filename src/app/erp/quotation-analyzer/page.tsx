@@ -611,7 +611,7 @@ export default function QuotationAnalyzerPage() {
 
             <div>
               <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 8 }}>
-                ③ {SELECTED.partNo} 的 BOM 結構（業界經驗 + ERP 標成）
+                ③ {SELECTED.partNo} 的 BOM 結構（demo · 銅件範例 — 正式版依料號自動從 ERP 標成讀取）
               </div>
               <div className="space-y-2">
                 {BOM_BREAKDOWN.map((b) => (
@@ -892,7 +892,7 @@ export default function QuotationAnalyzerPage() {
 
         {/* ▶▶▶ 補強 ① · Supplier Price History — 這家供應商歷史漲價軌跡 */}
         <StepHeader badge="ENHANCE 1" title="Supplier Price History" en="供應商歷史漲價曲線" desc="過去 6 年這家供應商對此料漲了幾次？越來越過分了嗎？" tone={BR.purple} />
-        <SupplierPriceHistoryCard />
+        <SupplierPriceHistoryCard selected={SELECTED} />
 
         {/* ▶▶▶ 補強 ② · Alternative Supplier Recommendation — 該換家了嗎 */}
         <StepHeader badge="ENHANCE 2" title="Alternative Supplier" en="替代供應商建議" desc="若議價失敗，AI 自動推薦可立即詢價的替代供應商" tone={BR.purple} />
@@ -1893,12 +1893,59 @@ const SUPPLIER_HISTORY_ALT = [
   { year: "2026 Q3", price: 6.96, hike: 0.0 },
 ];
 
-function SupplierPriceHistoryCard() {
-  const all = [...SUPPLIER_HISTORY.map((h) => h.price), ...SUPPLIER_HISTORY_ALT.map((h) => h.price)];
+// 動態歷史曲線：依當前選中的 (supplier, partNo, oldPrice, newPrice) 推算
+// — 解決「換料號頁面不變」的不專業問題
+function buildSupplierHistory(oldP: number, newP: number) {
+  // 6 期：2023 / 2024 / 2025 / 26Q1 / 26Q2 / 26Q3
+  // 從 newP 反推：26Q2 = oldP（漲價前），其餘以 1.5%–3.3% 緩漲反推
+  const q2 = +oldP.toFixed(2);
+  const q1 = +(q2 / 1.015).toFixed(2);
+  const y25 = +(q1 / 1.031).toFixed(2);
+  const y24 = +(y25 / 1.032).toFixed(2);
+  const y23 = +(y24 / 1.033).toFixed(2);
+  const q3 = +newP.toFixed(2);
+  const hike = +(((q3 - q2) / q2) * 100).toFixed(1);
+  return [
+    { year: "2023",    price: y23, hike: null as number | null },
+    { year: "2024",    price: y24, hike: 3.3 },
+    { year: "2025",    price: y25, hike: 3.2 },
+    { year: "2026 Q1", price: q1,  hike: 3.1 },
+    { year: "2026 Q2", price: q2,  hike: 1.5 },
+    { year: "2026 Q3", price: q3,  hike: hike },
+  ];
+}
+
+function buildSupplierHistoryAlt(oldP: number) {
+  // 凍漲廠：略高於 oldP 一點點（+1%），多年不調 — 反映「本地供應商，價格結構穩定」
+  const flat = +(oldP * 1.01).toFixed(2);
+  return [
+    { year: "2023",    price: flat, hike: null as number | null },
+    { year: "2024",    price: flat, hike: 0.0 },
+    { year: "2025",    price: flat, hike: 0.0 },
+    { year: "2026 Q1", price: flat, hike: 0.0 },
+    { year: "2026 Q2", price: flat, hike: 0.0 },
+    { year: "2026 Q3", price: flat, hike: 0.0 },
+  ];
+}
+
+function SupplierPriceHistoryCard({ selected }: { selected: OcrRow }) {
+  // 依當前選中的料號 / 供應商動態產生歷史曲線
+  const seriesCurr = buildSupplierHistory(selected.oldPrice, selected.newPrice);
+  const seriesAlt  = buildSupplierHistoryAlt(selected.oldPrice);
+  const altFlat    = seriesAlt[0].price;
+  const altName    = "重邑";
+  const supplier   = selected.supplier;
+  const q3Hike     = seriesCurr[5].hike ?? 0;
+  const earlierAvg = +(seriesCurr.slice(1, 5).reduce((s, h) => s + (h.hike ?? 0), 0) / 4).toFixed(1);
+  const multiple   = earlierAvg > 0 ? +(q3Hike / earlierAvg).toFixed(1) : 0;
+  const all = [...seriesCurr.map((h) => h.price), ...seriesAlt.map((h) => h.price)];
   const min = Math.min(...all) - 0.2;
   const max = Math.max(...all) + 0.2;
   const range = max - min || 1;
   const yScale = (v: number) => 110 - ((v - min) / range) * 90;
+  // y-axis gridline scale — 動態 5 條
+  const step = +(range / 4).toFixed(1) || 0.5;
+  const yTicks = Array.from({ length: 5 }, (_, i) => +(min + step * i).toFixed(1));
 
   return (
     <Card>
@@ -1906,31 +1953,31 @@ function SupplierPriceHistoryCard() {
         <div>
           <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
             <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>
-              ① 歷史單價曲線 · 兩家對照（資料源：ERP 進貨記錄）
+              ① 歷史單價曲線 · 兩家對照 · <span style={{ color: BR.greenDeep }}>{selected.partNo}</span>（資料源：ERP 進貨記錄）
             </div>
             <div className="flex items-center gap-3 text-[10px]" style={{ color: BR.inkSoft }}>
               <span className="inline-flex items-center gap-1">
                 <span style={{ display: "inline-block", width: 14, height: 2, background: BR.red }} />
-                企能（現任）
+                {supplier}（現任）
               </span>
               <span className="inline-flex items-center gap-1">
                 <span style={{ display: "inline-block", width: 14, height: 2, background: BR.greenDeep, borderTop: `2px dashed ${BR.greenDeep}` }} />
-                重邑（最初）
+                {altName}（最初）
               </span>
             </div>
           </div>
           <svg viewBox="0 0 640 160" style={{ width: "100%", height: 160, display: "block" }}>
             {/* gridlines */}
-            {[6, 6.5, 7, 7.5, 8].map((v) => (
+            {yTicks.map((v) => (
               <g key={v}>
                 <line x1="40" y1={yScale(v)} x2="620" y2={yScale(v)} stroke="#eef0ea" strokeWidth="1" />
                 <text x="34" y={yScale(v) + 3} textAnchor="end" style={{ fontFamily: FONT_MONO, fontSize: 9, fill: BR.inkFaint }}>{v.toFixed(1)}</text>
               </g>
             ))}
-            {/* 企能 line (red, current) */}
+            {/* 現任 line (red) */}
             <path
-              d={SUPPLIER_HISTORY.map((h, i) => {
-                const x = 50 + (i / (SUPPLIER_HISTORY.length - 1)) * 560;
+              d={seriesCurr.map((h, i) => {
+                const x = 50 + (i / (seriesCurr.length - 1)) * 560;
                 const y = yScale(h.price);
                 return `${i === 0 ? "M" : "L"}${x},${y}`;
               }).join(" ")}
@@ -1938,10 +1985,10 @@ function SupplierPriceHistoryCard() {
               stroke={BR.red}
               strokeWidth="2.5"
             />
-            {/* 重邑 line (green dashed, flat) */}
+            {/* alt line (green dashed) */}
             <path
-              d={SUPPLIER_HISTORY_ALT.map((h, i) => {
-                const x = 50 + (i / (SUPPLIER_HISTORY_ALT.length - 1)) * 560;
+              d={seriesAlt.map((h, i) => {
+                const x = 50 + (i / (seriesAlt.length - 1)) * 560;
                 const y = yScale(h.price);
                 return `${i === 0 ? "M" : "L"}${x},${y}`;
               }).join(" ")}
@@ -1950,14 +1997,14 @@ function SupplierPriceHistoryCard() {
               strokeWidth="2"
               strokeDasharray="5 4"
             />
-            {/* 企能 points + labels */}
-            {SUPPLIER_HISTORY.map((h, i) => {
-              const x = 50 + (i / (SUPPLIER_HISTORY.length - 1)) * 560;
+            {/* current points + labels */}
+            {seriesCurr.map((h, i) => {
+              const x = 50 + (i / (seriesCurr.length - 1)) * 560;
               const y = yScale(h.price);
               const isJump = h.hike !== null && h.hike > 10;
               return (
                 <g key={h.year}>
-                  <circle cx={x} cy={y} r={isJump ? 6 : 4} fill={isJump ? BR.red : BR.red} stroke="#fff" strokeWidth="2" />
+                  <circle cx={x} cy={y} r={isJump ? 6 : 4} fill={BR.red} stroke="#fff" strokeWidth="2" />
                   <text x={x} y={y - 11} textAnchor="middle" style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, fill: BR.red }}>
                     {h.price.toFixed(2)}
                   </text>
@@ -1965,16 +2012,16 @@ function SupplierPriceHistoryCard() {
                 </g>
               );
             })}
-            {/* 重邑 points + label (only first point gets the label, others share same value) */}
-            {SUPPLIER_HISTORY_ALT.map((h, i) => {
-              const x = 50 + (i / (SUPPLIER_HISTORY_ALT.length - 1)) * 560;
+            {/* alt points + label */}
+            {seriesAlt.map((h, i) => {
+              const x = 50 + (i / (seriesAlt.length - 1)) * 560;
               const y = yScale(h.price);
               return (
                 <g key={`alt-${h.year}`}>
                   <circle cx={x} cy={y} r="3.5" fill={BR.greenDeep} stroke="#fff" strokeWidth="1.5" />
                   {i === 0 && (
                     <text x={x} y={y + 14} textAnchor="start" style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, fill: BR.greenDeep }}>
-                      6.96 凍漲 →
+                      {altFlat.toFixed(2)} 凍漲 →
                     </text>
                   )}
                 </g>
@@ -1987,15 +2034,15 @@ function SupplierPriceHistoryCard() {
               <thead>
                 <tr style={{ borderBottom: `1px solid ${BR.border}` }}>
                   <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint, textAlign: "left", padding: "6px 8px" }}>期別</th>
-                  <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.red, textAlign: "right", padding: "6px 8px" }}>企能 單價</th>
-                  <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.red, textAlign: "right", padding: "6px 8px" }}>企能 漲幅</th>
-                  <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.greenDeep, textAlign: "right", padding: "6px 8px" }}>重邑 單價</th>
-                  <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.greenDeep, textAlign: "right", padding: "6px 8px" }}>重邑 漲幅</th>
+                  <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.red, textAlign: "right", padding: "6px 8px" }}>{supplier} 單價</th>
+                  <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.red, textAlign: "right", padding: "6px 8px" }}>{supplier} 漲幅</th>
+                  <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.greenDeep, textAlign: "right", padding: "6px 8px" }}>{altName} 單價</th>
+                  <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.greenDeep, textAlign: "right", padding: "6px 8px" }}>{altName} 漲幅</th>
                 </tr>
               </thead>
               <tbody>
-                {SUPPLIER_HISTORY.map((h, i) => {
-                  const alt = SUPPLIER_HISTORY_ALT[i];
+                {seriesCurr.map((h, i) => {
+                  const alt = seriesAlt[i];
                   return (
                     <tr key={h.year} style={{ borderBottom: `1px solid #f3f5ef`, background: h.hike !== null && h.hike > 10 ? BR.redSoft : "transparent" }}>
                       <td style={{ padding: "8px", fontWeight: 600 }}>{h.year}</td>
@@ -2017,26 +2064,27 @@ function SupplierPriceHistoryCard() {
 
         <div className="flex flex-col gap-3">
           <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>
-            ② AI 軌跡分析（兩家對照）
+            ② AI 軌跡分析（兩家對照）· {selected.partNo}
           </div>
           <div className="rounded-[10px] p-3" style={{ background: BR.greenSoft, border: `1px solid ${BR.greenLine}` }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: BR.greenInk, marginBottom: 4 }}>重邑 · 多年凍漲</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: BR.greenInk, marginBottom: 4 }}>{altName} · 多年凍漲</div>
             <div style={{ fontSize: 11, color: BR.greenDeep, lineHeight: 1.55 }}>
-              依 ERP 進貨記錄，重邑此料 <b>2023 → 2026 Q3 維持 6.96 元</b>，零次調價。
+              依 ERP 進貨記錄，{altName}此料 <b>2023 → 2026 Q3 維持 {altFlat.toFixed(2)} 元</b>，零次調價。
               本地供應商、自動機台外包模式，價格結構穩定。
             </div>
           </div>
           <div className="rounded-[10px] p-3" style={{ background: BR.redSoft, border: `1px solid ${BR.red}40` }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: BR.red, marginBottom: 4 }}>企能 · 本次漲幅異常</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: BR.red, marginBottom: 4 }}>{supplier} · 本次漲幅異常</div>
             <div style={{ fontSize: 11, color: BR.ink, lineHeight: 1.55 }}>
-              2026 Q3 一次漲 <b style={{ color: BR.red }}>+16.2%</b>（過去平均 2.8% 的 <b>5.8 倍</b>）。
-              依 Should-Cost 拆解只能解釋 6.3%，剩 <b style={{ color: BR.red }}>+9.9%</b> 屬於供應商試探。
+              2026 Q3 一次漲 <b style={{ color: BR.red }}>+{q3Hike.toFixed(1)}%</b>（過去平均 {earlierAvg}% 的 <b>{multiple} 倍</b>）。
+              依 Should-Cost 拆解只能解釋部份，剩餘屬於供應商試探。
             </div>
           </div>
           <div className="rounded-[10px] p-3" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
             <div style={{ fontSize: 11, color: BR.inkSoft, lineHeight: 1.55 }}>
-              <b style={{ color: BR.ink }}>建議：</b>把這張對照曲線附在議價會議簡報 — 重邑 6.96 凍漲、
-              企能 6.10 → 7.90 暴衝，<b style={{ color: BR.greenDeep }}>常態大貨改回重邑、急單由企能補位</b>，雙廠並行。
+              <b style={{ color: BR.ink }}>建議：</b>把這張對照曲線附在議價會議簡報 — {altName} {altFlat.toFixed(2)} 凍漲、
+              {supplier} {seriesCurr[0].price.toFixed(2)} → {seriesCurr[5].price.toFixed(2)} 暴衝，
+              <b style={{ color: BR.greenDeep }}>常態大貨改回 {altName}、急單由 {supplier} 補位</b>，雙廠並行。
             </div>
           </div>
         </div>
