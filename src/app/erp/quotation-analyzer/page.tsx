@@ -159,15 +159,15 @@ export default function QuotationAnalyzerPage() {
       "✓ 董事會 / CEO 版（1 頁）已開啟 — 真正 100 分的版本");
   };
 
-  // ── ③ 採購 / 廠商版（4 頁） — Should Cost / Financial / Action ──
+  // ── ③ L1 Executive Report · 總經理閱讀版（4 頁固定） ──
   const handleGeneratePurchasingReport = () => {
     const html = buildPurchasingReportHtml({
       partNo: SELECTED.partNo, supplier: SELECTED.supplier,
       oldPrice: SELECTED.oldPrice, newPrice: SELECTED.newPrice,
       supplierClaim, supplierExcess, sc, bom: BOM_BREAKDOWN, moves: COMMODITY_MOVES,
     });
-    openOrDownload(html, `should-cost-PROC-${SELECTED.partNo}.html`,
-      "✓ 採購 / 廠商版（4 頁）已開啟 — 已移除 AI Confidence 段");
+    openOrDownload(html, `L1-executive-${SELECTED.partNo}.html`,
+      "✓ L1 Executive Report（4 頁固定）已開啟 — 為什麼不合理？影響多少？有沒有備案？風險多高？+ CEO Decision Workflow");
   };
 
   // ── ④ 發送議價會議邀請 — mailto link（預先組好 href） ──
@@ -782,7 +782,7 @@ export default function QuotationAnalyzerPage() {
                     border: "1px solid rgba(118,185,0,.4)", borderRadius: 9, padding: "10px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer",
                     display: "block", textAlign: "left",
                   }}>
-                  🏭 採購 / 廠商版　<span style={{ opacity: 0.85, fontWeight: 600 }}>· 4 頁 · 無 AI Confidence</span>
+                  🏛 L1 Executive Report　<span style={{ opacity: 0.85, fontWeight: 600 }}>· 4 頁 · 總經理閱讀</span>
                 </button>
                 <button
                   type="button"
@@ -2305,8 +2305,12 @@ function buildBoardReportHtml(args: {
 }
 
 // ============================================================
-// ③ 採購 / 廠商版（4 頁）— Should Cost / Financial / Action
-// 不含 AI Confidence（CEO 不在意 92/95/88 太空泛）
+// ③ L1 Executive Report — 總經理 / 採購主管閱讀（4 頁固定）
+// 回答總經理 4 個問題：
+//   Page 1  為什麼不合理？ (Executive Summary)
+//   Page 2  影響多少？     (Financial Impact)
+//   Page 3  有沒有備案？風險多高？(Supply Risk)
+//   Page 4  Action Plan + CEO Decision Workflow（簽核 → 系統自動執行）
 // ============================================================
 function buildPurchasingReportHtml(args: {
   partNo: string;
@@ -2324,7 +2328,7 @@ function buildPurchasingReportHtml(args: {
   const overByActual = +(args.supplierClaim - args.sc.buffered).toFixed(1);
   const monthlyVolume = 17000;
   const annualVolume = monthlyVolume * 12;
-  // 修正：年化要 × 12（先前漏掉 × 12，導致 NT$ 9,690 被誤標為「年化」）
+  // 月損失 / 年化（× 12）— 修正先前 bug：年化要 × 12
   const monthlyImpact = Math.round((args.newPrice - targetPrice) * monthlyVolume);
   const annualImpact = monthlyImpact * 12;
   const monthlyImpactSwitch = Math.round((args.newPrice - 6.90) * monthlyVolume);
@@ -2334,21 +2338,33 @@ function buildPurchasingReportHtml(args: {
   const verdictColor = args.supplierClaim > args.sc.buffered * 1.5 ? "#d4351c"
                      : args.supplierClaim > args.sc.buffered ? "#b8860b" : "#4d7c0f";
   const verdictIcon = verdictLabel === "不合理" ? "🚨" : verdictLabel === "偏高" ? "⚠" : "✓";
+  const grossMarginBefore = 21.4;
+  const grossMarginAfter  = 12.45;
+
+  // 替代供應商精選
+  const suppliers = [
+    { name: "鼎能精密",  quote: 6.90, leadWeeks: 5, quality: "A+", otd: 97, riskScore: 92, recommend: "首選" },
+    { name: "力豐電子",  quote: 7.10, leadWeeks: 3, quality: "A+", otd: 95, riskScore: 88, recommend: "備案" },
+    { name: "新竹 EFG",  quote: 7.30, leadWeeks: 4, quality: "A",  otd: 89, riskScore: 76, recommend: "觀察" },
+  ];
 
   return `<!DOCTYPE html>
 <html lang="zh-Hant"><head><meta charset="UTF-8" />
-<title>Should-Cost · 採購廠商版 · ${args.partNo}</title>
+<title>L1 Executive Report · ${args.partNo}</title>
 <style>
-  @page { size: A4; margin: 16mm 14mm; }
+  @page { size: A4; margin: 14mm 14mm; }
   * { box-sizing: border-box; }
-  body { font-family: "Noto Sans TC","Sora",system-ui,sans-serif; color: #0c1208; margin: 0; padding: 18px; line-height: 1.55; }
+  body { font-family: "Noto Sans TC","Sora",system-ui,sans-serif; color: #0c1208; margin: 0; padding: 14px 18px; line-height: 1.5; }
   .mono { font-family: "IBM Plex Mono",ui-monospace,Menlo,monospace; font-feature-settings: "tnum" 1; }
-  h1 { font-size: 22px; font-weight: 800; margin: 0 0 4px; color: #0c1908; }
-  h2 { font-size: 13.5px; font-weight: 700; margin: 22px 0 8px; padding: 6px 10px; background: #f0f7e4; border-left: 4px solid #76b900; color: #0c1908; page-break-after: avoid; }
-  .sub { color: #5b6356; font-size: 12px; margin-bottom: 14px; }
-  .meta { font-size: 10.5px; color: #9aa291; margin-bottom: 6px; letter-spacing: .04em; }
-  table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-  th,td { padding: 7px 8px; border-bottom: 1px solid #e9ece3; font-size: 11.5px; vertical-align: top; }
+  h1 { font-size: 22px; font-weight: 800; margin: 0 0 2px; color: #0c1908; }
+  h2 { font-size: 14px; font-weight: 700; margin: 16px 0 6px; padding: 6px 12px; background: #f0f7e4; border-left: 4px solid #76b900; color: #0c1908; page-break-after: avoid; border-radius: 0 4px 4px 0; }
+  h3 { font-size: 12.5px; font-weight: 700; margin: 12px 0 4px; color: #0c1908; }
+  .sub { color: #5b6356; font-size: 12px; margin-bottom: 12px; }
+  .meta { font-family: "IBM Plex Mono"; font-size: 10px; color: #9aa291; margin-bottom: 4px; letter-spacing: .06em; }
+  .question { font-size: 14px; font-weight: 700; color: #0c1908; margin: 4px 0 10px; padding: 8px 14px; background: #0c1908; color: #76b900; border-radius: 6px; }
+  .question .q { color: #cdd6c2; font-weight: 500; font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  th, td { padding: 7px 8px; border-bottom: 1px solid #e9ece3; font-size: 11.5px; vertical-align: top; }
   th { background: #fbfcfa; color: #5b6356; text-align: left; font-weight: 600; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
   td.r,th.r { text-align: right; }
   .red    { color: #d4351c; font-weight: 700; }
@@ -2359,193 +2375,317 @@ function buildPurchasingReportHtml(args: {
   .pagebreak { page-break-after: always; }
   .nobreak   { page-break-inside: avoid; }
   .chip { display: inline-block; font-family: "IBM Plex Mono"; font-size: 9.5px; font-weight: 700; color: #fff; padding: 2px 7px; border-radius: 4px; letter-spacing: .04em; }
-  .chip.r { background: #d4351c; } .chip.g { background: #4d7c0f; } .chip.a { background: #b8860b; } .chip.p { background: #c026d3; }
+  .chip.r { background: #d4351c; } .chip.g { background: #4d7c0f; } .chip.a { background: #b8860b; } .chip.p { background: #c026d3; } .chip.gray { background: #9aa291; }
   .note { font-size: 11px; color: #5b6356; padding: 8px 12px; background: #f0f7e4; border-left: 3px solid #76b900; border-radius: 4px; margin-top: 6px; }
+  .note b { color: #0c1908; }
 
-  /* Page 1 board card mini */
   .verdict-bar { background: ${verdictColor}; color: #fff; padding: 12px 18px; border-radius: 10px; display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 12px; }
-  .verdict-bar .lbl { font-family: "IBM Plex Mono"; font-size: 10.5px; color: rgba(255,255,255,.7); letter-spacing: .1em; }
-  .verdict-bar .lbl b { display: block; font-family: "Noto Sans TC"; font-size: 24px; font-weight: 800; color: #fff; margin-top: 2px; }
+  .verdict-bar .lbl { font-family: "IBM Plex Mono"; font-size: 11px; color: rgba(255,255,255,.7); letter-spacing: .1em; }
+  .verdict-bar .lbl b { display: block; font-family: "Noto Sans TC"; font-size: 26px; font-weight: 800; color: #fff; margin-top: 2px; }
   .verdict-bar .big { font-family: "IBM Plex Mono"; font-size: 20px; font-weight: 800; }
   .grid4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px 12px; margin-bottom: 12px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
   .cell { border: 1px solid #e9ece3; border-radius: 8px; padding: 10px 12px; }
   .cell .k { font-family: "IBM Plex Mono"; font-size: 10px; color: #9aa291; letter-spacing: .06em; }
-  .cell .v { font-family: "IBM Plex Mono"; font-size: 18px; font-weight: 800; margin-top: 3px; line-height: 1; }
+  .cell .v { font-family: "IBM Plex Mono"; font-size: 19px; font-weight: 800; margin-top: 4px; line-height: 1; }
+  .cell .v2 { font-size: 10.5px; color: #5b6356; margin-top: 4px; }
+  .cell.dark { background: #0c1908; border-color: #0c1908; }
+  .cell.dark .k { color: #9aa78d; }
+  .cell.dark .v.red { color: #ff8a7a; }
+  .cell.dark .v.green { color: #76b900; }
+  .cell.dark .v2 { color: #cdd6c2; }
 
-  .footer { margin-top: 22px; padding-top: 8px; border-top: 1px solid #e9ece3; font-family: "IBM Plex Mono"; font-size: 9.5px; color: #9aa291; }
+  /* Why-unreasonable visualization (page 1) */
+  .why-bar { display: flex; align-items: stretch; gap: 8px; margin: 12px 0; }
+  .why-seg { flex: 1; border-radius: 8px; padding: 12px 14px; text-align: center; }
+  .why-seg.fair { background: #f0f7e4; border: 2px solid #76b900; }
+  .why-seg.gap  { background: #fdecea; border: 2px solid #d4351c; }
+  .why-seg .lbl { font-family: "IBM Plex Mono"; font-size: 9.5px; letter-spacing: .1em; }
+  .why-seg .val { font-family: "IBM Plex Mono"; font-size: 22px; font-weight: 800; margin-top: 4px; }
+  .why-seg.fair .lbl,.why-seg.fair .val { color: #4d7c0f; }
+  .why-seg.gap  .lbl,.why-seg.gap  .val { color: #d4351c; }
+  .why-arrow { display: flex; align-items: center; font-size: 22px; color: #9aa291; font-weight: 700; }
+
+  /* CEO Decision section (page 4) */
+  .decision-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-top: 8px; }
+  .decision-card { border: 2px solid; border-radius: 10px; padding: 14px 14px; min-height: 100px; position: relative; }
+  .decision-card .cb { font-family: "IBM Plex Mono"; font-size: 16px; }
+  .decision-card .h { font-family: "Noto Sans TC"; font-size: 14px; font-weight: 800; margin-top: 8px; }
+  .decision-card .d { font-size: 10.5px; color: #5b6356; margin-top: 4px; line-height: 1.45; }
+  .decision-card .rec { position: absolute; top: 8px; right: 10px; font-family: "IBM Plex Mono"; font-size: 8.5px; font-weight: 700; padding: 1px 6px; border-radius: 3px; letter-spacing: .08em; }
+  .decision-card.reject   { border-color: #d4351c; background: #fdecea; }
+  .decision-card.reject .h,.decision-card.reject .cb { color: #d4351c; }
+  .decision-card.reject .rec { background: #d4351c; color: #fff; }
+  .decision-card.rfq      { border-color: #4d7c0f; background: #f0f7e4; }
+  .decision-card.rfq .h,.decision-card.rfq .cb { color: #4d7c0f; }
+  .decision-card.rfq .rec { background: #4d7c0f; color: #fff; }
+  .decision-card.survey   { border-color: #b8860b; background: #fffaf0; }
+  .decision-card.survey .h,.decision-card.survey .cb { color: #b8860b; }
+  .decision-card.approve  { border-color: #9aa291; background: #fbfcfa; border-style: dashed; }
+  .decision-card.approve .h,.decision-card.approve .cb { color: #5b6356; }
+
+  .workflow { background: #0c1908; color: #fff; border-radius: 10px; padding: 14px 18px; margin-top: 12px; }
+  .workflow .h { font-family: "IBM Plex Mono"; font-size: 11px; letter-spacing: .12em; color: #76b900; font-weight: 700; }
+  .workflow .lead { font-size: 13px; font-weight: 700; color: #fff; margin-top: 6px; }
+  .workflow .lead .em { color: #76b900; }
+  .workflow ul { padding-left: 18px; margin: 8px 0 0; }
+  .workflow li { font-size: 11.5px; color: #cdd6c2; margin: 3px 0; }
+  .workflow li b { color: #fff; }
+
+  .layers { margin-top: 14px; font-size: 10.5px; color: #5b6356; padding: 10px 14px; background: #fbfcfa; border: 1px solid #e9ece3; border-radius: 8px; }
+  .layers b { color: #0c1908; }
+  .footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #e9ece3; font-family: "IBM Plex Mono"; font-size: 9.5px; color: #9aa291; line-height: 1.55; }
 </style></head>
 <body>
 
-  <!-- ═════════════ PAGE 1 · Board Decision Card ═════════════ -->
-  <div class="meta">CHI HUA AI · 採購 / 廠商版（4 頁）· PAGE 1 of 4</div>
-  <h1>議價 Should-Cost 報告 · ${args.partNo}</h1>
-  <div class="sub">給採購 / 廠商閱讀 — 4 頁完成判讀。供應商 <b>${args.supplier}</b> · 報告日 ${today}</div>
+  <!-- ═════════════ PAGE 1 · 為什麼不合理？ ═════════════ -->
+  <div class="meta">CHI HUA AI · L1 EXECUTIVE REPORT · PAGE 1 of 4 · 給總經理 / 採購主管</div>
+  <h1>L1 Executive Report · ${args.partNo}</h1>
+  <div class="sub">總經理閱讀版（4 頁）· 供應商 <b>${args.supplier}</b> · 報告日 ${today}</div>
 
-  <h2>第 1 頁 · Board Decision Card</h2>
+  <div class="question"><span class="q">總經理想知道的第 1 個問題：</span><br/>為什麼不合理？</div>
+  <h2>第 1 頁 · Executive Summary</h2>
+
   <div class="verdict-bar nobreak">
     <div class="lbl">AI VERDICT<b>${verdictLabel}</b></div>
     <div class="big">${verdictIcon}</div>
   </div>
+
   <div class="grid4 nobreak">
-    <div class="cell"><div class="k">供應商漲幅</div><div class="v red">+${args.supplierClaim.toFixed(1)}%</div></div>
-    <div class="cell"><div class="k">合理範圍</div><div class="v green">+${args.sc.buffered.toFixed(1)}%</div></div>
-    <div class="cell"><div class="k">超出</div><div class="v red">+${overByActual.toFixed(1)}%</div></div>
-    <div class="cell"><div class="k">議價目標</div><div class="v purple">${targetPrice.toFixed(2)}</div></div>
+    <div class="cell"><div class="k">供應商</div><div class="v" style="font-size:15px;color:#0c1208">${args.supplier}</div><div class="v2">${args.partNo}</div></div>
+    <div class="cell"><div class="k">新單價</div><div class="v red">${args.newPrice.toFixed(2)}</div><div class="v2">舊價 ${args.oldPrice.toFixed(2)} → +${args.supplierClaim.toFixed(1)}%</div></div>
+    <div class="cell"><div class="k">合理範圍</div><div class="v green">+${args.sc.buffered.toFixed(1)}%</div><div class="v2">目標價 ${targetPrice.toFixed(2)}</div></div>
+    <div class="cell"><div class="k">超出</div><div class="v red">+${overByActual.toFixed(1)}%</div><div class="v2">無市場依據</div></div>
+  </div>
+
+  <h3>為什麼不合理 — 一張圖看懂</h3>
+  <div class="why-bar nobreak">
+    <div class="why-seg fair">
+      <div class="lbl">SHOULD-COST 合理</div>
+      <div class="val">+${args.sc.buffered.toFixed(1)}%</div>
+    </div>
+    <div class="why-arrow">+</div>
+    <div class="why-seg gap">
+      <div class="lbl">無依據超出</div>
+      <div class="val">+${overByActual.toFixed(1)}%</div>
+    </div>
+    <div class="why-arrow">=</div>
+    <div class="why-seg gap">
+      <div class="lbl">供應商喊</div>
+      <div class="val">+${args.supplierClaim.toFixed(1)}%</div>
+    </div>
+  </div>
+
+  <h3>合理 +${args.sc.buffered.toFixed(1)}% 的市場依據（逐筆可驗證）</h3>
+  <table class="nobreak">
+    <thead><tr><th>成分</th><th class="r">權重</th><th class="r">市場價變動</th><th class="r">合理貢獻</th><th>來源</th></tr></thead>
+    <tbody>
+      ${args.sc.rows.map((r) => {
+        const cp = COMPONENT_PRICE[r.k];
+        return `<tr>
+          <td><b>${r.k}</b></td>
+          <td class="r mono">${r.weight}%</td>
+          <td class="r mono ${r.delta > 5 ? "red" : "amber"}">${cp ? `${cp.baseline.toLocaleString()} → ${cp.current.toLocaleString()}` : ""} (+${r.delta}%)</td>
+          <td class="r mono green">+${r.contrib.toFixed(2)}%</td>
+          <td style="font-size:10.5px">${cp?.source ?? "—"}</td>
+        </tr>`;
+      }).join("")}
+      <tr style="background:#f0f7e4"><td colspan="3"><b>合理上限（緩衝後）</b></td><td class="r mono green"><b>+${args.sc.buffered.toFixed(1)}%</b></td><td></td></tr>
+    </tbody>
+  </table>
+
+  <div class="pagebreak"></div>
+
+  <!-- ═════════════ PAGE 2 · 影響多少？ ═════════════ -->
+  <div class="meta">CHI HUA AI · L1 EXECUTIVE REPORT · PAGE 2 of 4</div>
+  <div class="question"><span class="q">總經理想知道的第 2 個問題：</span><br/>影響多少？</div>
+  <h2>第 2 頁 · Financial Impact</h2>
+
+  <div class="grid3 nobreak">
+    <div class="cell dark">
+      <div class="k">月損失</div>
+      <div class="v red">NT$ ${monthlyImpact.toLocaleString()}</div>
+      <div class="v2">(${args.newPrice.toFixed(2)} − ${targetPrice.toFixed(2)}) × ${monthlyVolume.toLocaleString()}</div>
+    </div>
+    <div class="cell dark">
+      <div class="k">年化損失 Annual Profit Impact</div>
+      <div class="v red">−NT$ ${annualImpact.toLocaleString()}</div>
+      <div class="v2">月損失 × 12 月</div>
+    </div>
+    <div class="cell dark">
+      <div class="k">切換鼎能 · Annual Saving</div>
+      <div class="v green">+NT$ ${annualImpactSwitch.toLocaleString()}</div>
+      <div class="v2">月省 NT$ ${monthlyImpactSwitch.toLocaleString()} × 12 月</div>
+    </div>
+  </div>
+
+  <h3>毛利衝擊（如果接受 +${args.supplierClaim.toFixed(1)}%）</h3>
+  <table class="nobreak">
+    <thead><tr><th>指標</th><th class="r">接受漲價前</th><th class="r">接受漲價後</th><th class="r">變動</th></tr></thead>
+    <tbody>
+      <tr><td>毛利率</td><td class="r mono">${grossMarginBefore}%</td><td class="r mono red">${grossMarginAfter}%</td><td class="r mono red"><b>−${(grossMarginBefore - grossMarginAfter).toFixed(2)} pp</b></td></tr>
+      <tr><td>年化毛利金額</td><td class="r mono">NT$ ${Math.round(9_700_000 * grossMarginBefore / 100).toLocaleString()}</td><td class="r mono red">NT$ ${Math.round(9_700_000 * grossMarginAfter / 100).toLocaleString()}</td><td class="r mono red"><b>−NT$ ${Math.round(9_700_000 * (grossMarginBefore - grossMarginAfter) / 100).toLocaleString()}</b></td></tr>
+    </tbody>
+  </table>
+
+  <h3>三情境並排</h3>
+  <table class="nobreak">
+    <thead><tr><th>情境</th><th class="r">單價</th><th class="r">月差</th><th class="r">年化差</th><th>結果</th></tr></thead>
+    <tbody>
+      <tr><td>接受 ${args.newPrice.toFixed(2)}</td><td class="r mono red">${args.newPrice.toFixed(2)}</td><td class="r mono muted">baseline</td><td class="r mono muted">baseline</td><td><span class="chip r">不建議</span></td></tr>
+      <tr style="background:#f0f7e4"><td><b>議價目標</b></td><td class="r mono purple"><b>${targetPrice.toFixed(2)}</b></td><td class="r mono green"><b>−${monthlyImpact.toLocaleString()}</b></td><td class="r mono green"><b>−${annualImpact.toLocaleString()}</b></td><td><span class="chip g">議價空間</span></td></tr>
+      <tr><td>切換鼎能</td><td class="r mono green">6.90</td><td class="r mono green">−${monthlyImpactSwitch.toLocaleString()}</td><td class="r mono green">−${annualImpactSwitch.toLocaleString()}</td><td><span class="chip g">最省</span></td></tr>
+    </tbody>
+  </table>
+  <div class="note">
+    <b>總經理結論</b> · 接受 ${args.newPrice.toFixed(2)} 一年虧 <b class="red">NT$ ${annualImpact.toLocaleString()}</b>；
+    壓回 ${targetPrice.toFixed(2)} 即守住；切換鼎能反而省 <b class="green">NT$ ${annualImpactSwitch.toLocaleString()}/年</b>，毛利可保住 <b>${grossMarginBefore}%</b>。
   </div>
 
   <div class="pagebreak"></div>
 
-  <!-- ═════════════ PAGE 2 · Should Cost Summary ═════════════ -->
-  <div class="meta">CHI HUA AI · 採購 / 廠商版 · PAGE 2 of 4</div>
-  <h2>第 2 頁 · Should Cost Summary</h2>
+  <!-- ═════════════ PAGE 3 · 有沒有備案？風險多高？ ═════════════ -->
+  <div class="meta">CHI HUA AI · L1 EXECUTIVE REPORT · PAGE 3 of 4</div>
+  <div class="question"><span class="q">總經理想知道的第 3 & 4 個問題：</span><br/>有沒有備案？風險多高？</div>
+  <h2>第 3 頁 · Supply Risk · 替代供應商 + Supplier Risk Score</h2>
 
-  <h3 style="font-size:12.5px;margin:10px 0 4px;color:#0c1908">① Price Change</h3>
-  <table class="nobreak">
-    <tr><td>舊單價</td><td class="r mono">${args.oldPrice.toFixed(2)}</td></tr>
-    <tr><td>新單價（供應商喊）</td><td class="r mono red">${args.newPrice.toFixed(2)}</td></tr>
-    <tr><td>實際漲幅</td><td class="r mono red">+${args.supplierClaim.toFixed(1)}%</td></tr>
-    <tr style="background:#f0f7e4"><td><b>建議議價目標</b></td><td class="r mono purple"><b>${targetPrice.toFixed(2)}</b>（+${args.sc.buffered}%）</td></tr>
-  </table>
-
-  <h3 style="font-size:12.5px;margin:18px 0 4px;color:#0c1908">② Cost Breakdown · BOM 結構</h3>
-  <table class="nobreak">
-    <thead><tr><th>成分</th><th class="r">佔成本</th><th>對應商品 / 指數</th></tr></thead>
-    <tbody>
-      ${args.bom.map((b) => `<tr><td>${b.k}</td><td class="r mono">${b.pct}%</td><td>${b.mapTo}</td></tr>`).join("")}
-    </tbody>
-  </table>
-
-  <h3 style="font-size:12.5px;margin:18px 0 4px;color:#0c1908">③ Commodity Impact · 含當前 vs 基期（推導透明）</h3>
   <table class="nobreak">
     <thead><tr>
-      <th>商品 / 指數</th>
-      <th class="r">當前</th>
-      <th class="r">基期</th>
-      <th class="r">變動</th>
-      <th>來源</th>
+      <th>排序</th>
+      <th>供應商</th>
+      <th class="r">報價</th>
+      <th class="r">交期</th>
+      <th class="r">品質</th>
+      <th class="r">OTD</th>
+      <th class="r">Risk Score</th>
+      <th>AI 推薦</th>
     </tr></thead>
     <tbody>
-      ${args.moves.map((m) => `
-        <tr>
-          <td>${m.k}</td>
-          <td class="r mono"><b>${m.current.toLocaleString()}</b></td>
-          <td class="r mono muted">${m.baseline.toLocaleString()}</td>
-          <td class="r mono ${m.delta > 5 ? "red" : "amber"}">+${m.delta.toFixed(1)}%</td>
-          <td style="font-size:10.5px">${m.source}</td>
-        </tr>`).join("")}
+      <tr style="background:#fdecea">
+        <td><span class="chip r">NOW</span></td>
+        <td><b>${args.supplier}</b>（現任）</td>
+        <td class="r mono red">${args.newPrice.toFixed(2)}</td>
+        <td class="r mono">7 週</td>
+        <td class="r mono">A</td>
+        <td class="r mono red">92%</td>
+        <td class="r mono red"><b>65</b><span style="font-size:9px;color:#9aa291">/100</span></td>
+        <td><span class="chip r">退單</span></td>
+      </tr>
+      ${suppliers.map((s, i) => {
+        const recTone = s.recommend === "首選" ? "g" : s.recommend === "備案" ? "g" : "a";
+        const scoreColor = s.riskScore >= 90 ? "#4d7c0f" : s.riskScore >= 80 ? "#b8860b" : "#5b6356";
+        const rowBg = i === 0 ? "background:#f0f7e4" : "";
+        return `<tr style="${rowBg}">
+          <td><span class="chip ${i === 0 ? "g" : "gray"}">${i === 0 ? "★ 1st" : `#${i + 1}`}</span></td>
+          <td><b>${s.name}</b></td>
+          <td class="r mono green">${s.quote.toFixed(2)}</td>
+          <td class="r mono">${s.leadWeeks} 週</td>
+          <td class="r mono">${s.quality}</td>
+          <td class="r mono ${s.otd >= 95 ? "green" : s.otd >= 90 ? "amber" : "red"}">${s.otd}%</td>
+          <td class="r mono" style="color:${scoreColor};font-weight:800;font-size:13px">${s.riskScore}<span style="font-size:9px;color:#9aa291">/100</span></td>
+          <td><span class="chip ${recTone}">${s.recommend}</span></td>
+        </tr>`;
+      }).join("")}
     </tbody>
   </table>
 
-  <h3 style="font-size:12.5px;margin:18px 0 4px;color:#0c1908">④ 加總 · 合理上限</h3>
-  <table class="nobreak">
-    <thead><tr><th>成分</th><th class="r">權重</th><th class="r">變動</th><th class="r">合理貢獻</th></tr></thead>
+  <div class="note">
+    <b>備案明確</b> · 首選 <b class="green">鼎能精密 Risk 92/100</b>（${suppliers[0].quote.toFixed(2)} 元 / ${suppliers[0].leadWeeks} 週 / OTD ${suppliers[0].otd}% / 品質 ${suppliers[0].quality}）
+    年省 NT$ ${annualImpactSwitch.toLocaleString()}。<br/>
+    <b>風險可控</b> · 雙廠 SOS（70% 鼎能 + 30% 力豐）即可消除單一供應商依賴。
+  </div>
+
+  <h3>Supplier Risk Score 評分維度（共 4 項，加總 100）</h3>
+  <table class="nobreak" style="font-size:11px">
+    <thead><tr><th>維度</th><th class="r">權重</th><th>說明</th></tr></thead>
     <tbody>
-      ${args.sc.rows.map((r) => `
-        <tr><td>${r.k}</td><td class="r mono">${r.weight}%</td><td class="r mono ${r.delta > 5 ? "red" : "amber"}">+${r.delta}%</td><td class="r mono green">+${r.contrib.toFixed(2)}%</td></tr>`).join("")}
-      <tr style="background:#f0f7e4"><td colspan="3"><b>合理上限（緩衝後）</b></td><td class="r mono"><b>+${args.sc.buffered.toFixed(1)}%</b></td></tr>
+      <tr><td><b>交期準確率 OTD</b></td><td class="r mono">30%</td><td>過去 12 月準時交貨比率</td></tr>
+      <tr><td><b>品質 / 不良率</b></td><td class="r mono">30%</td><td>過去 12 月入料 IQC PPM</td></tr>
+      <tr><td><b>報價競爭力</b></td><td class="r mono">25%</td><td>與市場 / 同業均值比較</td></tr>
+      <tr><td><b>規模 / 穩定度</b></td><td class="r mono">15%</td><td>產能 / 財務 / 替代產線</td></tr>
     </tbody>
   </table>
-  <div class="note">
-    <b>讀法</b> · 銅佔 58%、LME 銅 9,021 → 9,472（+5%），該欄合理 +2.9%。
-    加總 +5.65%，緩衝後 <b>+${args.sc.buffered}%</b> 即合理上限。
-  </div>
 
   <div class="pagebreak"></div>
 
-  <!-- ═════════════ PAGE 3 · Financial Impact ═════════════ -->
-  <div class="meta">CHI HUA AI · 採購 / 廠商版 · PAGE 3 of 4</div>
-  <h2>第 3 頁 · Financial Impact · 公司財務衝擊</h2>
-  <p style="font-size:11.5px;color:#5b6356;margin:0 0 8px">
-    <b>採購不在意漲幾 % — 採購在意公司一年虧多少。</b>
-    月用量 <span class="mono">${monthlyVolume.toLocaleString()} 件</span> × 12 月 = 年化 <span class="mono">${annualVolume.toLocaleString()} 件</span>。
-  </p>
+  <!-- ═════════════ PAGE 4 · Action Plan + CEO Decision Workflow ═════════════ -->
+  <div class="meta">CHI HUA AI · L1 EXECUTIVE REPORT · PAGE 4 of 4</div>
+  <h2>第 4 頁 · Action Plan + CEO Decision</h2>
 
-  <div class="grid4 nobreak">
-    <div class="cell" style="background:#fdecea;border-color:#d4351c">
-      <div class="k red">IF ACCEPT 7.90</div>
-      <div class="v red">−NT$ ${annualImpact.toLocaleString()}</div>
-    </div>
-    <div class="cell" style="background:#fffaf0;border-color:#b8860b">
-      <div class="k amber">IF TARGET ${targetPrice.toFixed(2)}</div>
-      <div class="v amber">−NT$ ${Math.round((targetPrice - args.oldPrice) * annualVolume).toLocaleString()}</div>
-    </div>
-    <div class="cell" style="background:#f0f7e4;border-color:#4d7c0f">
-      <div class="k green">IF SWITCH 鼎能 6.90</div>
-      <div class="v green">+NT$ ${annualImpactSwitch.toLocaleString()}</div>
-    </div>
-    <div class="cell" style="background:#0c1908;border-color:#0c1908">
-      <div class="k" style="color:#9aa78d">議價空間</div>
-      <div class="v purple">${Math.round((args.newPrice - targetPrice) * monthlyVolume).toLocaleString()}/月</div>
-    </div>
-  </div>
-
+  <h3>採購行動三層 · P1 / P2 / P3</h3>
   <table class="nobreak">
-    <thead><tr><th>情境</th><th class="r">單價</th><th class="r">月差</th><th class="r">年化差</th><th>意義</th></tr></thead>
-    <tbody>
-      <tr><td>供應商喊</td><td class="r mono red">${args.newPrice.toFixed(2)}</td><td class="r mono muted">baseline</td><td class="r mono muted">baseline</td><td>原始痛點</td></tr>
-      <tr style="background:#f0f7e4"><td><b>議價目標</b></td><td class="r mono purple"><b>${targetPrice.toFixed(2)}</b></td><td class="r mono green"><b>−${Math.round((args.newPrice - targetPrice) * monthlyVolume).toLocaleString()}</b></td><td class="r mono green"><b>−${annualImpact.toLocaleString()}</b></td><td><b>議價空間</b></td></tr>
-      <tr><td>切換鼎能</td><td class="r mono green">6.90</td><td class="r mono green">−${Math.round((args.newPrice - 6.90) * monthlyVolume).toLocaleString()}</td><td class="r mono green">−${annualImpactSwitch.toLocaleString()}</td><td>結構性省下</td></tr>
-    </tbody>
-  </table>
-  <div class="note">
-    <b>採購結論</b> · 接受 7.90 一年虧 <b class="red">NT$ ${annualImpact.toLocaleString()}</b>；
-    壓回 ${targetPrice.toFixed(2)} 即守住；切換鼎能反而省 <b class="green">NT$ ${annualImpactSwitch.toLocaleString()}/年</b>。
-  </div>
-
-  <div class="pagebreak"></div>
-
-  <!-- ═════════════ PAGE 4 · Action Plan ═════════════ -->
-  <div class="meta">CHI HUA AI · 採購 / 廠商版 · PAGE 4 of 4</div>
-  <h2>第 4 頁 · Action Plan · 採購行動建議</h2>
-  <p style="font-size:11.5px;color:#5b6356;margin:0 0 8px">
-    給採購直接抄進週會議程。每行都有負責人 / 截止 / 財務數字。
-  </p>
-
-  <table class="nobreak">
-    <thead><tr><th>優先級</th><th>動作</th><th>負責</th><th>截止</th><th class="r">財務影響</th><th>狀態</th></tr></thead>
+    <thead><tr><th>優先級</th><th>動作</th><th>負責</th><th>截止</th><th class="r">財務影響</th></tr></thead>
     <tbody>
       <tr style="background:#fdecea">
         <td><span class="chip r">P1 · 立即</span></td>
-        <td><b>退回現報價 + 發出鼎能 RFQ</b><br/><span class="muted">同步詢價力豐 / 鼎能，鎖定 90 天</span></td>
+        <td><b>拒退報價 + 啟動鼎能 RFQ</b><br/><span class="muted">月化 NT$ ${monthlyImpactSwitch.toLocaleString()}</span></td>
         <td>採購</td>
         <td>48 小時</td>
-        <td class="r mono red">擋損 NT$ ${annualImpactSwitch.toLocaleString()}</td>
-        <td><span class="chip r">未啟動</span></td>
+        <td class="r mono red">擋損 NT$ ${annualImpactSwitch.toLocaleString()}/年</td>
       </tr>
       <tr style="background:#fffaf0">
         <td><span class="chip a">P2 · 短期</span></td>
-        <td><b>雙供應商策略 SOS</b><br/><span class="muted">70% 鼎能 + 30% 現任，降風險</span></td>
+        <td><b>建立雙廠 SOS 機制</b><br/><span class="muted">70% 鼎能 + 30% 現任</span></td>
         <td>採購 + 生管</td>
         <td>14 天</td>
         <td class="r mono amber">分散風險</td>
-        <td><span class="chip a">規劃中</span></td>
       </tr>
       <tr style="background:#f0f7e4">
         <td><span class="chip g">P3 · 長期</span></td>
-        <td><b>含解價條款 PEC</b><br/><span class="muted">新約綁 LME 銅 + IPCEI，自動算合理調幅</span></td>
+        <td><b>含解價條款 PEC</b><br/><span class="muted">合約綁 LME 銅 + IPCEI，自動算合理調幅</span></td>
         <td>採購 + 法務</td>
         <td>90 天</td>
-        <td class="r mono green">結構性消除爭議</td>
-        <td><span class="chip g">待簽核</span></td>
+        <td class="r mono green">結構性消除</td>
       </tr>
     </tbody>
   </table>
 
-  <h3 style="font-size:12.5px;margin:18px 0 4px;color:#0c1908">議價會議拿話清單（可會中直接念出）</h3>
-  <ol style="padding-left:22px;margin:6px 0 0">
-    <li style="font-size:12px;margin:3px 0">「銅佔 58%、LME 9,021 → 9,472，該欄合理 +2.9%。」</li>
-    <li style="font-size:12px;margin:3px 0">「電鍍佔 10%、IPCEI 119.8 → 134.2，該欄合理 +1.2%。」</li>
-    <li style="font-size:12px;margin:3px 0">「加工佔 15%、工資 +3% + 鏡板 +8%，該欄合理 +1.2%。」</li>
-    <li style="font-size:12px;margin:3px 0">「運費佔 5%、BDI 1,721 → 1,842，該欄合理 +0.35%。」</li>
-    <li style="font-size:12px;margin:3px 0">「加總 +5.7%，緩衝後 <b>+${args.sc.buffered}%</b> 為合理上限。」</li>
-    <li style="font-size:12px;margin:3px 0">「貴司喊 +${args.supplierClaim}% <b style="color:#d4351c">超出 +${overByActual}%</b>，沒有依據。」</li>
-    <li style="font-size:12px;margin:3px 0">「已詢價鼎能 ${(6.90).toFixed(2)} 元 / 5 週、力豐 ${(7.10).toFixed(2)} 元 / 3 週，請貴司審慎評估。」</li>
-  </ol>
+  <h3>CEO Decision · 簽核四選一</h3>
+  <div class="decision-grid nobreak">
+    <div class="decision-card reject">
+      <span class="rec">RECOMMENDED</span>
+      <div class="cb">☐</div>
+      <div class="h">Reject</div>
+      <div class="d">拒絕現報價 +${args.supplierClaim.toFixed(1)}%，要求重報至合理上限 ${targetPrice.toFixed(2)} 以內。</div>
+    </div>
+    <div class="decision-card rfq">
+      <span class="rec">RECOMMENDED</span>
+      <div class="cb">☐</div>
+      <div class="h">RFQ Alternative</div>
+      <div class="d">啟動鼎能精密 RFQ，5 週交期、Risk Score 92/100。</div>
+    </div>
+    <div class="decision-card survey">
+      <div class="cb">☐</div>
+      <div class="h">Send Survey</div>
+      <div class="d">發出供應商成本依據問卷，要求 7 天內回覆超出 +${overByActual.toFixed(1)}% 的明細。</div>
+    </div>
+    <div class="decision-card approve">
+      <div class="cb">☐</div>
+      <div class="h">Approve</div>
+      <div class="d">接受 +${args.supplierClaim.toFixed(1)}%，年化損失 NT$ ${annualImpact.toLocaleString()}。不建議。</div>
+    </div>
+  </div>
+
+  <div class="workflow nobreak">
+    <div class="h">DECISION + WORKFLOW · 一個簽核完成</div>
+    <div class="lead">CEO 勾選後，系統<span class="em">自動執行</span>下列任務，無需人工重打：</div>
+    <ul>
+      <li><b>Reject</b> → 自動寄出 <span class="mono">退單通知</span> + 觸發 <span class="mono">議價任務 NEG-${args.partNo}</span></li>
+      <li><b>RFQ Alternative</b> → 自動建立 <span class="mono">RFQ-${args.partNo}</span> + 寄送鼎能 / 力豐 + 設 14 天回覆鬧鐘</li>
+      <li><b>Send Survey</b> → 推送 Supplier Portal 問卷（已附 Should-Cost 拆解 PDF）</li>
+      <li><b>Approve</b> → 觸發 <span class="mono">PO 簽核流程</span>（含風險警示與年化損失警告）</li>
+    </ul>
+  </div>
+
+  <div class="layers nobreak">
+    <b>AI Supply Chain OS · 3 層報告系統</b><br/>
+    <b>L0</b> Board Decision Card · 董事會 1 頁　·　<b>L1</b> Executive Report · 本份 4 頁　·　<b>L3</b> Quotation Analyzer · 完整 11 段 + Evidence Pack
+  </div>
 
   <div class="footer">
-    CHI HUA AI · L3 AI Quotation Analyzer · 採購 / 廠商版 v1 · 4 頁<br/>
-    資料來源：ERP BOM v3.2 · LME · IPCEI · 中鋼牌價 · BDI · 勞動部　·　列印日：${today}<br/>
-    <span style="color:#5b6356"><b>已移除</b> AI Confidence 段（CEO 不在意 92/95/88 抽象比例）。完整版（11 段）含此段供內部 deep dive。</span>
+    CHI HUA AI · L1 Executive Report v2 · 為總經理 / 採購主管設計 · 4 頁固定<br/>
+    回答 4 個問題：為什麼不合理？影響多少？有沒有備案？風險多高？<br/>
+    資料來源：ERP BOM v3.2 · LME · IPCEI · 中鋼 · BDI · 勞動部　·　列印日：${today}
   </div>
 
 </body></html>`;
