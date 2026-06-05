@@ -152,6 +152,28 @@ function computeShouldCost(profile: PartProfile) {
   return { rows, total, buffered };
 }
 
+// ============================================================
+// 共用：依當前現任供應商 + 舊/新單價，產出 4 家替代供應商與「最便宜」推薦
+// 兩個 builder（L0 / L1 / 完整）共用，避免硬寫「重邑」
+// ============================================================
+function computeAlternatives(currentSupplier: string, oldPrice: number, currentPrice: number) {
+  const alts = [
+    { name: "重邑",     quote: +(oldPrice * 1.00).toFixed(2), leadWeeks: 6, quality: "A",  qualityScore: 90, onTime: 87, riskScore: 92, status: "最初供應商 · 今年凍漲", isRegistered: true },
+    { name: "鼎能精密", quote: +(oldPrice * 0.99).toFixed(2), leadWeeks: 5, quality: "A+", qualityScore: 92, onTime: 88, riskScore: 90, status: "次選 · 報價最低", isRegistered: false },
+    { name: "力豐電子", quote: +(oldPrice * 1.03).toFixed(2), leadWeeks: 3, quality: "A+", qualityScore: 95, onTime: 93, riskScore: 88, status: "急單備案 · 交期最快", isRegistered: false },
+    { name: "新竹 EFG", quote: +(oldPrice * 1.06).toFixed(2), leadWeeks: 4, quality: "A",  qualityScore: 89, onTime: 85, riskScore: 76, status: "觀察 · 品質次之", isRegistered: false },
+  ]
+    // 不要把現任供應商列為替代候選
+    .filter((s) => s.name !== currentSupplier)
+    .map((s) => ({
+      ...s,
+      deltaVsCurrent: +(((s.quote - currentPrice) / currentPrice) * 100).toFixed(1),
+    }));
+  // 推薦取最便宜的那家
+  const top = [...alts].sort((a, b) => a.quote - b.quote)[0];
+  return { alts, top };
+}
+
 type OcrRow = {
   quoteNo: string;                 // 報價單號（1 份報價單可含多筆料號）
   supplier: string; partNo: string; oldPrice: number; newPrice: number; reasonText: string;
@@ -1262,22 +1284,30 @@ function buildShouldCostReportHtml(args: {
   const overallConfidence = 92;
 
   // §6 替代供應商精簡版（含 Risk Score + 完整績效指標）
+  // 替代供應商 — 用共用 helper 計算，跟料號/廠商連動
+  const { alts: dynAlts } = computeAlternatives(args.supplier, args.oldPrice, args.newPrice);
+  const dynSortedAlts = [...dynAlts].sort((a, b) => a.quote - b.quote);
+  // altsRich：含現任 + 排序後的候選；§6 / §9 等表用
   const altsRich = [
-    { name: "現任 企能", quote: args.newPrice, leadWeeks: 7, quality: "A",  otd: 92, scale: "中", riskScore: 65, current: true },
-    { name: "力豐電子",  quote: 7.10,           leadWeeks: 3, quality: "A+", otd: 95, scale: "大", riskScore: 88, current: false },
-    { name: "鼎能精密",  quote: 6.90,           leadWeeks: 5, quality: "A+", otd: 97, scale: "中", riskScore: 92, current: false },
-    { name: "新竹 EFG",  quote: 7.30,           leadWeeks: 4, quality: "A",  otd: 89, scale: "低", riskScore: 76, current: false },
+    { name: `現任 ${args.supplier}`, quote: args.newPrice, leadWeeks: 7, quality: "A",  otd: 82, scale: "中", riskScore: 65, current: true },
+    ...dynSortedAlts.map((s) => ({
+      name: s.name, quote: s.quote, leadWeeks: s.leadWeeks, quality: s.quality,
+      otd: s.onTime, scale: "中", riskScore: s.riskScore, current: false,
+    })),
   ];
-  const alts = ALT_SUPPLIERS.map((s) => ({
-    name: s.name, quote: s.quote, leadWeeks: s.leadWeeks, quality: s.qualityScore >= 95 ? "A+" : "A",
+  // alts：精簡版（給 §7 議價拿話、§9 簽核 RFQ 寄送 用）
+  const alts = dynSortedAlts.map((s) => ({
+    name: s.name, quote: s.quote, leadWeeks: s.leadWeeks, quality: s.quality,
   }));
+  // 用最便宜的候選做「切換可省」計算
+  const cheapestAlt = dynSortedAlts[0] ?? { name: "—", quote: args.oldPrice, leadWeeks: 0, riskScore: 0 };
 
   // 月用量 17,000 件 → 年化財務衝擊
   const monthlyVolume = 17000;
   const annualVolume = monthlyVolume * 12;
   const annualImpactAcceptVsTarget = Math.round((args.newPrice - targetPrice) * annualVolume); // 接受 vs 目標
   const annualImpactAcceptVsOld    = Math.round((args.newPrice - args.oldPrice) * annualVolume); // 接受 vs 原價
-  const annualImpactSwitch         = Math.round((args.newPrice - altsRich[2].quote) * annualVolume); // 切換鼎能 vs 接受
+  const annualImpactSwitch         = Math.round((args.newPrice - cheapestAlt.quote) * annualVolume); // 切換最便宜候選 vs 接受
   const bestAltSaving = Math.round((args.newPrice - alts[0].quote) * 12000 / 100); // 月用 12,000 件（§6 用）
 
   // §11 年度毛利報告（broader：含本料對全年毛利的拖累 %）
@@ -1412,7 +1442,7 @@ function buildShouldCostReportHtml(args: {
       </div>
       <div style="background:#fff; border:2px solid #4d7c0f; border-radius:10px; padding:12px 14px">
         <div style="font-family:'IBM Plex Mono'; font-size:10px; color:#4d7c0f; font-weight:700; letter-spacing:.08em">☑ 切換 鼎能精密</div>
-        <div style="font-size:12px; color:#0c1208; margin-top:4px; line-height:1.45">${altsRich[2].quote.toFixed(2)} 元 / ${altsRich[2].leadWeeks} 週 · Risk Score <b>${altsRich[2].riskScore}/100</b></div>
+        <div style="font-size:12px; color:#0c1208; margin-top:4px; line-height:1.45">${cheapestAlt.quote.toFixed(2)} 元 / ${cheapestAlt.leadWeeks} 週 · Risk Score <b>${cheapestAlt.riskScore}/100</b></div>
       </div>
       <div style="background:#fff; border:2px dashed #9aa291; border-radius:10px; padding:12px 14px">
         <div style="font-family:'IBM Plex Mono'; font-size:10px; color:#5b6356; font-weight:700; letter-spacing:.08em">☐ 接受現喊價</div>
@@ -1718,8 +1748,8 @@ function buildShouldCostReportHtml(args: {
   </table>
   <div class="note">
     <b>Supplier Risk Score</b> 由 4 維度加權：交期準確率 30% + 品質 30% + 報價競爭力 25% + 規模/穩定度 15%。
-    最高分 <b class="green">鼎能精密 92/100</b>（${altsRich[2].quote.toFixed(2)} 元 / ${altsRich[2].leadWeeks} 週 / OTD 97%）。<br/>
-    切換後可省 <b class="green">NT$ ${Math.round((args.newPrice - altsRich[2].quote) * monthlyVolume / 100 * 100).toLocaleString()}/月</b>，
+    最高分 <b class="green">${cheapestAlt.name} ${cheapestAlt.riskScore}/100</b>（${cheapestAlt.quote.toFixed(2)} 元 / ${cheapestAlt.leadWeeks} 週）。<br/>
+    切換後可省 <b class="green">NT$ ${Math.round((args.newPrice - cheapestAlt.quote) * monthlyVolume).toLocaleString()}/月</b>，
     年化 <b class="green">NT$ ${annualImpactSwitch.toLocaleString()}</b>。
   </div>
   <p style="font-size:11px;color:#5b6356;margin-top:8px">
@@ -1805,9 +1835,9 @@ function buildShouldCostReportHtml(args: {
         <td><span class="chip g">優先</span></td>
       </tr>
       <tr>
-        <td><b>B. 切換 ${altsRich[2].name}</b></td>
-        <td>${altsRich[2].quote.toFixed(2)} 元 / ${altsRich[2].leadWeeks} 週 / Risk Score ${altsRich[2].riskScore}/100</td>
-        <td>月省 vs 現任喊價 <b class="green">NT$ ${Math.round((args.newPrice - altsRich[2].quote) * monthlyVolume).toLocaleString()}</b></td>
+        <td><b>B. 切換 ${cheapestAlt.name}</b></td>
+        <td>${cheapestAlt.quote.toFixed(2)} 元 / ${cheapestAlt.leadWeeks} 週 / Risk Score ${cheapestAlt.riskScore}/100</td>
+        <td>月省 vs 現任喊價 <b class="green">NT$ ${Math.round((args.newPrice - cheapestAlt.quote) * monthlyVolume).toLocaleString()}</b></td>
         <td><span class="chip g">備案</span></td>
       </tr>
       <tr>
@@ -1831,7 +1861,7 @@ function buildShouldCostReportHtml(args: {
     <tbody>
       <tr style="background:#fdecea">
         <td><span class="chip r">P1 · 立即</span></td>
-        <td><b>發出 RFQ 與鎖價單</b><br/><span class="muted">同步詢價鼎能 / 力豐，鎖定 90 天價格</span></td>
+        <td><b>發出 RFQ 與鎖價單</b><br/><span class="muted">同步詢價 ${dynSortedAlts.slice(0, 2).map((s) => s.name).join(" / ") || "替代供應商"}，鎖定 90 天價格</span></td>
         <td>採購</td>
         <td>48 小時</td>
         <td class="r mono red">擋損 NT$ ${annualImpactSwitch.toLocaleString()}</td>
@@ -1839,7 +1869,7 @@ function buildShouldCostReportHtml(args: {
       </tr>
       <tr style="background:#fffaf0">
         <td><span class="chip a">P2 · 短期</span></td>
-        <td><b>雙供應商策略 SOS</b><br/><span class="muted">同時保留 70% 鼎能 + 30% 現任，降低單一供應商風險</span></td>
+        <td><b>雙供應商策略 SOS</b><br/><span class="muted">同時保留 70% ${cheapestAlt.name} + 30% 現任，降低單一供應商風險</span></td>
         <td>採購 + 生管</td>
         <td>14 天</td>
         <td class="r mono amber">分散風險</td>
@@ -1884,9 +1914,9 @@ function buildShouldCostReportHtml(args: {
       <div style="font-size:10.5px;color:#5b6356;margin-top:6px;line-height:1.4">vs 原價 ${args.oldPrice.toFixed(2)}<br/>= (7.30 − 6.90) × ${annualVolume.toLocaleString()}</div>
     </div>
     <div style="border:2px solid #4d7c0f; background:#f0f7e4; border-radius:11px; padding:14px 16px">
-      <div style="font-family:'IBM Plex Mono';font-size:9.5px;color:#4d7c0f;letter-spacing:.1em;font-weight:700">IF SWITCH 鼎能 6.90</div>
+      <div style="font-family:'IBM Plex Mono';font-size:9.5px;color:#4d7c0f;letter-spacing:.1em;font-weight:700">IF SWITCH ${cheapestAlt.name} ${cheapestAlt.quote.toFixed(2)}</div>
       <div style="font-family:'IBM Plex Mono';font-size:24px;font-weight:800;color:#4d7c0f;margin-top:4px;line-height:1">+NT$ ${annualImpactSwitch.toLocaleString()}</div>
-      <div style="font-size:10.5px;color:#5b6356;margin-top:6px;line-height:1.4">vs 接受現任 7.90<br/>= (7.90 − 6.90) × ${annualVolume.toLocaleString()}</div>
+      <div style="font-size:10.5px;color:#5b6356;margin-top:6px;line-height:1.4">vs 接受現任 ${args.newPrice.toFixed(2)}<br/>= (${args.newPrice.toFixed(2)} − ${cheapestAlt.quote.toFixed(2)}) × ${annualVolume.toLocaleString()}</div>
     </div>
   </div>
 
@@ -1896,13 +1926,13 @@ function buildShouldCostReportHtml(args: {
     <tbody>
       <tr><td>供應商喊</td><td class="r mono red">7.90</td><td class="r mono muted">baseline</td><td class="r mono muted">baseline</td><td>原始痛點</td></tr>
       <tr style="background:#f0f7e4"><td><b>議價目標</b></td><td class="r mono purple"><b>${targetPrice.toFixed(2)}</b></td><td class="r mono green"><b>−NT$ ${Math.round((args.newPrice - targetPrice) * monthlyVolume).toLocaleString()}</b></td><td class="r mono green"><b>−NT$ ${annualImpactAcceptVsTarget.toLocaleString()}</b></td><td><b>議價空間</b></td></tr>
-      <tr><td>切換鼎能</td><td class="r mono green">6.90</td><td class="r mono green">−NT$ ${Math.round((args.newPrice - 6.90) * monthlyVolume).toLocaleString()}</td><td class="r mono green">−NT$ ${annualImpactSwitch.toLocaleString()}</td><td>結構性省下</td></tr>
+      <tr><td>切換 ${cheapestAlt.name}</td><td class="r mono green">${cheapestAlt.quote.toFixed(2)}</td><td class="r mono green">−NT$ ${Math.round((args.newPrice - cheapestAlt.quote) * monthlyVolume).toLocaleString()}</td><td class="r mono green">−NT$ ${annualImpactSwitch.toLocaleString()}</td><td>結構性省下</td></tr>
       <tr><td>原價持平</td><td class="r mono">${args.oldPrice.toFixed(2)}</td><td class="r mono green">−NT$ ${Math.round((args.newPrice - args.oldPrice) * monthlyVolume).toLocaleString()}</td><td class="r mono green">−NT$ ${annualImpactAcceptVsOld.toLocaleString()}</td><td>理想情境</td></tr>
     </tbody>
   </table>
   <div class="note">
     <b>CEO 一句話</b> · 接受 7.90 一年虧 <b class="red">NT$ ${annualImpactAcceptVsTarget.toLocaleString()}</b>；
-    壓回 ${targetPrice.toFixed(2)} 即守住；切換鼎能反而<b class="green">省 NT$ ${annualImpactSwitch.toLocaleString()}/年</b>。
+    壓回 ${targetPrice.toFixed(2)} 即守住；切換 ${cheapestAlt.name} 反而<b class="green">省 NT$ ${annualImpactSwitch.toLocaleString()}/年</b>。
   </div>
 
   <!-- ═════════════════════════════════════════════════════ -->
@@ -2628,12 +2658,14 @@ function buildBoardReportHtml(args: {
   const monthlyVolume = 17000;
   const monthlyImpact = Math.round((args.newPrice - targetPrice) * monthlyVolume);
   const annualImpact  = monthlyImpact * 12;
-  // 替代廠商資料（隨 ERP 比對結果調整 — v5 從鼎能改為重邑）
-  const altName     = "重邑";
-  const altPrice    = 6.96;   // 重邑歷史進貨記錄維持 6.96，多年凍漲
-  const altOTD      = 87;
-  const altRisk     = 90;
-  const altSubtitle = "沿用原供應商 · 多年凍漲";
+  // 替代廠商資料 — 用共用 helper 計算，依現任供應商過濾、依價格排序取最便宜
+  // 換料號 / 換現任廠商 → 推薦廠商會自動跟著動，不再硬寫「重邑」
+  const altInfo    = computeAlternatives(args.supplier, args.oldPrice, args.newPrice);
+  const altName    = altInfo.top.name;
+  const altPrice   = altInfo.top.quote;
+  const altOTD     = altInfo.top.onTime;
+  const altRisk    = altInfo.top.riskScore;
+  const altSubtitle = altInfo.top.status;
   const monthlySaving = Math.round((args.newPrice - altPrice) * monthlyVolume);
   const annualSaving  = monthlySaving * 12;
 
@@ -2645,9 +2677,9 @@ function buildBoardReportHtml(args: {
   // Risk Radar — 4 維度（高分 = 高風險），讓董事長不用猜「60 是什麼意思」
   const riskRadar = [
     { k: "價格風險", v: 95, note: "供應商喊 +14.5%、超出 +8.3% 無依據" },
-    { k: "供應風險", v: 20, note: `${altName} / 鼎能 / 力豐 三家備案就緒` },
-    { k: "品質風險", v: 10, note: `${altName} OTD ${altOTD}% / 多年無調價` },
-    { k: "轉換風險", v: 35, note: `${altName} 為登錄供應商、無重新驗證成本` },
+    { k: "供應風險", v: 20, note: altInfo.alts.length >= 2 ? `${altName} / ${altInfo.alts[1].name} 等 ${altInfo.alts.length} 家備案就緒` : `${altName} 備案就緒` },
+    { k: "品質風險", v: 10, note: `${altName} OTD ${altOTD}% / Risk ${altRisk}/100` },
+    { k: "轉換風險", v: 35, note: altInfo.top.isRegistered ? `${altName} 為 ERP 登錄供應商、無重新驗證成本` : `${altName} 需新供應商驗證流程（約 4 週）` },
   ];
   // Overall = 加權平均（價格 50% + 轉換 20% + 供應 15% + 品質 15%） → ≈ 60
   const overallRisk = Math.round(
@@ -2924,10 +2956,22 @@ function buildPurchasingReportHtml(args: {
   const overByActual = +(args.supplierClaim - args.sc.buffered).toFixed(1);
   const monthlyVolume = 17000;
   const annualVolume = monthlyVolume * 12;
-  // 月損失 / 年化（× 12）— 修正先前 bug：年化要 × 12
+
+  // 替代供應商 — 用共用 helper 計算（依現任供應商過濾、依價格排序）
+  // 換料號 / 換現任廠商 → 候選名單與報價自動跟著動
+  const { alts: suppliersRaw, top: topSupplier } = computeAlternatives(args.supplier, args.oldPrice, args.newPrice);
+  const suppliers = [...suppliersRaw]
+    .sort((a, b) => a.quote - b.quote)
+    .map((s, i) => ({
+      ...s,
+      otd: s.onTime,
+      recommend: i === 0 ? (s === topSupplier ? "首選" : "次選") : i === 1 ? "次選" : i === 2 ? "備案" : "觀察",
+    }));
+
+  // 月損失 / 年化（× 12） — 切換用 topSupplier.quote 而非硬寫 6.90
   const monthlyImpact = Math.round((args.newPrice - targetPrice) * monthlyVolume);
   const annualImpact = monthlyImpact * 12;
-  const monthlyImpactSwitch = Math.round((args.newPrice - 6.90) * monthlyVolume);
+  const monthlyImpactSwitch = Math.round((args.newPrice - topSupplier.quote) * monthlyVolume);
   const annualImpactSwitch = monthlyImpactSwitch * 12;
   const verdictLabel = args.supplierClaim > args.sc.buffered * 1.5 ? "不合理"
                      : args.supplierClaim > args.sc.buffered ? "偏高" : "合理";
@@ -2936,14 +2980,6 @@ function buildPurchasingReportHtml(args: {
   const verdictIcon = verdictLabel === "不合理" ? "🚨" : verdictLabel === "偏高" ? "⚠" : "✓";
   const grossMarginBefore = 21.4;
   const grossMarginAfter  = 12.45;
-
-  // 替代供應商精選 — 對齊真實 ERP / 報價單資料（v3：補入 重邑 SUP-CY）
-  const suppliers = [
-    { name: "重邑",      quote: 6.96, leadWeeks: 6, quality: "A",  otd: 87, riskScore: 90, recommend: "首選 · 凍漲" },
-    { name: "鼎能精密",  quote: 6.90, leadWeeks: 5, quality: "A+", otd: 97, riskScore: 92, recommend: "次選 · 急單" },
-    { name: "力豐電子",  quote: 7.10, leadWeeks: 3, quality: "A+", otd: 95, riskScore: 88, recommend: "急單備案" },
-    { name: "新竹 EFG",  quote: 7.30, leadWeeks: 4, quality: "A",  otd: 89, riskScore: 76, recommend: "觀察" },
-  ];
 
   return `<!DOCTYPE html>
 <html lang="zh-Hant"><head><meta charset="UTF-8" />
@@ -3112,7 +3148,7 @@ function buildPurchasingReportHtml(args: {
       <div class="v2">月損失 × 12 月</div>
     </div>
     <div class="cell dark">
-      <div class="k">切換鼎能 · Annual Saving</div>
+      <div class="k">切換 ${topSupplier.name} · Annual Saving</div>
       <div class="v green">+NT$ ${annualImpactSwitch.toLocaleString()}</div>
       <div class="v2">月省 NT$ ${monthlyImpactSwitch.toLocaleString()} × 12 月</div>
     </div>
@@ -3133,12 +3169,12 @@ function buildPurchasingReportHtml(args: {
     <tbody>
       <tr><td>接受 ${args.newPrice.toFixed(2)}</td><td class="r mono red">${args.newPrice.toFixed(2)}</td><td class="r mono muted">baseline</td><td class="r mono muted">baseline</td><td><span class="chip r">不建議</span></td></tr>
       <tr style="background:#f0f7e4"><td><b>議價目標</b></td><td class="r mono purple"><b>${targetPrice.toFixed(2)}</b></td><td class="r mono green"><b>−${monthlyImpact.toLocaleString()}</b></td><td class="r mono green"><b>−${annualImpact.toLocaleString()}</b></td><td><span class="chip g">議價空間</span></td></tr>
-      <tr><td>切換鼎能</td><td class="r mono green">6.90</td><td class="r mono green">−${monthlyImpactSwitch.toLocaleString()}</td><td class="r mono green">−${annualImpactSwitch.toLocaleString()}</td><td><span class="chip g">最省</span></td></tr>
+      <tr><td>切換 ${topSupplier.name}</td><td class="r mono green">${topSupplier.quote.toFixed(2)}</td><td class="r mono green">−${monthlyImpactSwitch.toLocaleString()}</td><td class="r mono green">−${annualImpactSwitch.toLocaleString()}</td><td><span class="chip g">最省</span></td></tr>
     </tbody>
   </table>
   <div class="note">
     <b>總經理結論</b> · 接受 ${args.newPrice.toFixed(2)} 一年虧 <b class="red">NT$ ${annualImpact.toLocaleString()}</b>；
-    壓回 ${targetPrice.toFixed(2)} 即守住；切換鼎能反而省 <b class="green">NT$ ${annualImpactSwitch.toLocaleString()}/年</b>，毛利可保住 <b>${grossMarginBefore}%</b>。
+    壓回 ${targetPrice.toFixed(2)} 即守住；切換 ${topSupplier.name} 反而省 <b class="green">NT$ ${annualImpactSwitch.toLocaleString()}/年</b>，毛利可保住 <b>${grossMarginBefore}%</b>。
   </div>
 
   <!-- 接續同頁 — 第 3 段 Supply Risk（與 Financial Impact 合併於同張 A4） -->
@@ -3187,7 +3223,7 @@ function buildPurchasingReportHtml(args: {
 
   <div class="note">
     <b>備案明確</b> · 首選 <b class="green">${suppliers[0].name} Risk ${suppliers[0].riskScore}/100</b>（${suppliers[0].quote.toFixed(2)} 元 / ${suppliers[0].leadWeeks} 週 / OTD ${suppliers[0].otd}% / 品質 ${suppliers[0].quality}）
-    年省 NT$ ${annualImpactSwitch.toLocaleString()}。重邑為 ERP 已登錄供應商（SUP-CY），多年凍漲、無重新驗證成本。<br/>
+    年省 NT$ ${annualImpactSwitch.toLocaleString()}。${suppliers[0].isRegistered ? `${suppliers[0].name}為 ERP 登錄供應商，多年凍漲、無重新驗證成本。` : `${suppliers[0].name}需走新供應商驗證流程（約 4 週）。`}<br/>
     <b>風險可控</b> · 雙廠 SOS（70% ${suppliers[0].name} 常態大貨 + 30% ${suppliers[1].name} 急單支援）即可消除單一供應商依賴。
   </div>
 
