@@ -155,8 +155,8 @@ export default function QuotationAnalyzerPage() {
       oldPrice: SELECTED.oldPrice, newPrice: SELECTED.newPrice,
       supplierClaim, sc,
     });
-    openOrDownload(html, `should-cost-BOARD-${SELECTED.partNo}.html`,
-      "✓ 董事會 / CEO 版（1 頁）已開啟 — 真正 100 分的版本");
+    openOrDownload(html, `L0-board-card-${SELECTED.partNo}.html`,
+      "✓ L0 Board Decision Card（1 頁 · 5 排）已開啟 — Verdict 合併 / Risk 拆 3 項 / 含毛利衝擊");
   };
 
   // ── ③ L1 Executive Report · 總經理閱讀版（4 頁固定） ──
@@ -772,7 +772,7 @@ export default function QuotationAnalyzerPage() {
                     border: "none", borderRadius: 9, padding: "11px 14px", fontSize: 13, fontWeight: 800, cursor: "pointer",
                     display: "block", textAlign: "left",
                   }}>
-                  👔 董事會 / CEO 版　<span style={{ opacity: 0.85, fontWeight: 600 }}>· 1 頁 · 真正 100 分</span>
+                  👔 L0 Board Decision Card　<span style={{ opacity: 0.85, fontWeight: 600 }}>· 1 頁 · 董事長 / 總經理 / CEO</span>
                 </button>
                 <button
                   type="button"
@@ -2083,9 +2083,15 @@ function CostIntelligenceCenterCard() {
 }
 
 // ============================================================
-// ② 董事會 / CEO 版（1 頁）— 真正 100 分的版本
-// 不是 11 頁，而是 3 層架構的 Layer 1：Board Card
-// 內容只保留：AI Verdict / 漲幅 / 合理範圍 / 超出 / 接受損失 / 替代方案 / 年省 / 建議
+// ② L0 Executive Intelligence Layer · Board Decision Card（1 頁）
+// 五排架構：
+//   排 1  AI Verdict + Confidence + Decision Risk（合併一條）
+//   排 2  供應商漲幅 / 合理上限 / 超出 / 目標價
+//   排 3  年損失 / 可節省 / 毛利影響 / 供應風險
+//   排 4  建議
+//   排 5  簽核三選一
+// Decision Risk 拆成 價格 / 供應 / 品質（不只 HIGH）
+// 新增 Gross Margin Impact（董事長最在意「賺多少」）
 // ============================================================
 function buildBoardReportHtml(args: {
   partNo: string;
@@ -2099,185 +2105,217 @@ function buildBoardReportHtml(args: {
   const targetPrice = +(args.oldPrice * (1 + args.sc.buffered / 100)).toFixed(2);
   const overByActual = +(args.supplierClaim - args.sc.buffered).toFixed(1);
   const monthlyVolume = 17000;
-
-  // 修正：月損失 + 年損失 分開算（用戶反饋：原本 NT$9,690 寫成「年化」是錯的，那是月損失）
-  const monthlyImpact = Math.round((args.newPrice - targetPrice) * monthlyVolume);  // ≈ 9,690 / 月
-  const annualImpact  = monthlyImpact * 12;                                          // ≈ 116,280 / 年
-  // 替代方案 — 切換鼎能
+  const monthlyImpact = Math.round((args.newPrice - targetPrice) * monthlyVolume);
+  const annualImpact  = monthlyImpact * 12;
   const altPrice = 6.90;
-  const altOTD = 97;
-  const altRisk = 92;
-  const monthlySaving = Math.round((args.newPrice - altPrice) * monthlyVolume);     // ≈ 17,000 / 月
-  const annualSaving  = monthlySaving * 12;                                          // ≈ 204,000 / 年
+  const monthlySaving = Math.round((args.newPrice - altPrice) * monthlyVolume);
+  const annualSaving  = monthlySaving * 12;
 
-  // Decision Risk — 依超出幅度推
-  const decisionRisk = args.supplierClaim > args.sc.buffered * 1.8 ? { label: "HIGH",   tone: "#d4351c", note: "高 — 強烈建議拒絕" }
-                     : args.supplierClaim > args.sc.buffered * 1.3 ? { label: "MEDIUM", tone: "#b8860b", note: "中 — 需議價" }
-                                                                   : { label: "LOW",    tone: "#4d7c0f", note: "低 — 可接受" };
+  // 毛利衝擊（董事長最在意：賺多少 而不是 料漲多少）
+  const grossMarginBefore = 21.4;
+  const grossMarginAfter  = 12.5;
+  const grossMarginDrop   = +(grossMarginBefore - grossMarginAfter).toFixed(1);  // 8.9
+
+  // Decision Risk 拆三項（董事長會問「高什麼？」）
+  const priceRisk    = { label: "HIGH",   tone: "#d4351c", note: "超出 +8.3%、無依據" };
+  const supplyRisk   = { label: "LOW",    tone: "#4d7c0f", note: "已找到鼎能 RFQ 備案" };
+  const qualityRisk  = { label: "LOW",    tone: "#4d7c0f", note: "鼎能 OTD 97% / 品質 A+" };
+  // Overall Risk Score（加權：價格 50% + 供應 30% + 品質 20%）
+  const riskScore = (() => {
+    const toScore = (r: string) => r === "HIGH" ? 30 : r === "MEDIUM" ? 60 : 90;
+    return Math.round(toScore(priceRisk.label) * 0.5 + toScore(supplyRisk.label) * 0.3 + toScore(qualityRisk.label) * 0.2);
+  })();
 
   const verdictLabel = args.supplierClaim > args.sc.buffered * 1.5 ? "不合理"
                      : args.supplierClaim > args.sc.buffered ? "偏高" : "合理";
   const verdictColor = args.supplierClaim > args.sc.buffered * 1.5 ? "#d4351c"
                      : args.supplierClaim > args.sc.buffered ? "#b8860b" : "#4d7c0f";
-  const verdictIcon = verdictLabel === "不合理" ? "🚨" : verdictLabel === "偏高" ? "⚠" : "✓";
 
   return `<!DOCTYPE html>
 <html lang="zh-Hant"><head><meta charset="UTF-8" />
-<title>Board Card · ${args.partNo}</title>
+<title>L0 Board Decision Card · ${args.partNo}</title>
 <style>
-  @page { size: A4; margin: 14mm 12mm; }
+  @page { size: A4; margin: 12mm 14mm; }
   * { box-sizing: border-box; }
-  body { font-family: "Noto Sans TC","Sora",system-ui,sans-serif; color: #0c1208; margin: 0; padding: 14px 18px; line-height: 1.5; }
+  body { font-family: "Noto Sans TC","Sora",system-ui,sans-serif; color: #0c1208; margin: 0; padding: 12px 18px; line-height: 1.5; }
   .mono { font-family: "IBM Plex Mono",ui-monospace,Menlo,monospace; font-feature-settings: "tnum" 1; }
   .meta { font-family: "IBM Plex Mono"; font-size: 10px; color: #9aa291; margin-bottom: 4px; letter-spacing: .06em; }
-  h1 { font-size: 24px; font-weight: 800; margin: 0 0 2px; color: #0c1908; }
-  .sub { color: #5b6356; font-size: 12px; margin-bottom: 12px; }
+  h1 { font-size: 23px; font-weight: 800; margin: 0 0 2px; color: #0c1908; }
+  .sub { color: #5b6356; font-size: 11.5px; margin-bottom: 10px; }
 
-  /* 5-step layout */
-  .step { margin-bottom: 12px; page-break-inside: avoid; }
-  .step-tag { display: inline-block; font-family: "IBM Plex Mono"; font-size: 9.5px; font-weight: 700; letter-spacing: .14em; color: #fff; background: #0c1908; padding: 3px 9px; border-radius: 4px; margin-bottom: 6px; }
-  .step-title { font-size: 11px; color: #5b6356; margin-left: 8px; font-weight: 600; }
+  /* 排 (row) tag */
+  .row { margin-bottom: 9px; page-break-inside: avoid; }
+  .row-tag { display: inline-block; font-family: "IBM Plex Mono"; font-size: 9px; font-weight: 700; letter-spacing: .14em; color: #fff; background: #0c1908; padding: 2px 8px; border-radius: 3px; margin-bottom: 4px; }
+  .row-title { font-size: 10.5px; color: #5b6356; margin-left: 6px; font-weight: 600; }
 
-  /* Step 1 verdict bar */
-  .verdict-bar { background: ${verdictColor}; color: #fff; padding: 12px 22px; border-radius: 10px; display: flex; justify-content: space-between; align-items: baseline; }
-  .verdict-bar .lbl { font-family: "IBM Plex Mono"; font-size: 11px; color: rgba(255,255,255,.7); letter-spacing: .1em; }
-  .verdict-bar .lbl b { display: block; font-family: "Noto Sans TC"; font-size: 28px; font-weight: 800; color: #fff; margin-top: 2px; }
-  .verdict-bar .big { font-family: "IBM Plex Mono"; font-size: 20px; font-weight: 800; }
+  /* 排 1 · AI Verdict 合併條 — Verdict + Confidence + Decision Risk 一條 */
+  .verdict-line {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 8px;
+    background: ${verdictColor}; color: #fff;
+    padding: 12px 18px; border-radius: 10px;
+    align-items: center;
+  }
+  .verdict-line .vmain { display: flex; align-items: baseline; gap: 14px; }
+  .verdict-line .vmain .dot { width: 14px; height: 14px; border-radius: 50%; background: #fff; display: inline-block; }
+  .verdict-line .vmain .vlbl { font-family: "IBM Plex Mono"; font-size: 10.5px; color: rgba(255,255,255,.7); letter-spacing: .1em; }
+  .verdict-line .vmain .vbig { font-size: 26px; font-weight: 800; }
+  .verdict-line .vside { font-family: "IBM Plex Mono"; font-size: 12px; }
+  .verdict-line .vside b { display: block; font-size: 16px; font-weight: 800; margin-top: 2px; }
+  .verdict-line .vside .lbl { color: rgba(255,255,255,.65); letter-spacing: .08em; }
 
-  /* Step 2/3 grids */
-  .grid4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px 10px; }
-  .cell { border: 1px solid #e9ece3; border-radius: 9px; padding: 10px 12px; }
+  /* 排 2/3 grids */
+  .grid4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 7px 10px; }
+  .cell { border: 1px solid #e9ece3; border-radius: 8px; padding: 9px 12px; }
   .cell .k { font-family: "IBM Plex Mono"; font-size: 9.5px; color: #9aa291; letter-spacing: .06em; }
-  .cell .v { font-family: "IBM Plex Mono"; font-size: 20px; font-weight: 800; color: #0c1208; margin-top: 3px; line-height: 1; }
+  .cell .v { font-family: "IBM Plex Mono"; font-size: 19px; font-weight: 800; color: #0c1208; margin-top: 3px; line-height: 1; }
   .cell .v.red    { color: #d4351c; }
   .cell .v.green  { color: #4d7c0f; }
   .cell .v.purple { color: #c026d3; }
-  .cell .v2nd { font-size: 11px; font-weight: 600; color: #5b6356; margin-top: 3px; font-family: "Noto Sans TC"; }
+  .cell .v2 { font-size: 10px; color: #5b6356; margin-top: 3px; font-family: "Noto Sans TC"; }
   .cell.dark { background: #0c1908; border-color: #0c1908; }
   .cell.dark .k { color: #9aa78d; }
   .cell.dark .v.red { color: #ff8a7a; }
   .cell.dark .v.green { color: #76b900; }
-  .cell.dark .v2nd { color: #cdd6c2; }
+  .cell.dark .v2 { color: #cdd6c2; }
 
-  /* scope + risk chips */
-  .scope { display: inline-block; font-family: "IBM Plex Mono"; font-size: 9.5px; font-weight: 700; padding: 2px 7px; border-radius: 4px; background: #f0f7e4; color: #4d7c0f; border: 1px solid #dcebc4; }
+  /* Decision Risk 拆 3 項 — 排 3 第 4 格用迷你 grid */
+  .risk-mini { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-top: 3px; }
+  .risk-mini .r { padding: 4px 5px; border-radius: 4px; text-align: center; }
+  .risk-mini .r .l { font-family: "IBM Plex Mono"; font-size: 8.5px; color: #5b6356; letter-spacing: .04em; }
+  .risk-mini .r .v { font-family: "IBM Plex Mono"; font-size: 11px; font-weight: 800; margin-top: 1px; }
 
-  /* Step 4 advice */
-  .advice { background: #f0f7e4; border: 2px solid #76b900; border-radius: 11px; padding: 12px 16px; }
-  .advice .lbl { font-family: "IBM Plex Mono"; font-size: 10.5px; font-weight: 700; color: #4d7c0f; letter-spacing: .1em; }
-  .advice .v { font-size: 17px; font-weight: 800; color: #0c1908; margin-top: 3px; }
+  /* 排 4 advice */
+  .advice { background: #f0f7e4; border: 2px solid #76b900; border-radius: 10px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .advice .lbl { font-family: "IBM Plex Mono"; font-size: 10px; font-weight: 700; color: #4d7c0f; letter-spacing: .1em; }
+  .advice .v { font-size: 16px; font-weight: 800; color: #0c1908; margin-top: 2px; }
+  .advice .deadline { font-family: "IBM Plex Mono"; font-size: 11px; color: #4d7c0f; font-weight: 700; white-space: nowrap; }
 
-  /* Step 5 action buttons (printed) */
-  .actbar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-  .actbtn { border: 2px solid; border-radius: 9px; padding: 11px 12px; text-align: center; }
-  .actbtn .k { font-family: "IBM Plex Mono"; font-size: 9.5px; letter-spacing: .12em; }
-  .actbtn .v { font-size: 14px; font-weight: 800; margin-top: 4px; }
+  /* 排 5 action bar */
+  .actbar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; }
+  .actbtn { border: 2px solid; border-radius: 9px; padding: 9px 12px; text-align: center; position: relative; }
+  .actbtn .cb { font-family: "IBM Plex Mono"; font-size: 14px; }
+  .actbtn .v { font-size: 13px; font-weight: 800; margin-top: 3px; }
+  .actbtn .rec { position: absolute; top: 4px; right: 6px; font-family: "IBM Plex Mono"; font-size: 7.5px; font-weight: 700; padding: 1px 5px; border-radius: 3px; letter-spacing: .06em; }
   .actbtn.refuse { border-color: #d4351c; background: #fdecea; }
-  .actbtn.refuse .k, .actbtn.refuse .v { color: #d4351c; }
+  .actbtn.refuse .cb,.actbtn.refuse .v { color: #d4351c; }
+  .actbtn.refuse .rec { background: #d4351c; color: #fff; }
   .actbtn.switch { border-color: #4d7c0f; background: #f0f7e4; }
-  .actbtn.switch .k, .actbtn.switch .v { color: #4d7c0f; }
+  .actbtn.switch .cb,.actbtn.switch .v { color: #4d7c0f; }
+  .actbtn.switch .rec { background: #4d7c0f; color: #fff; }
   .actbtn.accept { border-color: #9aa291; background: #fbfcfa; border-style: dashed; }
-  .actbtn.accept .k, .actbtn.accept .v { color: #5b6356; }
+  .actbtn.accept .cb,.actbtn.accept .v { color: #5b6356; }
 
-  /* footer / layered system note */
-  .sign { display: flex; justify-content: space-between; padding-top: 12px; border-top: 1px solid #e9ece3; font-size: 11px; color: #5b6356; margin-top: 18px; }
-  .layers { margin-top: 10px; padding: 10px 14px; background: #0c1908; color: #fff; border-radius: 9px; font-size: 11px; line-height: 1.6; }
+  .sign { display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid #e9ece3; font-size: 10.5px; color: #5b6356; margin-top: 12px; }
+  .layers { margin-top: 8px; padding: 8px 14px; background: #0c1908; color: #fff; border-radius: 8px; font-size: 10.5px; line-height: 1.55; }
   .layers b { color: #76b900; }
-  .layers .lbl { font-family: "IBM Plex Mono"; font-size: 9.5px; letter-spacing: .12em; color: #9aa78d; }
-  .footer { margin-top: 8px; font-family: "IBM Plex Mono"; font-size: 9px; color: #9aa291; }
+  .layers .lbl { font-family: "IBM Plex Mono"; font-size: 9px; letter-spacing: .12em; color: #9aa78d; }
+  .footer { margin-top: 6px; font-family: "IBM Plex Mono"; font-size: 8.5px; color: #9aa291; line-height: 1.5; }
 </style></head>
 <body>
 
-  <div class="meta">CHI HUA AI · L0 · BOARD DECISION CARD · 1 PAGE · 給董事長 / 總經理 / CEO 看</div>
+  <div class="meta">CHI HUA AI · L0 EXECUTIVE INTELLIGENCE LAYER · BOARD DECISION CARD · 1 PAGE · 給董事長 / 總經理 / CEO 看</div>
   <h1>${args.partNo}　·　${args.supplier} 漲價案</h1>
-  <div class="sub">看一頁、做一個決定 — 細節由 L1 採購報告 / L3 完整分析負責。</div>
+  <div class="sub">五排架構，看一頁、做一個決定 — 細節由 L1 / L3 負責。</div>
 
-  <!-- ── 第一步 · AI Verdict ── -->
-  <div class="step">
-    <span class="step-tag">第 1 步</span><span class="step-title">AI Verdict · AI 判定</span>
-    <div class="verdict-bar">
-      <div class="lbl">AI VERDICT<b>${verdictLabel}</b></div>
-      <div class="big">${verdictIcon}</div>
-    </div>
-  </div>
-
-  <!-- ── 第二步 · 漲幅情報 + Scope（避免 CEO 問「這是單型號還是系列衝擊？」）── -->
-  <div class="step">
-    <span class="step-tag">第 2 步</span><span class="step-title">漲幅情報 · Price Movement</span>
-    <div class="grid4" style="margin-top:4px">
-      <div class="cell">
-        <div class="k">供應商漲幅</div>
-        <div class="v red">+${args.supplierClaim.toFixed(1)}%</div>
-        <div class="v2nd"><span class="scope">範圍 · 本料件單型</span></div>
+  <!-- ── 排 1 · AI Verdict + Confidence + Decision Risk 合併 ── -->
+  <div class="row">
+    <span class="row-tag">排 1</span><span class="row-title">AI Verdict · 一條合併</span>
+    <div class="verdict-line">
+      <div class="vmain">
+        <span class="dot"></span>
+        <div>
+          <div class="vlbl">AI VERDICT</div>
+          <div class="vbig">${verdictLabel}</div>
+        </div>
       </div>
-      <div class="cell">
-        <div class="k">合理範圍</div>
-        <div class="v green">+${args.sc.buffered.toFixed(1)}%</div>
-        <div class="v2nd">Should-Cost 上限</div>
+      <div class="vside">
+        <span class="lbl">Confidence</span>
+        <b>92%</b>
       </div>
-      <div class="cell">
-        <div class="k">超出</div>
-        <div class="v red">+${overByActual.toFixed(1)}%</div>
-        <div class="v2nd">無市場依據</div>
-      </div>
-      <div class="cell">
-        <div class="k">議價目標</div>
-        <div class="v purple">${targetPrice.toFixed(2)}</div>
-        <div class="v2nd">${args.oldPrice.toFixed(2)} → ${targetPrice.toFixed(2)}</div>
+      <div class="vside">
+        <span class="lbl">Decision Risk</span>
+        <b>${riskScore} / 100</b>
       </div>
     </div>
   </div>
 
-  <!-- ── 第三步 · 公司痛 + 月省 + 替代廠商（CEO 在意的數字 + Decision Risk）── -->
-  <div class="step">
-    <span class="step-tag">第 3 步</span><span class="step-title">公司財務衝擊 · Financial Impact</span>
-    <div class="grid4" style="margin-top:4px">
+  <!-- ── 排 2 · 漲幅情報 ── -->
+  <div class="row">
+    <span class="row-tag">排 2</span><span class="row-title">漲幅情報 · Price Movement</span>
+    <div class="grid4">
+      <div class="cell"><div class="k">供應商漲幅</div><div class="v red">+${args.supplierClaim.toFixed(1)}%</div><div class="v2">舊 ${args.oldPrice.toFixed(2)} → 新 ${args.newPrice.toFixed(2)}</div></div>
+      <div class="cell"><div class="k">合理上限</div><div class="v green">+${args.sc.buffered.toFixed(1)}%</div><div class="v2">Should-Cost 拆解</div></div>
+      <div class="cell"><div class="k">超出</div><div class="v red">+${overByActual.toFixed(1)}%</div><div class="v2">無市場依據</div></div>
+      <div class="cell"><div class="k">目標價</div><div class="v purple">${targetPrice.toFixed(2)}</div><div class="v2">壓回合理上限</div></div>
+    </div>
+  </div>
+
+  <!-- ── 排 3 · 公司財務 + 毛利衝擊 + 供應風險拆 3 項 ── -->
+  <div class="row">
+    <span class="row-tag">排 3</span><span class="row-title">公司財務 + 毛利衝擊 + 風險細分（董事長最在意：賺多少）</span>
+    <div class="grid4">
       <div class="cell dark">
-        <div class="k">Annual Profit Impact</div>
+        <div class="k">Annual Profit Impact 年損失</div>
         <div class="v red">−NT$ ${annualImpact.toLocaleString()}</div>
-        <div class="v2nd">月損失 NT$ ${monthlyImpact.toLocaleString()} × 12</div>
+        <div class="v2">月損失 ${monthlyImpact.toLocaleString()} × 12</div>
       </div>
       <div class="cell dark">
-        <div class="k">Annual Saving (切換)</div>
+        <div class="k">Annual Saving 可節省</div>
         <div class="v green">+NT$ ${annualSaving.toLocaleString()}</div>
-        <div class="v2nd">月省 NT$ ${monthlySaving.toLocaleString()} × 12</div>
+        <div class="v2">切換鼎能 月省 ${monthlySaving.toLocaleString()} × 12</div>
       </div>
-      <div class="cell">
-        <div class="k">替代廠商</div>
-        <div class="v" style="color:#0c1908">A. 鼎能</div>
-        <div class="v2nd">OTD ${altOTD}%　·　Risk ${altRisk}/100</div>
+      <div class="cell" style="border-color:#d4351c;background:#fdecea">
+        <div class="k red">Gross Margin Impact 毛利衝擊</div>
+        <div class="v red">−${grossMarginDrop.toFixed(1)} pp</div>
+        <div class="v2">${grossMarginBefore}% → <b style="color:#d4351c">${grossMarginAfter}%</b></div>
       </div>
-      <div class="cell" style="border-color:${decisionRisk.tone};background:${decisionRisk.tone}10">
-        <div class="k" style="color:${decisionRisk.tone}">Decision Risk</div>
-        <div class="v" style="color:${decisionRisk.tone}">${decisionRisk.label}</div>
-        <div class="v2nd" style="color:${decisionRisk.tone}">${decisionRisk.note}</div>
+      <div class="cell" style="border-color:${priceRisk.tone};background:#fbfcfa">
+        <div class="k">Decision Risk 拆 3 項</div>
+        <div class="risk-mini">
+          <div class="r" style="background:${priceRisk.tone}15">
+            <div class="l">價格</div><div class="v" style="color:${priceRisk.tone}">${priceRisk.label}</div>
+          </div>
+          <div class="r" style="background:${supplyRisk.tone}15">
+            <div class="l">供應</div><div class="v" style="color:${supplyRisk.tone}">${supplyRisk.label}</div>
+          </div>
+          <div class="r" style="background:${qualityRisk.tone}15">
+            <div class="l">品質</div><div class="v" style="color:${qualityRisk.tone}">${qualityRisk.label}</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- ── 第四步 · 建議 ── -->
-  <div class="step">
-    <span class="step-tag">第 4 步</span><span class="step-title">建議 · AI Recommendation</span>
+  <!-- ── 排 4 · 建議 + 截止 ── -->
+  <div class="row">
+    <span class="row-tag">排 4</span><span class="row-title">建議 · AI Recommendation</span>
     <div class="advice">
-      <div class="lbl">建議　ACTION</div>
-      <div class="v">退回重議 — 同時啟動 <b style="color:#4d7c0f">鼎能 RFQ</b>，14 天內鎖定結果。</div>
+      <div>
+        <div class="lbl">建議　ACTION</div>
+        <div class="v">退回重議 — 同時啟動 <b style="color:#4d7c0f">鼎能 RFQ</b></div>
+      </div>
+      <div class="deadline">14 天完成</div>
     </div>
   </div>
 
-  <!-- ── 第五步 · 簽核三選一 ── -->
-  <div class="step">
-    <span class="step-tag">第 5 步</span><span class="step-title">簽核 · Sign-off（請董事勾選一項）</span>
-    <div class="actbar" style="margin-top:4px">
+  <!-- ── 排 5 · 簽核三選一 ── -->
+  <div class="row">
+    <span class="row-tag">排 5</span><span class="row-title">簽核 · Sign-off（請董事勾選一項）</span>
+    <div class="actbar">
       <div class="actbtn refuse">
-        <div class="k">☑ RECOMMENDED</div>
-        <div class="v">拒絕 / 退回重議</div>
+        <span class="rec">RECOMMENDED</span>
+        <div class="cb">☐</div>
+        <div class="v">拒絕</div>
       </div>
       <div class="actbtn switch">
-        <div class="k">☑ RECOMMENDED</div>
+        <span class="rec">RECOMMENDED</span>
+        <div class="cb">☐</div>
         <div class="v">切換 鼎能</div>
       </div>
       <div class="actbtn accept">
-        <div class="k">☐ NOT RECOMMENDED</div>
+        <div class="cb">☐</div>
         <div class="v">接受 ${args.newPrice.toFixed(2)}</div>
       </div>
     </div>
@@ -2288,17 +2326,14 @@ function buildBoardReportHtml(args: {
     <span class="mono">簽核：______________　日期：__________</span>
   </div>
 
-  <!-- AI Supply Chain OS · 3-layer report system -->
   <div class="layers">
-    <span class="lbl">AI SUPPLY CHAIN OS · 報告分層</span><br/>
-    <b>L0</b> Board Decision Card · 董事會卡 · <b>1 頁</b>（本頁）　&nbsp;
-    <b>L1</b> Executive Report · 採購行政報告 · <b>5 頁</b>　&nbsp;
-    <b>L3</b> AI Quotation Analyzer · 完整分析 · <b>11 段</b>
+    <span class="lbl">AI SUPPLY CHAIN OS · 3 層報告系統</span><br/>
+    <b>L0</b> Executive Intelligence Layer · 董事會 1 頁（本頁）　·　<b>L1</b> Executive Report · 4 頁　·　<b>L3</b> Quotation Analyzer · 完整 11 段
   </div>
 
   <div class="footer">
-    CHI HUA AI · L3 AI Quotation Analyzer · Board Card v2 (CEO-focus revision) · ${today}<br/>
-    報告分層說明：CEO 看 L0、採購看 L1、內部分析看 L3。月用量 ${monthlyVolume.toLocaleString()} 件 · 年化 ${(monthlyVolume * 12).toLocaleString()} 件。
+    CHI HUA AI · L0 Board Card v3 · 五排架構 · ${today}<br/>
+    決策卡定位：作為董事長 / 總經理 / CEO 登入系統第一頁。月用 ${monthlyVolume.toLocaleString()} 件 · 年用 ${(monthlyVolume * 12).toLocaleString()} 件。
   </div>
 
 </body></html>`;
