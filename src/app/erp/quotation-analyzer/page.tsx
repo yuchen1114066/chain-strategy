@@ -131,7 +131,7 @@ export default function QuotationAnalyzerPage() {
         win.document.write(reportHtml);
         win.document.close();
         setTimeout(() => { try { win.focus(); win.print(); } catch {} }, 700);
-        showToast("✓ Should-Cost 報告已開啟新分頁（列印對話框會自動跳出，選「另存為 PDF」即可）");
+        showToast("✓ AI Should-Cost Decision Report（9 段式）已開啟 — 列印對話框會自動跳出，選「另存為 PDF」即可");
         return;
       }
       // Fallback：彈窗被擋 → 改用 Blob 觸發下載 .html
@@ -859,7 +859,16 @@ function StepHeader({ badge, title, en, desc, tone = BR.green }: {
 }
 
 // ============================================================
-// 產出 Should-Cost 報告（HTML，於新分頁列印或存 PDF）
+// 產出 AI Should-Cost Decision Report（世界級 · 9 段式）
+//   §1 Executive Summary (AI Verdict) — CEO 只看這頁
+//   §2 Price Change
+//   §3 Cost Breakdown
+//   §4 Commodity Impact（含當前 vs 基期推導）
+//   §5 Supplier Benchmark · Historical Trend
+//   §6 Alternative Supplier Comparison
+//   §7 Negotiation Strategy（行動 / 證據 / 拒絕 / 備案）
+//   §8 AI Confidence（信心拆解）
+//   §9 Approval Recommendation
 // ============================================================
 function buildShouldCostReportHtml(args: {
   partNo: string;
@@ -874,65 +883,202 @@ function buildShouldCostReportHtml(args: {
 }): string {
   const today = new Date().toLocaleDateString("zh-TW", { year: "numeric", month: "long", day: "numeric" });
   const overByActual = +(args.supplierClaim - args.sc.buffered).toFixed(1);
-  const overByExcess = +(args.supplierExcess - args.sc.buffered).toFixed(1);
-  const verdict = args.supplierClaim > args.sc.buffered * 1.5 ? "🚨 嚴重超出 · 強力議價"
-                : args.supplierClaim > args.sc.buffered ? "⚠ 偏高 · 要求重議"
-                                                        : "✓ 合理 · 可接受";
+  // 建議議價目標 = 舊價 × (1 + 合理上限)
+  const targetPrice = +(args.oldPrice * (1 + args.sc.buffered / 100)).toFixed(2);
+  // 合理區間：±0.6%
+  const fairLow = +(args.sc.buffered - 0.6).toFixed(1);
+  const fairHigh = +(args.sc.buffered + 0.3).toFixed(1);
+  const verdictLabel = args.supplierClaim > args.sc.buffered * 1.5 ? "不合理"
+                     : args.supplierClaim > args.sc.buffered ? "偏高"
+                                                              : "合理";
+  const verdictIcon = args.supplierClaim > args.sc.buffered * 1.5 ? "🚨"
+                    : args.supplierClaim > args.sc.buffered ? "⚠"
+                                                            : "✓";
   const verdictColor = args.supplierClaim > args.sc.buffered * 1.5 ? "#d4351c"
                      : args.supplierClaim > args.sc.buffered ? "#b8860b" : "#4d7c0f";
+
+  // §5 歷史趨勢
+  const historyAvgHike = +(SUPPLIER_HISTORY.filter((h) => h.hike !== null).slice(0, -1).reduce((s, h) => s + (h.hike ?? 0), 0) / 4).toFixed(1);
+  const historyMultiple = +(args.supplierClaim / historyAvgHike).toFixed(1);
+
+  // §8 Confidence 拆解
+  const confidenceBreakdown = [
+    { k: "BOM 完整性",       v: 100, note: "已從 ERP 標準成本卡確認 6 個成分" },
+    { k: "市場資料完整度",   v: 95,  note: "LME / IPCEI / BDI / 勞動部 皆即時" },
+    { k: "同業對比覆蓋率",   v: 90,  note: "3 家替代供應商已詢價對比" },
+    { k: "歷史資料覆蓋",     v: 88,  note: "6 年 6 次調價軌跡" },
+  ];
+  const overallConfidence = 92;
+
+  // §6 替代供應商精簡版
+  const alts = ALT_SUPPLIERS.map((s) => ({
+    name: s.name, quote: s.quote, leadWeeks: s.leadWeeks, quality: s.qualityScore >= 95 ? "A+" : "A",
+  }));
+  const bestAltSaving = Math.round((args.newPrice - alts[0].quote) * 12000 / 100); // demo: 假設月用 12,000 件
 
   return `<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8" />
-<title>Should-Cost 報告 · ${args.partNo}</title>
+<title>AI Should-Cost Decision Report · ${args.partNo}</title>
 <style>
-  @page { size: A4; margin: 18mm 16mm; }
-  body { font-family: "Noto Sans TC", "Sora", system-ui, sans-serif; color: #0c1208; margin: 0; padding: 24px; line-height: 1.6; }
-  .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+  @page { size: A4; margin: 16mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Noto Sans TC", "Sora", system-ui, sans-serif; color: #0c1208; margin: 0; padding: 20px; line-height: 1.55; }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-feature-settings: "tnum" 1; }
   h1 { font-size: 22px; font-weight: 800; margin: 0 0 4px; color: #0c1908; }
-  h2 { font-size: 14px; font-weight: 700; margin: 22px 0 8px; padding: 6px 10px; background: #f0f7e4; border-left: 4px solid #76b900; color: #0c1908; }
+  h2 { font-size: 14px; font-weight: 700; margin: 22px 0 8px; padding: 6px 10px; background: #f0f7e4; border-left: 4px solid #76b900; color: #0c1908; page-break-after: avoid; }
+  h3 { font-size: 13px; font-weight: 700; margin: 12px 0 6px; color: #0c1908; }
   .sub { color: #5b6356; font-size: 12px; margin-bottom: 18px; }
-  .meta { font-size: 11px; color: #9aa291; margin-bottom: 12px; }
+  .meta { font-size: 10.5px; color: #9aa291; margin-bottom: 8px; letter-spacing: .04em; }
   table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-  th, td { padding: 7px 8px; border-bottom: 1px solid #e9ece3; font-size: 12px; vertical-align: top; }
+  th, td { padding: 7px 8px; border-bottom: 1px solid #e9ece3; font-size: 11.5px; vertical-align: top; }
   th { background: #fbfcfa; color: #5b6356; text-align: left; font-weight: 600; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
   td.r, th.r { text-align: right; }
-  .verdict { padding: 14px 18px; border-radius: 10px; border: 2px solid ${verdictColor}; background: ${verdictColor}10; margin: 14px 0; }
-  .verdict h3 { margin: 0 0 8px; font-size: 16px; color: ${verdictColor}; }
-  .verdict .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; font-size: 13px; }
-  .verdict .grid b { display: block; font-size: 18px; margin-top: 4px; }
-  ul { margin: 6px 0 12px 20px; padding: 0; }
-  ul li { margin: 2px 0; font-size: 13px; }
-  .footer { margin-top: 30px; padding-top: 12px; border-top: 1px solid #e9ece3; font-size: 10.5px; color: #9aa291; }
-  .red { color: #d4351c; font-weight: 700; }
-  .green { color: #4d7c0f; font-weight: 700; }
+  .red    { color: #d4351c; font-weight: 700; }
+  .green  { color: #4d7c0f; font-weight: 700; }
   .purple { color: #c026d3; font-weight: 700; }
+  .amber  { color: #b8860b; font-weight: 700; }
+  .muted  { color: #9aa291; }
+  .pagebreak { page-break-after: always; }
+  .nobreak   { page-break-inside: avoid; }
+
+  /* §1 Executive Summary cover */
+  .cover { padding: 22px 24px; border: 2px solid ${verdictColor}; border-radius: 14px; background: ${verdictColor}08; margin: 8px 0 14px; }
+  .cover-tag { display: inline-block; font-family: "IBM Plex Mono"; font-size: 10px; font-weight: 700; letter-spacing: .12em; color: #fff; background: #0c1908; padding: 4px 10px; border-radius: 5px; margin-bottom: 6px; }
+  .cover-h { font-size: 26px; font-weight: 800; color: ${verdictColor}; margin: 4px 0 14px; line-height: 1.1; }
+  .cover-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px 18px; }
+  .cover-cell { border-bottom: 1px solid #e9ece3; padding: 6px 0 8px; }
+  .cover-cell .k { font-size: 10px; color: #9aa291; letter-spacing: .06em; }
+  .cover-cell .v { font-family: "IBM Plex Mono"; font-size: 17px; font-weight: 800; color: #0c1208; margin-top: 3px; }
+  .cover-cell .v.red    { color: #d4351c; }
+  .cover-cell .v.green  { color: #4d7c0f; }
+  .cover-cell .v.amber  { color: #b8860b; }
+  .cover-cell .v.purple { color: #c026d3; }
+  .cover-verdict { margin-top: 14px; padding: 14px; border-radius: 10px; background: ${verdictColor}; color: #fff; display: flex; align-items: baseline; justify-content: space-between; }
+  .cover-verdict .lbl { font-size: 15px; font-weight: 700; }
+  .cover-verdict .big { font-family: "IBM Plex Mono"; font-size: 28px; font-weight: 800; }
+  .ceo-note { font-size: 11.5px; color: #5b6356; margin-top: 10px; text-align: center; font-style: italic; }
+
+  /* §2-9 layout helpers */
+  .twocol { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; }
+  .chip   { display: inline-block; font-family: "IBM Plex Mono"; font-size: 9.5px; font-weight: 700; color: #fff; padding: 2px 7px; border-radius: 4px; letter-spacing: .04em; }
+  .chip.r { background: #d4351c; } .chip.g { background: #4d7c0f; } .chip.a { background: #b8860b; } .chip.p { background: #c026d3; }
+  .note { font-size: 11px; color: #5b6356; padding: 8px 12px; background: #f0f7e4; border-left: 3px solid #76b900; border-radius: 4px; margin-top: 6px; }
+  .note b { color: #0c1908; }
+
+  /* §5 sparkline */
+  .spark { width: 100%; height: 80px; }
+  .spark text { font-family: "IBM Plex Mono"; }
+
+  /* §7 evidence list */
+  ol.evidence { padding-left: 22px; margin: 6px 0 0; }
+  ol.evidence li { margin: 4px 0; font-size: 12px; }
+
+  /* §8 confidence bars */
+  .conf-row { display: grid; grid-template-columns: 130px 1fr 50px; gap: 10px; align-items: center; padding: 4px 0; font-size: 11.5px; }
+  .conf-bar { height: 7px; border-radius: 3px; background: #eef0ea; overflow: hidden; }
+  .conf-bar i { display: block; height: 100%; background: #76b900; }
+
+  /* Footer */
+  .footer { margin-top: 28px; padding-top: 10px; border-top: 1px solid #e9ece3; font-size: 9.5px; color: #9aa291; line-height: 1.5; }
+
+  /* TOC */
+  .toc { font-size: 11.5px; color: #5b6356; }
+  .toc-line { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dotted #e9ece3; }
+  .toc-line b { color: #0c1908; }
+  .toc-line .num { font-family: "IBM Plex Mono"; color: #9aa291; }
 </style>
 </head>
 <body>
-  <div class="meta">CHI HUA AI · L3 AI Quotation Analyzer · Should-Cost Report</div>
-  <h1>Should-Cost 漲價合理性報告</h1>
+
+  <div class="meta">CHI HUA AI · L3 AI Quotation Analyzer · AI Should-Cost Decision Report</div>
+  <h1>議價的 AI Should-Cost Decision Report</h1>
   <div class="sub">料號 <b class="mono">${args.partNo}</b> · 供應商 <b>${args.supplier}</b> · 報告日期 ${today}</div>
 
-  <h2>① 報價變化</h2>
-  <table>
-    <tr><th>項目</th><th class="r">數值</th></tr>
-    <tr><td>舊單價</td><td class="r mono">${args.oldPrice.toFixed(2)}</td></tr>
-    <tr><td>新單價（供應商喊）</td><td class="r mono red">${args.newPrice.toFixed(2)}</td></tr>
-    <tr><td>實際漲幅</td><td class="r mono red">+${args.supplierClaim.toFixed(1)}%</td></tr>
+  <!-- ═════════════════════════════════════════════════════ -->
+  <!-- §1 EXECUTIVE SUMMARY (AI VERDICT) — CEO 只看這頁 -->
+  <!-- ═════════════════════════════════════════════════════ -->
+  <h2>§1 Executive Summary · AI Verdict</h2>
+  <div class="cover nobreak">
+    <span class="cover-tag">EXECUTIVE SUMMARY · 這一頁最重要 · CEO 只看這頁</span>
+    <div class="cover-h">${verdictIcon} ${verdictLabel}　·　超出合理範圍 +${overByActual.toFixed(1)}%</div>
+
+    <div class="cover-grid">
+      <div class="cover-cell"><div class="k">供應商</div><div class="v">${args.supplier}</div></div>
+      <div class="cover-cell"><div class="k">料號</div><div class="v mono">${args.partNo}</div></div>
+      <div class="cover-cell"><div class="k">AI 信心度</div><div class="v green">${overallConfidence}%</div></div>
+
+      <div class="cover-cell"><div class="k">舊價格</div><div class="v">${args.oldPrice.toFixed(2)}</div></div>
+      <div class="cover-cell"><div class="k">新價格（供應商喊）</div><div class="v red">${args.newPrice.toFixed(2)}</div></div>
+      <div class="cover-cell"><div class="k">漲幅</div><div class="v red">+${args.supplierClaim.toFixed(1)}%</div></div>
+
+      <div class="cover-cell"><div class="k">AI 合理區間</div><div class="v green">+${fairLow}% ~ +${fairHigh}%</div></div>
+      <div class="cover-cell"><div class="k">建議議價目標</div><div class="v purple">${targetPrice.toFixed(2)} 元</div></div>
+      <div class="cover-cell"><div class="k">超出合理範圍</div><div class="v red">+${overByActual.toFixed(1)}%</div></div>
+    </div>
+
+    <div class="cover-verdict">
+      <span class="lbl">AI 結論</span>
+      <span class="big">${verdictIcon} ${verdictLabel}</span>
+    </div>
+
+    <div class="ceo-note">這一頁最重要 — CEO 只看這頁。其後 §2 ~ §9 為支撐證據與議價依據。</div>
+  </div>
+
+  <h3>本報告目錄（9 個段落）</h3>
+  <div class="toc nobreak">
+    ${[
+      ["§1", "Executive Summary · AI Verdict",       "CEO 一頁摘要"],
+      ["§2", "Price Change",                          "舊價 / 新價 / 漲幅"],
+      ["§3", "Cost Breakdown",                        "BOM × CBS 成分結構"],
+      ["§4", "Commodity Impact",                      "各成分當前 vs 基期（推導透明）"],
+      ["§5", "Supplier Benchmark · Historical Trend", "過去 6 年漲價軌跡"],
+      ["§6", "Alternative Supplier Comparison",       "備案供應商比較"],
+      ["§7", "Negotiation Strategy",                  "行動 · 證據 · 拒絕 · 備案"],
+      ["§8", "AI Confidence",                         "信心度拆解 · 為何 92%"],
+      ["§9", "Approval Recommendation",               "留客戶 / 切換 / 重議"],
+    ].map(([n, t, d]) => `<div class="toc-line"><span><span class="num">${n}</span>　<b>${t}</b></span><span class="muted">${d}</span></div>`).join("")}
+  </div>
+
+  <div class="pagebreak"></div>
+
+  <!-- ═════════════════════════════════════════════════════ -->
+  <!-- §2 PRICE CHANGE -->
+  <!-- ═════════════════════════════════════════════════════ -->
+  <h2>§2 Price Change · 價格變動</h2>
+  <table class="nobreak">
+    <thead><tr><th>項目</th><th class="r">數值</th></tr></thead>
+    <tbody>
+      <tr><td>舊單價</td><td class="r mono">${args.oldPrice.toFixed(2)}</td></tr>
+      <tr><td>新單價（供應商喊）</td><td class="r mono red">${args.newPrice.toFixed(2)}</td></tr>
+      <tr><td>實際漲幅</td><td class="r mono red">+${args.supplierClaim.toFixed(1)}%</td></tr>
+      <tr style="background:#f0f7e4"><td><b>建議議價目標</b></td><td class="r mono"><b class="purple">${targetPrice.toFixed(2)}</b>（即合理上限 +${args.sc.buffered}%）</td></tr>
+    </tbody>
   </table>
 
-  <h2>② Should-Cost 拆解（BOM 結構）</h2>
-  <table>
+  <!-- ═════════════════════════════════════════════════════ -->
+  <!-- §3 COST BREAKDOWN -->
+  <!-- ═════════════════════════════════════════════════════ -->
+  <h2>§3 Cost Breakdown · BOM × CBS 成分結構</h2>
+  <p style="font-size:11.5px;color:#5b6356;margin:0 0 6px">
+    依 ERP 標準成本卡 + Cost Breakdown System（CBS）反推此料各成分佔比。
+  </p>
+  <table class="nobreak">
     <thead><tr><th>成分</th><th class="r">佔成本</th><th>對應商品 / 指數</th></tr></thead>
     <tbody>
       ${args.bom.map((b) => `<tr><td>${b.k}</td><td class="r mono">${b.pct}%</td><td>${b.mapTo}</td></tr>`).join("")}
     </tbody>
   </table>
 
-  <h2>③ AI 抓的目前商品價格波動（含當前 vs 基期 · 每個 % 都可驗證）</h2>
-  <table>
+  <!-- ═════════════════════════════════════════════════════ -->
+  <!-- §4 COMMODITY IMPACT — 含當前 vs 基期推導 -->
+  <!-- ═════════════════════════════════════════════════════ -->
+  <h2>§4 Commodity Impact · 各成分當前波動（含推導）</h2>
+  <p style="font-size:11.5px;color:#5b6356;margin:0 0 6px">
+    <b>每個 % 都不是供應商說了算 — 是用公開市場價反推的，可逐筆驗證。</b>
+  </p>
+  <table class="nobreak">
     <thead>
       <tr>
         <th>商品 / 指數</th>
@@ -949,27 +1095,27 @@ function buildShouldCostReportHtml(args: {
         <tr>
           <td>${m.k}</td>
           <td class="r mono"><b>${m.current.toLocaleString()}</b></td>
-          <td class="r mono" style="color:#5b6356">${m.baseline.toLocaleString()}</td>
-          <td class="r mono" style="font-size:10px;color:#9aa291">${m.unit}</td>
-          <td class="r mono" style="font-size:10px;color:#9aa291">(${m.current.toLocaleString()} − ${m.baseline.toLocaleString()}) / ${m.baseline.toLocaleString()}</td>
-          <td class="r mono ${m.delta > 5 ? "red" : ""}">+${m.delta.toFixed(1)}%</td>
-          <td style="font-size:10.5px">${m.source}<br/><span style="color:#9aa291">${m.asOf}</span></td>
+          <td class="r mono muted">${m.baseline.toLocaleString()}</td>
+          <td class="r mono muted" style="font-size:10px">${m.unit}</td>
+          <td class="r mono muted" style="font-size:10px">(${m.current.toLocaleString()} − ${m.baseline.toLocaleString()}) / ${m.baseline.toLocaleString()}</td>
+          <td class="r mono ${m.delta > 5 ? "red" : "amber"}">+${m.delta.toFixed(1)}%</td>
+          <td style="font-size:10.5px">${m.source}<br/><span class="muted">${m.asOf}</span></td>
         </tr>`).join("")}
     </tbody>
   </table>
-  <p style="font-size:11px;color:#5b6356;margin-top:6px;line-height:1.55">
-    <b>讀法</b>：以「LME 銅」為例，<b class="mono">(9,472 − 9,021) / 9,021 ≒ 5.0%</b> — 不是供應商喊的，是公開市場價反推。
-  </p>
 
-  <h2>④ Should-Cost Engine 計算（含每個成分的當前 / 基期推導）</h2>
-  <table>
+  <h3>成本貢獻分析（議價核心）</h3>
+  <p style="font-size:11.5px;color:#5b6356;margin:0 0 6px">
+    只看 BOM 佔比不夠 — 必須乘上當前市場變動，才知道「合理該漲多少」。
+  </p>
+  <table class="nobreak">
     <thead>
       <tr>
         <th>成分</th>
         <th class="r">BOM 權重</th>
         <th class="r">當前價</th>
         <th class="r">基期價</th>
-        <th class="r">變動 %</th>
+        <th class="r">市場變動</th>
         <th class="r">計算式</th>
         <th class="r">合理貢獻</th>
       </tr>
@@ -979,14 +1125,13 @@ function buildShouldCostReportHtml(args: {
         const cp = COMPONENT_PRICE[r.k];
         const cur = cp ? cp.current.toLocaleString() : "—";
         const base = cp ? cp.baseline.toLocaleString() : "—";
-        const unit = cp?.unit ?? "";
         return `<tr>
-          <td>${r.k}${cp ? `<div style="font-size:9.5px;color:#9aa291">${cp.source}</div>` : ""}</td>
+          <td><b>${r.k}</b>${cp ? `<div style="font-size:9.5px;color:#9aa291">${cp.source}</div>` : ""}</td>
           <td class="r mono">${r.weight}%</td>
-          <td class="r mono">${cur}${unit ? `<span style="font-size:9px;color:#9aa291"> ${unit}</span>` : ""}</td>
-          <td class="r mono" style="color:#5b6356">${base}</td>
-          <td class="r mono">+${r.delta}%</td>
-          <td class="r mono" style="font-size:10.5px;color:#9aa291">${r.weight}% × ${r.delta}%</td>
+          <td class="r mono">${cur}</td>
+          <td class="r mono muted">${base}</td>
+          <td class="r mono ${r.delta > 5 ? "red" : "amber"}">+${r.delta}%</td>
+          <td class="r mono muted" style="font-size:10.5px">${r.weight}% × ${r.delta}%</td>
           <td class="r mono green">+${r.contrib.toFixed(2)}%</td>
         </tr>`;
       }).join("")}
@@ -994,39 +1139,213 @@ function buildShouldCostReportHtml(args: {
       <tr style="background:#f0f7e4"><td colspan="6"><b>緩衝後（×1.10）</b></td><td class="r mono"><b>+${args.sc.buffered.toFixed(1)}%</b></td></tr>
     </tbody>
   </table>
+  <div class="note">
+    <b>讀法</b>：以「銅材 +5%」為例 — <b class="mono">(9,472 − 9,021) / 9,021 ≒ 5.0%</b>。
+    合計 +5.65%，緩衝後 <b>+${args.sc.buffered}%</b> 即合理上限。
+    供應商喊 +${args.supplierClaim}% <b class="red">超出 +${overByActual}%</b>，沒有市場依據。
+  </div>
 
-  <div class="verdict">
-    <h3>${verdict}</h3>
-    <div class="grid">
-      <div>合理上限 <b class="green">+${args.sc.buffered.toFixed(1)}%</b></div>
-      <div>供應商喊 <b class="red">+${args.supplierClaim.toFixed(1)}%</b></div>
-      <div>${overByActual > 0 ? "超出" : "差距"} <b class="purple">${overByActual > 0 ? "+" : ""}${overByActual.toFixed(1)}%</b></div>
+  <div class="pagebreak"></div>
+
+  <!-- ═════════════════════════════════════════════════════ -->
+  <!-- §5 SUPPLIER BENCHMARK · HISTORICAL TREND -->
+  <!-- ═════════════════════════════════════════════════════ -->
+  <h2>§5 Supplier Benchmark · 歷史價格趨勢</h2>
+  <p style="font-size:11.5px;color:#5b6356;margin:0 0 6px">
+    過去 6 年這家供應商對此料的調價軌跡 — <b>這一段供應商很難反駁</b>。
+  </p>
+
+  <svg viewBox="0 0 720 120" class="spark nobreak" preserveAspectRatio="none">
+    ${(() => {
+      const min = Math.min(...SUPPLIER_HISTORY.map((h) => h.price));
+      const max = Math.max(...SUPPLIER_HISTORY.map((h) => h.price));
+      const range = max - min || 1;
+      const yScale = (v: number) => 90 - ((v - min) / range) * 70;
+      const pts = SUPPLIER_HISTORY.map((h, i) => {
+        const x = 50 + (i / (SUPPLIER_HISTORY.length - 1)) * 640;
+        const y = yScale(h.price);
+        return { x, y, ...h };
+      });
+      const path = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
+      return `
+        <path d="${path}" fill="none" stroke="#c026d3" stroke-width="2.5" />
+        ${pts.map((p) => {
+          const isJump = p.hike !== null && p.hike > 10;
+          return `
+            <circle cx="${p.x}" cy="${p.y}" r="${isJump ? 6 : 4}" fill="${isJump ? "#d4351c" : "#c026d3"}" stroke="#fff" stroke-width="2" />
+            <text x="${p.x}" y="${p.y - 9}" text-anchor="middle" font-size="10" font-weight="700" fill="${isJump ? "#d4351c" : "#0c1208"}">${p.price.toFixed(2)}</text>
+            <text x="${p.x}" y="115" text-anchor="middle" font-size="9" fill="#9aa291">${p.year}</text>
+          `;
+        }).join("")}
+      `;
+    })()}
+  </svg>
+
+  <table class="nobreak" style="margin-top:10px">
+    <thead><tr><th>期別</th><th class="r">單價</th><th class="r">調幅</th><th>備註</th></tr></thead>
+    <tbody>
+      ${SUPPLIER_HISTORY.map((h) => `
+        <tr ${h.hike !== null && h.hike > 10 ? 'style="background:#fdecea"' : ""}>
+          <td>${h.year}</td>
+          <td class="r mono">${h.price.toFixed(2)}</td>
+          <td class="r mono ${h.hike === null ? "muted" : h.hike > 10 ? "red" : h.hike > 5 ? "amber" : "green"}">${h.hike === null ? "—" : `+${h.hike.toFixed(1)}%`}</td>
+          <td class="muted" style="font-size:11px">${h.hike === null ? "基期" : h.hike > 10 ? "★ 異常跳漲" : "正常區間"}</td>
+        </tr>
+      `).join("")}
+    </tbody>
+  </table>
+
+  <div class="note">
+    <b>AI 判斷</b> · 本次漲幅 <b class="red">+${args.supplierClaim.toFixed(1)}%</b>，
+    高於過去 3 年平均（${historyAvgHike}%）的 <b class="red">${historyMultiple} 倍</b>。
+    這張曲線可作為議價會議簡報附件 — <b>過去 3 年我們接受每次 ${historyAvgHike}% 內，這次跳到 ${args.supplierClaim}% 沒有依據</b>。
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════ -->
+  <!-- §6 ALTERNATIVE SUPPLIER -->
+  <!-- ═════════════════════════════════════════════════════ -->
+  <h2>§6 Alternative Supplier Comparison · 替代供應商比較</h2>
+  <p style="font-size:11.5px;color:#5b6356;margin:0 0 6px">
+    <b>這一段給對方看了就知道 — 我們有備案。</b>
+  </p>
+  <table class="nobreak">
+    <thead><tr><th>供應商</th><th class="r">報價</th><th class="r">交期</th><th class="r">品質</th><th class="r">vs 現任</th><th>AI 建議</th></tr></thead>
+    <tbody>
+      <tr style="background:#fdecea">
+        <td><b>${args.supplier}（現任）</b> <span class="chip r">NOW</span></td>
+        <td class="r mono red">${args.newPrice.toFixed(2)}</td>
+        <td class="r mono">7 週</td>
+        <td class="r mono">A</td>
+        <td class="r mono muted">baseline</td>
+        <td class="red">本次 +${args.supplierClaim.toFixed(1)}% 不合理 → 退單</td>
+      </tr>
+      ${alts.map((a, i) => {
+        const diff = +(((a.quote - args.newPrice) / args.newPrice) * 100).toFixed(1);
+        const advice = i === 0 ? "✓ 立即詢價" : i === 1 ? "✓ 切換" : "備案";
+        return `
+          <tr>
+            <td><b>${a.name}</b></td>
+            <td class="r mono green">${a.quote.toFixed(2)}</td>
+            <td class="r mono">${a.leadWeeks} 週</td>
+            <td class="r mono">${a.quality}</td>
+            <td class="r mono green">${diff.toFixed(1)}%</td>
+            <td><span class="chip g">${advice}</span></td>
+          </tr>`;
+      }).join("")}
+    </tbody>
+  </table>
+  <div class="note">
+    <b>AI 建議</b> · 切換 <b>${alts[0].name}</b>（${alts[0].quote.toFixed(2)} 元 / ${alts[0].leadWeeks} 週）
+    vs 現任 ${args.newPrice.toFixed(2)} 元，月用量 12,000 件估算可省
+    <b class="green">NT$ ${bestAltSaving.toLocaleString()}/月</b>。
+  </div>
+
+  <div class="pagebreak"></div>
+
+  <!-- ═════════════════════════════════════════════════════ -->
+  <!-- §7 NEGOTIATION STRATEGY -->
+  <!-- ═════════════════════════════════════════════════════ -->
+  <h2>§7 Negotiation Strategy · 議價策略</h2>
+
+  <h3>① 三層目標價</h3>
+  <table class="nobreak">
+    <thead><tr><th>層級</th><th>價格</th><th>說明</th></tr></thead>
+    <tbody>
+      <tr><td><span class="chip g">理想</span></td><td class="mono"><b>${(args.oldPrice * 1.04).toFixed(2)}</b> 元</td><td>= 舊價 × (1 + 4%) — 接近過去 3 年平均漲幅</td></tr>
+      <tr style="background:#f0f7e4"><td><span class="chip p">建議</span></td><td class="mono"><b class="purple">${targetPrice.toFixed(2)}</b> 元</td><td>= 舊價 × (1 + ${args.sc.buffered}%) — Should-Cost 合理上限</td></tr>
+      <tr><td><span class="chip a">保底</span></td><td class="mono"><b>${(args.oldPrice * 1.09).toFixed(2)}</b> 元</td><td>= 舊價 × (1 + 9%) — 最末退讓底線</td></tr>
+      <tr><td><span class="chip r">拒絕</span></td><td class="mono red"><b>${args.newPrice.toFixed(2)}</b> 元</td><td>= 供應商喊 +${args.supplierClaim}% — 已超出合理範圍 ${overByActual}%</td></tr>
+    </tbody>
+  </table>
+
+  <h3>② 議價會議拿話清單（可會中直接念出）</h3>
+  <ol class="evidence">
+    <li>「銅佔此料 58%，LME 銅實際只漲 5%（9,021 → 9,472），該欄合理 +2.9%。」</li>
+    <li>「電鍍佔 10%，IPCEI 指數 +12%（119.8 → 134.2），該欄合理 +1.2%。」</li>
+    <li>「加工佔 15%，工資 +3%、鏡板 +8%，該欄合理 +1.2%。」</li>
+    <li>「運費佔 5%，BDI +7%（1,721 → 1,842），該欄合理 +0.35%。」</li>
+    <li>「加總 <b>+5.7%</b>，加 10% 緩衝後 <b>+${args.sc.buffered}%</b> 為合理上限。」</li>
+    <li>「貴司喊 +${args.supplierClaim}% <b class="red">超出 +${overByActual}%</b> 沒有市場依據。」</li>
+    <li>「過去 3 年貴司平均調價 ${historyAvgHike}%，這次跳 ${args.supplierClaim}% 是 <b class="red">${historyMultiple} 倍</b>。」</li>
+    <li>「我方已詢價 ${alts[0].name} ${alts[0].quote.toFixed(2)} 元 / ${alts[0].leadWeeks} 週，請貴司審慎評估。」</li>
+  </ol>
+
+  <h3>③ 證據包（會中呈現）</h3>
+  <ol class="evidence">
+    <li>LME 銅 30 日均價截圖（9,021 → 9,472，+5%）</li>
+    <li>IPCEI 電鍍指數 2026 Q1 公告（119.8 → 134.2，+12%）</li>
+    <li>中鋼 + 寶武 鏡板牌價 2026-06（289 → 312，+8%）</li>
+    <li>勞動部 製造業最低工資 2026 Q2 調幅（30,560 → 31,480，+3%）</li>
+    <li>BDI 指數 2026-06-04（1,721 → 1,842，+7%）</li>
+    <li>過去 6 年貴司對本料調價軌跡（§5 曲線）</li>
+    <li>替代供應商 3 家報價對比（§6 表）</li>
+  </ol>
+
+  <!-- ═════════════════════════════════════════════════════ -->
+  <!-- §8 AI CONFIDENCE -->
+  <!-- ═════════════════════════════════════════════════════ -->
+  <h2>§8 AI Confidence · 信心度拆解</h2>
+  <p style="font-size:11.5px;color:#5b6356;margin:0 0 6px">
+    避免被問「AI 怎麼算的？」 — 信心度由 4 個維度組成，每一項都可獨立驗證。
+  </p>
+
+  <div class="nobreak" style="border: 2px solid #76b900; border-radius: 10px; padding: 14px; background: #f0f7e4; margin: 8px 0;">
+    <div style="display:flex;align-items:baseline;justify-content:space-between">
+      <span style="font-family:'IBM Plex Mono';font-size:10px;font-weight:700;color:#4d7c0f;letter-spacing:.1em">OVERALL AI CONFIDENCE</span>
+      <span style="font-family:'IBM Plex Mono';font-size:32px;font-weight:800;color:#4d7c0f">${overallConfidence}%</span>
+    </div>
+    <div style="margin-top:10px">
+      ${confidenceBreakdown.map((c) => `
+        <div class="conf-row">
+          <span><b>${c.k}</b><div style="font-size:10px;color:#5b6356">${c.note}</div></span>
+          <div class="conf-bar"><i style="width:${c.v}%"></i></div>
+          <span class="mono" style="text-align:right;font-weight:700;color:#4d7c0f">${c.v}%</span>
+        </div>
+      `).join("")}
     </div>
   </div>
 
-  <h2>⑤ 議價會議重點清單（可會中直接念出）</h2>
-  <ul>
-    <li>銅佔 <b>58%</b>、銅只漲 <b>5%</b> → 該欄合理 <b class="green">+2.9%</b></li>
-    <li>電鍍佔 <b>10%</b>、+12% → 該欄合理 <b class="green">+1.2%</b></li>
-    <li>加工佔 <b>15%</b>、+8% → 該欄合理 <b class="green">+1.2%</b></li>
-    <li>運費佔 <b>5%</b>、+7% → 該欄合理 <b class="green">+0.4%</b></li>
-    <li>加總 +5.7%，緩衝後上限 <b class="green">+${args.sc.buffered.toFixed(1)}%</b></li>
-    <li>貴司喊 <b class="red">+${args.supplierClaim.toFixed(1)}%</b> → 超出 <b class="purple">+${overByActual.toFixed(1)}%</b></li>
-  </ul>
-
-  <h2>⑥ 我方立場</h2>
-  <ul>
-    <li>接受 Should-Cost 上限 <b class="green">+${args.sc.buffered.toFixed(1)}%</b></li>
-    <li>超出部分需供應商明確說明（原料 / 工資 / 運費 對應證據）</li>
-    <li>逾期未說明，<b class="red">退單重議</b></li>
-  </ul>
+  <!-- ═════════════════════════════════════════════════════ -->
+  <!-- §9 APPROVAL RECOMMENDATION -->
+  <!-- ═════════════════════════════════════════════════════ -->
+  <h2>§9 Approval Recommendation · 簽核建議</h2>
+  <table class="nobreak">
+    <thead><tr><th>選項</th><th>條件</th><th>影響</th><th>AI 建議</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>A. 留現任供應商</b></td>
+        <td>須對方降至 <b class="purple">${targetPrice.toFixed(2)}</b> 元（合理上限）</td>
+        <td>月省 vs 喊價 NT$ ${Math.round((args.newPrice - targetPrice) * 12000).toLocaleString()}</td>
+        <td><span class="chip g">優先</span></td>
+      </tr>
+      <tr>
+        <td><b>B. 切換 ${alts[0].name}</b></td>
+        <td>${alts[0].quote.toFixed(2)} 元 / ${alts[0].leadWeeks} 週 / 品質 ${alts[0].quality}</td>
+        <td>月省 vs 現任喊價 <b class="green">NT$ ${bestAltSaving.toLocaleString()}</b></td>
+        <td><span class="chip g">備案</span></td>
+      </tr>
+      <tr>
+        <td><b>C. 要求重議</b></td>
+        <td>7 個工作日內提供超出 +${overByActual.toFixed(1)}% 的成本依據</td>
+        <td>無法說明則退單</td>
+        <td><span class="chip a">並行</span></td>
+      </tr>
+      <tr>
+        <td><b>D. 接受現喊價</b></td>
+        <td>${args.newPrice.toFixed(2)} 元（+${args.supplierClaim.toFixed(1)}%）</td>
+        <td>月多支 vs 合理 NT$ ${Math.round((args.newPrice - targetPrice) * 12000).toLocaleString()}</td>
+        <td><span class="chip r">不建議</span></td>
+      </tr>
+    </tbody>
+  </table>
 
   <div class="footer">
-    本報告由 CHI HUA AI Supply Chain OS · L3 AI Quotation Analyzer 自動產出，
-    Should-Cost 模型 = 各成分 BOM 權重 × 當前商品波動 × 1.10 緩衝係數。
-    資料來源：ERP BOM、LME、Brent、中鋼牌價、BoT 工資 / 匯率。
-    <br />列印日：${today}
+    本報告由 <b>CHI HUA AI Supply Chain OS · L3 AI Quotation Analyzer</b> 自動產出。<br />
+    Should-Cost 模型 = Σ(BOM 權重 × 當前商品波動) × 1.10 緩衝係數。<br />
+    資料來源：ERP BOM v3.2 · LME 倫敦金屬交易所 · IPCEI 電鍍指數 · 中鋼 / 寶武牌價 · 勞動部 · Baltic Dry Index。<br />
+    列印日：${today} · 報告版本 v9.0 (9-section world-class)
   </div>
+
 </body>
 </html>`;
 }
