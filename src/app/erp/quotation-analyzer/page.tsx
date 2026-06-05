@@ -102,34 +102,48 @@ export default function QuotationAnalyzerPage() {
     setTimeout(() => setToast(null), 3200);
   };
 
-  // ── ① 產出 Should-Cost 報告 (PDF) — 開新分頁印成 PDF ──
+  // ── ① 產出 Should-Cost 報告 (PDF) — 開新分頁印成 PDF（彈窗被擋則自動改用 Blob 下載） ──
   const handleGenerateReport = () => {
-    const reportHtml = buildShouldCostReportHtml({
-      partNo: SELECTED.partNo,
-      supplier: SELECTED.supplier,
-      oldPrice: SELECTED.oldPrice,
-      newPrice: SELECTED.newPrice,
-      supplierClaim,
-      supplierExcess,
-      sc,
-      bom: BOM_BREAKDOWN,
-      moves: COMMODITY_MOVES,
-    });
-    const win = window.open("", "_blank", "noopener,noreferrer,width=900,height=1100");
-    if (!win) {
-      showToast("⚠ 請允許彈出視窗以產出 PDF");
-      return;
+    try {
+      const reportHtml = buildShouldCostReportHtml({
+        partNo: SELECTED.partNo,
+        supplier: SELECTED.supplier,
+        oldPrice: SELECTED.oldPrice,
+        newPrice: SELECTED.newPrice,
+        supplierClaim,
+        supplierExcess,
+        sc,
+        bom: BOM_BREAKDOWN,
+        moves: COMMODITY_MOVES,
+      });
+      // 優先：開新分頁 + 自動列印
+      const win = window.open("", "_blank");
+      if (win && win.document) {
+        win.document.open();
+        win.document.write(reportHtml);
+        win.document.close();
+        setTimeout(() => { try { win.focus(); win.print(); } catch {} }, 700);
+        showToast("✓ Should-Cost 報告已開啟新分頁（列印對話框會自動跳出，選「另存為 PDF」即可）");
+        return;
+      }
+      // Fallback：彈窗被擋 → 改用 Blob 觸發下載 .html
+      const blob = new Blob([reportHtml], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `should-cost-${SELECTED.partNo}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast("✓ 彈窗被擋 — 改用下載：should-cost-" + SELECTED.partNo + ".html（開啟後即可列印 / 另存為 PDF）");
+    } catch (e) {
+      showToast("⚠ 產出失敗：" + (e instanceof Error ? e.message : String(e)));
     }
-    win.document.open();
-    win.document.write(reportHtml);
-    win.document.close();
-    // 讓字體載入再印
-    setTimeout(() => { try { win.focus(); win.print(); } catch {} }, 700);
-    showToast("✓ Should-Cost 報告已開啟 — 列印對話框會自動跳出");
   };
 
-  // ── ② 發送議價會議邀請 — mailto ──
-  const handleSendMeetingInvite = () => {
+  // ── ② 發送議價會議邀請 — mailto link（預先組好 href） ──
+  const meetingMailto = (() => {
     const subject = `[議價會議] ${SELECTED.partNo} 報價調整 — Should-Cost 結果說明`;
     const body = [
       `Dear ${SELECTED.supplier} 先進，`,
@@ -153,13 +167,11 @@ export default function QuotationAnalyzerPage() {
       `祺驊股份有限公司 · CHI HUA AI Supply Chain OS`,
       `(此信由 L3 AI Quotation Analyzer 自動草擬)`,
     ].join("\n");
-    const href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.location.href = href;
-    showToast("✓ 議價會議邀請已開啟郵件草稿");
-  };
+    return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  })();
 
-  // ── ③ 退單通知供應商 — mailto ──
-  const handleSendReject = () => {
+  // ── ③ 退單通知供應商 — mailto link ──
+  const rejectMailto = (() => {
     const subject = `[退單] ${SELECTED.partNo} 報價超出合理區間 — 需重新報價`;
     const body = [
       `Dear ${SELECTED.supplier} 先進，`,
@@ -186,10 +198,8 @@ export default function QuotationAnalyzerPage() {
       `祺驊股份有限公司 · 採購中心`,
       `(此信由 L3 AI Quotation Analyzer 依據 Should-Cost 拆解自動產出)`,
     ].join("\n");
-    const href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.location.href = href;
-    showToast("✓ 退單通知已開啟郵件草稿");
-  };
+    return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  })();
 
   return (
     <div
@@ -566,30 +576,37 @@ export default function QuotationAnalyzerPage() {
               </div>
               <div className="space-y-2">
                 <button
+                  type="button"
                   onClick={handleGenerateReport}
                   style={{
                     width: "100%", background: BR.green, color: "#fff",
                     border: "none", borderRadius: 9, padding: "10px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer",
-                    display: "flex", alignItems: "center", gap: 8,
+                    display: "block", textAlign: "center",
                   }}>
                   📑 產出 Should-Cost 報告 (PDF)
                 </button>
-                <button
-                  onClick={handleSendMeetingInvite}
+                <a
+                  href={meetingMailto}
+                  onClick={() => showToast("✓ 議價會議邀請已開啟郵件草稿")}
                   style={{
+                    display: "block", textDecoration: "none",
                     width: "100%", background: "rgba(255,255,255,.08)", color: "#fff",
                     border: "1px solid rgba(255,255,255,.16)", borderRadius: 9, padding: "10px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                    textAlign: "center", boxSizing: "border-box",
                   }}>
                   📨 發送議價會議邀請
-                </button>
-                <button
-                  onClick={handleSendReject}
+                </a>
+                <a
+                  href={rejectMailto}
+                  onClick={() => showToast("✓ 退單通知已開啟郵件草稿")}
                   style={{
+                    display: "block", textDecoration: "none",
                     width: "100%", background: "rgba(255,255,255,.08)", color: "#fff",
                     border: "1px solid rgba(255,255,255,.16)", borderRadius: 9, padding: "10px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                    textAlign: "center", boxSizing: "border-box",
                   }}>
                   📝 退單通知供應商
-                </button>
+                </a>
               </div>
             </div>
           </div>
