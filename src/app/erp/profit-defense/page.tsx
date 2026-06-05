@@ -1483,62 +1483,134 @@ function metalColor(m?: string): string {
 }
 
 // ─────────────── Cost Explosion Tree（4 層全展開：Product → Module → Component → Commodity）───────────────
+// ─────────────── Cost Explosion Tree（一次只展開一層 · 點下鑽）───────────────
 function CostExplosionTree({ root }: { root: CostNode }) {
   const C2 = { primary: "#005245", red: "#ba1a1a", blue: "#005cba", text: "#1a1c1c", textSub: "#574146", border: "#e2e2e2", surfaceDim: "#f4f3f3", outline: "#8a7176" };
+  const [path, setPath] = React.useState<string[]>([]);
+
+  let current: CostNode = root;
+  const breadcrumb: CostNode[] = [root];
+  for (const seg of path) {
+    const next = current.children?.find((c) => c.name === seg);
+    if (!next) break;
+    current = next;
+    breadcrumb.push(next);
+  }
+
+  const LAYER_LABEL = ["Product 整機", "Module 模組", "Component 零件", "Commodity 原料"];
+  const LAYER_TONE  = [C2.primary, C2.blue, "#7a4fbf", "#d97706"];
+  const depth = breadcrumb.length - 1;
+
   return (
     <div className="rounded-md border p-3" style={{ borderColor: C2.border, background: C2.surfaceDim }}>
       <div className="flex items-baseline justify-between mb-2 flex-wrap gap-1">
         <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C2.textSub, letterSpacing: "0.08em" }}>
-          ▎💥 Cost Explosion Tree · 4 層全展開
+          ▎💥 Cost Explosion Tree
         </div>
-        <span className="text-[9px]" style={{ color: C2.outline }}>Product → Module → Component → Commodity</span>
+        <span className="text-[9px]" style={{ color: C2.outline }}>點任一項 → 下鑽下一層（4 層：Product → Module → Component → Commodity）</span>
       </div>
 
-      {/* Full tree */}
-      <div className="font-mono text-[11px] leading-relaxed" style={{ color: C2.text }}>
-        <TreeNode node={root} depth={0} prefix="" isLast={true} />
+      {/* Breadcrumb 顯示目前下鑽路徑 */}
+      <div className="flex flex-wrap items-baseline gap-1 mb-3 text-[10px]">
+        {breadcrumb.map((n, i) => (
+          <span key={i} className="flex items-baseline gap-1">
+            {i > 0 && <span style={{ color: C2.outline }}>›</span>}
+            <button
+              onClick={() => setPath(path.slice(0, i))}
+              className="hover:underline font-semibold"
+              style={{ color: i === breadcrumb.length - 1 ? C2.red : C2.blue }}
+            >
+              {n.name}
+            </button>
+            <span className="text-[9px] px-1 rounded text-white" style={{ background: LAYER_TONE[i] ?? C2.outline }}>
+              {LAYER_LABEL[i] ?? `Lv${i + 1}`}
+            </span>
+          </span>
+        ))}
+        {path.length > 0 && (
+          <button
+            onClick={() => setPath([])}
+            className="ml-auto text-[10px]"
+            style={{ color: C2.outline }}
+          >
+            ↺ 回頂層
+          </button>
+        )}
       </div>
 
-      {/* 4 層說明 */}
-      <div className="mt-3 pt-2 border-t flex flex-wrap items-center gap-x-3 gap-y-1 text-[9px]"
+      {/* 當前節點 + 子節點（只展開一層） */}
+      <div className="rounded p-2.5 mb-2" style={{ background: "#fff", border: `1px solid ${C2.border}` }}>
+        <div className="flex items-baseline justify-between">
+          <span className="font-bold text-sm" style={{ color: LAYER_TONE[depth] ?? C2.text }}>
+            ● {current.name}
+          </span>
+          <span className="font-mono text-xs font-bold" style={{ color: C2.textSub }}>
+            {current.pct}%
+          </span>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        {(current.children ?? []).map((c) => {
+          const drillable = !!c.children && c.children.length > 0;
+          return (
+            <button
+              key={c.name}
+              onClick={() => drillable && setPath([...path, c.name])}
+              disabled={!drillable}
+              className="w-full rounded text-left transition-all"
+              style={{
+                background: "#fff",
+                border: `1px solid ${drillable ? C2.border : C2.border}`,
+                padding: "8px 10px",
+                cursor: drillable ? "pointer" : "default",
+              }}
+            >
+              <div className="flex items-center gap-2">
+                {c.metalType && (
+                  <span className="text-[9px] px-1 rounded font-mono shrink-0"
+                        style={{ background: `${metalColor(c.metalType)}20`, color: metalColor(c.metalType) }}>
+                    {c.metalType}
+                  </span>
+                )}
+                <span className="font-semibold text-xs" style={{ color: C2.text }}>{c.name}</span>
+                <div className="flex-1 flex items-center gap-2 ml-1">
+                  <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: C2.surfaceDim }}>
+                    <div className="h-full rounded-full" style={{
+                      width: `${Math.min(c.pct, 100)}%`,
+                      background: LAYER_TONE[Math.min(depth + 1, LAYER_TONE.length - 1)],
+                      opacity: 0.85,
+                    }} />
+                  </div>
+                  <span className="font-mono font-bold text-xs w-10 text-right" style={{ color: LAYER_TONE[Math.min(depth + 1, LAYER_TONE.length - 1)] }}>
+                    {c.pct}%
+                  </span>
+                </div>
+                {drillable && <span className="shrink-0 text-base" style={{ color: C2.outline }}>›</span>}
+                {!drillable && <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded" style={{ color: C2.outline, background: C2.surfaceDim }}>leaf</span>}
+              </div>
+            </button>
+          );
+        })}
+        {(!current.children || current.children.length === 0) && (
+          <div className="text-[10px] text-center py-2" style={{ color: C2.outline }}>
+            已到最末層（{LAYER_LABEL[depth]}）— 無法再下鑽
+          </div>
+        )}
+      </div>
+
+      {/* 層級色說明 */}
+      <div className="mt-3 pt-2 border-t flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[9px]"
            style={{ borderColor: C2.border, color: C2.textSub }}>
         <span className="font-bold uppercase tracking-widest">層級：</span>
-        <span><span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: C2.primary }} />① Product 整機</span>
-        <span><span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: C2.blue }} />② Module 模組</span>
-        <span><span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: "#7a4fbf" }} />③ Component 零件</span>
-        <span><span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: "#d97706" }} />④ Commodity 原料</span>
+        {LAYER_LABEL.map((l, i) => (
+          <span key={l} className="inline-flex items-center gap-1">
+            <span className="inline-block w-2 h-2 rounded-full" style={{ background: LAYER_TONE[i] }} />
+            {l}
+          </span>
+        ))}
       </div>
     </div>
-  );
-}
-
-function TreeNode({ node, depth, prefix, isLast }: { node: CostNode; depth: number; prefix: string; isLast: boolean }) {
-  const COLORS = ["#005245", "#005cba", "#7a4fbf", "#d97706"];
-  const tone = COLORS[Math.min(depth, COLORS.length - 1)];
-  const branch = depth === 0 ? "" : (isLast ? "└── " : "├── ");
-  const nextPrefix = depth === 0 ? "" : prefix + (isLast ? "    " : "│   ");
-  const isLeaf = !node.children || node.children.length === 0;
-  return (
-    <>
-      <div className="whitespace-pre flex items-baseline">
-        <span style={{ color: "#bec9c4" }}>{prefix}{branch}</span>
-        {node.metalType && (
-          <span className="text-[8px] px-1 mr-1 rounded font-mono"
-                style={{ background: `${metalColor(node.metalType)}20`, color: metalColor(node.metalType) }}>
-            {node.metalType}
-          </span>
-        )}
-        <span className={depth <= 1 ? "font-bold" : "font-semibold"} style={{ color: depth === 0 ? "#1c1b1b" : tone }}>
-          {node.name}
-        </span>
-        <span className="ml-1.5 font-mono" style={{ color: isLeaf ? "#ba1a1a" : "#1c1b1b", fontWeight: isLeaf ? 700 : 500 }}>
-          {node.pct}%
-        </span>
-      </div>
-      {node.children?.map((c, i, arr) => (
-        <TreeNode key={c.name} node={c} depth={depth + 1} prefix={nextPrefix} isLast={i === arr.length - 1} />
-      ))}
-    </>
   );
 }
 

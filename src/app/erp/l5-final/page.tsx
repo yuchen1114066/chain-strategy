@@ -35,15 +35,19 @@ const FONT = "'Noto Sans TC', 'Sora', system-ui, sans-serif";
 const FONT_HEAD = "'Sora', 'Noto Sans TC', system-ui, sans-serif";
 const FONT_MONO = "'IBM Plex Mono', ui-monospace, Menlo, monospace";
 
-// ─── Pipeline stages ───
+// ─── Pipeline stages（最終版 · 11 階段） ───
 const STAGES = [
-  { i: "01", k: "Commodity\nIntelligence",  zh: "商品情報"     },
-  { i: "02", k: "Cost\nBreakdown",          zh: "成本拆解"     },
-  { i: "03", k: "Impact\nExplosion",        zh: "影響爆炸"     },
-  { i: "04", k: "Profit\nSimulation",       zh: "獲利模擬"     },
-  { i: "05", k: "Recovery\nOptimization",   zh: "回收最佳化"   },
-  { i: "06", k: "Supplier\nValidation",     zh: "供應商驗證"   },
-  { i: "07", k: "Action\nRecommendation",   zh: "決策建議"     },
+  { i: "01", k: "Commodity Radar",        zh: "商品雷達"     },
+  { i: "02", k: "Market Benchmark",       zh: "市場對標"     },
+  { i: "03", k: "Product Exposure",       zh: "產品曝險"     },
+  { i: "04", k: "Cost Explosion Tree",    zh: "成本爆炸樹"   },
+  { i: "05", k: "Impact Explosion Tree",  zh: "影響爆炸樹"   },
+  { i: "06", k: "Supplier Exposure",      zh: "供應商曝險"   },
+  { i: "07", k: "Price Validation",       zh: "漲價合理性"   },
+  { i: "08", k: "Profit Waterfall",       zh: "毛利瀑布"     },
+  { i: "09", k: "AI Recovery",            zh: "AI 救援"       },
+  { i: "10", k: "Buy Signal",             zh: "買賣訊號"     },
+  { i: "11", k: "Executive Brief",        zh: "高層摘要"     },
 ];
 
 // ─── Commodity strip ───
@@ -245,150 +249,53 @@ export default function L5FinalPage() {
         {/* AI Executive Brief — 五行重點，CEO 一分鐘看完 */}
         <ExecutiveBrief />
 
-        {/* Pipeline indicator — 7 stages */}
+        {/* Pipeline indicator — 11 stages */}
         <Section>
           <PipelineIndicator />
         </Section>
 
-        {/* ① Commodity Intelligence */}
-        <Stage badge="01" zh="商品情報" en="Commodity Intelligence" desc="現在原料市場發生什麼" />
+        {/* 01 Commodity Radar */}
+        <Stage badge="01" zh="商品雷達" en="Commodity Radar" desc="5 大原料即時行情 — 一眼看市場" />
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           {METRICS.map((m) => <MetricCard key={m.name} m={m} />)}
         </div>
 
-        {/* Buy Signal — 該不該買，一眼看到 */}
-        <BuySignal />
+        {/* 02 Market Benchmark */}
+        <Stage badge="02" zh="市場對標" en="Market Benchmark" desc="現價 vs 2021 基期 / 6 月均值 / 同業均值 — 看相對位置" />
+        <MarketBenchmark />
 
-        {/* ② Cost Breakdown — Profit Cascade */}
-        <Stage badge="02" zh="成本拆解 · 獲利瀑布" en="Cost Breakdown · Profit Cascade" desc="CEO 只想知道一件事：AI 介入後，這一季最後還賠多少。" />
-        <Card>
-          <div className="flex items-center gap-3 mb-4 flex-wrap">
-            <span style={{
-              fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
-              color: "#fff", background: BR.greenInk, padding: "4px 9px", borderRadius: 5,
-            }}>EXECUTIVE KPI</span>
-            <span style={{ fontSize: 12, color: BR.inkSoft }}>四步公式：營收影響 − 毛利影響 + AI 可救回 = 最終淨衝擊</span>
-          </div>
-          <div className="flex items-stretch gap-2 flex-wrap">
-            {CASCADE.map((c, i) => c.op ? (
-              <div key={i} className="flex items-center" style={{ fontFamily: FONT_MONO, fontSize: 22, fontWeight: 700, color: BR.inkFaint }}>
-                {c.op}
-              </div>
-            ) : (
-              <div
-                key={i}
-                className="flex-1 min-w-[170px] rounded-[11px]"
-                style={{
-                  background: c.final ? BR.greenInk : "#fbfcfa",
-                  border: `1px solid ${c.final ? BR.greenInk : BR.border}`,
-                  padding: "14px 16px",
-                  color: c.final ? "#fff" : undefined,
-                }}
-              >
-                <div style={{ fontFamily: FONT_MONO, fontSize: 10.5, color: c.final ? "#c7d2b8" : BR.inkFaint, marginBottom: 9 }}>
-                  {c.label}
-                </div>
-                <div style={{
-                  fontFamily: FONT_MONO,
-                  fontSize: c.final ? 28 : 24,
-                  fontWeight: 700,
-                  letterSpacing: "-0.02em",
-                  lineHeight: 1,
-                  color: c.final ? "#ff8a7a" : c.tone,
-                }}>
-                  {c.value}
-                </div>
-                <div style={{ fontSize: 10.5, color: c.final ? "#9aa78d" : BR.inkSoft, marginTop: 9, lineHeight: 1.4 }}>
-                  {c.desc}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
+        {/* 03 Product Exposure */}
+        <Stage badge="03" zh="產品曝險" en="Product Exposure" desc="哪些產品被原料波動波及最深 — 點切換產品" />
+        <ProductExposureCard activeProduct={activeProduct} onSelect={(k) => { setActiveProduct(k); setSelectedNode(null); }} />
 
-        {/* Profit Waterfall — 誰殺掉毛利？一眼看出 */}
+        {/* 04 Cost Explosion Tree (drill-down, 一次一層) */}
+        <Stage badge="04" zh="成本爆炸樹" en="Cost Explosion Tree" desc="點選下鑽：橢圓機 → Drive Assy → Motor → 銅 — 不一次塞滿" />
+        <CostExplosionTreeL5 product={product} />
+
+        {/* 05 Impact Explosion Tree */}
+        <Stage badge="05" zh="影響爆炸樹" en="Impact Explosion Tree" desc="原料 → 供應商 → 料件 → 零件 → 整機 → 客戶 → 毛利 → 損失" />
+        <ImpactExplosionTreeL5 />
+
+        {/* 06 Supplier Exposure */}
+        <Stage badge="06" zh="供應商曝險" en="Supplier Exposure" desc="CEO 最後一定問：是哪一家供應商？" />
+        <SupplierExposureCard />
+
+        {/* 07 Price Validation */}
+        <Stage badge="07" zh="漲價合理性 · Price Validation" en="Supplier Price Validation" desc="供應商說 vs AI 合理值 — 立刻揭露議價空間" />
+        <PriceValidationCard />
+
+        {/* 08 Profit Waterfall */}
+        <Stage badge="08" zh="毛利瀑布 · Profit Waterfall" en="Profit Waterfall" desc="誰殺掉毛利？一眼看出 — 加上獲利瀑布 KPI" />
+        <ProfitCascadeCard />
         <ProfitWaterfall />
 
-        {/* ③ Impact Explosion — Product Cost Digital Twin */}
-        <Stage badge="03" zh="影響爆炸 · 產品成本數位分身" en="Impact Explosion · Product Cost Digital Twin" desc="點任一節點 → 下鑽到原料層，紅色為熱點路徑（銅 +5% 受影響）" />
-        <Card>
-          <div className="flex items-center gap-3 flex-wrap mb-4">
-            <div style={{
-              width: 30, height: 30, borderRadius: 8, background: BR.greenSoft,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <span style={{ color: BR.greenDeep, fontWeight: 700 }}>◈</span>
-            </div>
-            <div>
-              <h3 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 700 }}>BOM 成本爆炸樹</h3>
-              <span style={{ fontSize: 11, color: BR.inkSoft }}>產品成本數位分身 · 情境 銅 +5%</span>
-            </div>
-            <div className="flex-1" />
-            <Pill text="Cost Explosion Engine · 銅 +5%" tone="green" />
-            <Pill text="L4 EXECUTIVE" tone="ink" />
-          </div>
+        {/* 09 AI Recovery — 回收 + Copilot 一站 */}
+        <Stage badge="09" zh="AI 救援 · AI Recovery" en="AI Recovery" desc="回收中心 + AI Copilot 三步自主決策" />
+        <RecoveryOptimizationCard />
+        <AICopilotBanner generated={generated} generate={generate} executeAll={executeAll} />
 
-          {/* Product tabs */}
-          <div className="flex gap-2 flex-wrap mb-4">
-            {PRODUCTS.map((p) => (
-              <button
-                key={p.key}
-                onClick={() => { setActiveProduct(p.key); setSelectedNode(null); }}
-                className="flex items-center gap-2.5 px-3.5 py-2 rounded-[10px] transition-colors"
-                style={{
-                  background: activeProduct === p.key ? BR.greenSoft : BR.card,
-                  border: `1px solid ${activeProduct === p.key ? BR.green : BR.borderHi}`,
-                }}
-              >
-                <span style={{ fontSize: 13, fontWeight: 700 }}>{p.label}</span>
-                <span style={{ fontFamily: FONT_MONO, fontSize: 11, fontWeight: 700, color: p.neg ? BR.red : BR.greenDeep }}>
-                  {p.tag}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          <div className="grid lg:grid-cols-[1.35fr,1fr] gap-5">
-            {/* Tree */}
-            <div className="rounded-[12px] overflow-hidden" style={{ border: `1px solid ${BR.border}` }}>
-              <div className="flex justify-between px-4 py-3" style={{
-                background: "#fbfcfa", borderBottom: `1px solid ${BR.border}`,
-                fontFamily: FONT_MONO, fontSize: 10, letterSpacing: "0.06em", color: BR.inkFaint,
-              }}>
-                <span>BOM 成本爆炸樹</span><span>佔總成本</span>
-              </div>
-              <div className="py-2.5 px-2 max-h-[480px] overflow-y-auto">
-                {flat.filter((n) => isVisible(n, flat, openMap)).map((n) => (
-                  <TreeRow
-                    key={n.id}
-                    n={n}
-                    open={openMap[n.id] ?? false}
-                    selected={selectedNode === n.id}
-                    onClick={() => {
-                      setSelectedNode(n.id);
-                      if (n.hasChildren) setOpenMap((m) => ({ ...m, [n.id]: !(m[n.id] ?? false) }));
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Detail */}
-            <div className="flex flex-col gap-3.5">
-              <DetailCard
-                title={selected?.name ?? `${product.label} ${product.en}`}
-                meta={selected ? selected.cost : `毛利 ${product.margin}`}
-                sub={selected ? `佔整機成本 ${selected.pct}%` : `總成本 ${product.total} · 毛利率 ${product.margin}`}
-              />
-              <RatioCard product={product} selected={selected} />
-              <SourceCard mat={selected?.mat ?? "none"} />
-              <AINote text={selectedAiNote ?? product.aiNote} />
-            </div>
-          </div>
-        </Card>
-
-        {/* ④ Profit Simulation — 4-step AI */}
-        <Stage badge="04" zh="獲利模擬 · AI 四步分析" en="Profit Simulation · 4-step AI" desc="Current → Why → Prediction → Action（銅 LME Copper）" />
+        {/* 10 Buy Signal — 該不該買 + AI 四步分析支撐 */}
+        <Stage badge="10" zh="買賣訊號 · Buy Signal" en="Buy Signal" desc="不只看價格 — 直接告訴你動作（含 AI 四步分析支撐）" />
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {STEPS.map((s) => (
             <Card key={s.k} style={{ borderTop: `3px solid ${s.c}` }}>
@@ -406,307 +313,15 @@ export default function L5FinalPage() {
             </Card>
           ))}
         </div>
+        <BuySignal />
 
-        {/* ⑤ Recovery Optimization */}
-        <Stage badge="05" zh="回收最佳化 · 回收中心" en="Recovery Optimization · Recovery Center" desc="哪些零件最該救、AI 判斷可救回多少" />
-        <Card>
-          <div className="flex items-center gap-3 mb-4 flex-wrap">
-            <h3 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 700 }}>Commodity Cost Recovery Center</h3>
-            <div className="flex-1" />
-            <Pill text="L4 EXECUTIVE" tone="ink" />
-          </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-px rounded-[12px] overflow-hidden mb-5"
-               style={{ background: BR.border, border: `1px solid ${BR.border}` }}>
-            <RcStat l="受影響零件數" v="4 項" />
-            <RcStat l="庫存耗減量"   v="0.95 MT" />
-            <RcStat l="±5% 成本衝擊" v="±NT$ 205,822" tone="warn" />
-            <RcStat l="獲利影響"      v="−NT$ 205,822" sub="毛利 18.2% → 18.1%" tone="loss" />
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px]" style={{ borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ borderBottom: `1px solid ${BR.border}` }}>
-                  {["#","零件 / 用料編碼","含量占比","庫存狀態","月用量","±5% 衝擊"].map((h, i) => (
-                    <th key={h} style={{
-                      fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, letterSpacing: "0.04em",
-                      color: BR.inkFaint, textAlign: i >= 4 ? "right" : "left", padding: "0 6px 11px",
-                    }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {RECOVERY.map((r) => (
-                  <tr key={r.code} style={{ borderBottom: `1px solid #f3f5ef` }}>
-                    <td style={{ padding: "14px 6px" }}>
-                      <span style={{
-                        width: 24, height: 24, borderRadius: "50%", background: "#f3f5ef",
-                        display: "inline-flex", alignItems: "center", justifyContent: "center",
-                        fontFamily: FONT_MONO, fontSize: 11, fontWeight: 700, color: BR.inkSoft,
-                      }}>{r.rk}</span>
-                    </td>
-                    <td style={{ padding: "14px 6px" }}>
-                      <div style={{ fontWeight: 700, fontSize: 13 }}>{r.code}</div>
-                      <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint, marginTop: 1 }}>{r.model}</div>
-                    </td>
-                    <td style={{ padding: "14px 6px", fontFamily: FONT_MONO, fontSize: 13 }}>{r.pct}%</td>
-                    <td style={{ padding: "14px 6px" }}>
-                      <span style={{
-                        fontFamily: FONT_MONO, fontSize: 10.5, fontWeight: 600,
-                        padding: "3px 8px", borderRadius: 6, display: "inline-flex", alignItems: "center", gap: 4,
-                        background: r.riskTone === BR.red ? BR.redSoft : BR.amberSoft, color: r.riskTone,
-                      }}>
-                        <span style={{ width: 5, height: 5, borderRadius: "50%", background: r.riskTone }} />
-                        {r.days} 天
-                      </span>
-                    </td>
-                    <td style={{ padding: "14px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 600 }}>
-                      {r.monthly.toLocaleString()}
-                    </td>
-                    <td style={{ padding: "14px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.red }}>
-                      +NT$ {r.impactNTD.toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-
-        {/* ⑥ Supplier Validation — 漲價合理性 */}
-        <Stage badge="06" zh="供應商驗證 · 漲價合理性 (Supplier Price Validation)" en="Supplier Price Validation" desc="供應商說 vs AI 合理值 — 立刻揭露議價空間" />
-        <Card>
-          <div className="flex items-center gap-3 mb-4 flex-wrap">
-            <h3 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 700 }}>
-              漲價合理性 · <span style={{ color: BR.purple }}>Supplier Price Validation</span>
-            </h3>
-            <Pill text="L5 最強功能之一" tone="purple" />
-            <div className="flex-1" />
-            <Pill text={`已驗證 ${RECOVERY.length} 項`} tone="green" />
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px]" style={{ borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ borderBottom: `1px solid ${BR.border}` }}>
-                  {["料號","用於","供應商漲價","AI 合理值","差距","議價空間 (估)","建議動作"].map((h, i) => (
-                    <th key={h} style={{
-                      fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, letterSpacing: "0.04em",
-                      color: BR.inkFaint, textAlign: i >= 2 && i <= 5 ? "right" : "left", padding: "0 6px 11px",
-                    }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {RECOVERY.map((r) => {
-                  const gap = r.supplierClaim - r.aiFair;
-                  const roomNTD = Math.round((r.impactNTD * gap) / 5);
-                  const action = gap >= 3 ? { label: "退回 + 重新議價", tone: BR.red }
-                               : gap >= 1 ? { label: "壓 AI 合理值",     tone: BR.amber }
-                                          : { label: "可接受",             tone: BR.greenDeep };
-                  return (
-                    <tr key={r.code} style={{ borderBottom: `1px solid #f3f5ef` }}>
-                      <td style={{ padding: "14px 6px", fontWeight: 700, fontFamily: FONT_MONO }}>{r.code}</td>
-                      <td style={{ padding: "14px 6px", fontSize: 11.5, color: BR.inkSoft }}>{r.model}</td>
-                      <td style={{ padding: "14px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.red }}>
-                        +{r.supplierClaim.toFixed(1)}%
-                      </td>
-                      <td style={{ padding: "14px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenDeep }}>
-                        +{r.aiFair.toFixed(1)}%
-                      </td>
-                      <td style={{ padding: "14px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 800, color: BR.purple }}>
-                        −{gap.toFixed(1)}%
-                      </td>
-                      <td style={{ padding: "14px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.purple }}>
-                        NT$ {roomNTD.toLocaleString()}
-                      </td>
-                      <td style={{ padding: "14px 6px" }}>
-                        <span style={{
-                          fontSize: 11, fontWeight: 700, color: action.tone,
-                          padding: "4px 9px", borderRadius: 6, background: `${action.tone}15`,
-                        }}>{action.label}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr style={{ background: BR.greenSoft }}>
-                  <td colSpan={5} style={{ padding: "14px 6px", fontWeight: 700, color: BR.greenInk }}>
-                    合計議價空間
-                  </td>
-                  <td style={{
-                    padding: "14px 6px", textAlign: "right",
-                    fontFamily: FONT_MONO, fontWeight: 800, fontSize: 16, color: BR.purple,
-                  }}>
-                    NT$ {RECOVERY.reduce((s, r) => s + Math.round((r.impactNTD * (r.supplierClaim - r.aiFair)) / 5), 0).toLocaleString()}
-                  </td>
-                  <td />
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-          <div className="mt-4 rounded-[10px] p-3.5 text-xs leading-relaxed"
-               style={{ background: BR.greenSoft, border: `1px solid ${BR.greenLine}`, color: "#3c4a2e" }}>
-            <b style={{ color: BR.greenInk }}>✦ AI 觀察</b> · 供應商平均喊漲
-            <b className="font-mono" style={{ color: BR.red }}> +5.9%</b>，但依 LME 銅實際漲幅 + 此料銅佔比反推，AI 認為合理
-            <b className="font-mono" style={{ color: BR.greenDeep }}> +2.9%</b>。
-            <b className="font-mono" style={{ color: BR.purple }}> 議價空間 NT$ {RECOVERY.reduce((s, r) => s + Math.round((r.impactNTD * (r.supplierClaim - r.aiFair)) / 5), 0).toLocaleString()}</b>
-            ，建議優先退回 FB64-MOT（差距 3.7%）。
-          </div>
-        </Card>
-
-        {/* ⑦ Action Recommendation — AI Copilot dark banner */}
-        <Stage badge="07" zh="決策建議 · AI Copilot" en="Action Recommendation · AI Copilot" desc="自主決策代理：預測 → 影響 → 建議 → 執行" />
-        <div
-          className="rounded-[16px] relative overflow-hidden"
-          style={{
-            background: BR.greenInk, color: "#fff", padding: "26px 30px",
-          }}
-        >
-          <div style={{
-            position: "absolute", inset: 0,
-            backgroundImage: `linear-gradient(rgba(118,185,0,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(118,185,0,.07) 1px, transparent 1px)`,
-            backgroundSize: "30px 30px", pointerEvents: "none",
-          }} />
-          <div style={{
-            position: "absolute", right: -60, top: -60, width: 300, height: 300,
-            background: "radial-gradient(circle, rgba(118,185,0,.22), transparent 65%)", pointerEvents: "none",
-          }} />
-
-          <div className="relative z-10 flex items-start justify-between mb-5 flex-wrap gap-3">
-            <h3 className="flex items-center gap-2.5" style={{ fontFamily: FONT_HEAD, fontSize: 21, fontWeight: 700 }}>
-              <span style={{
-                width: 30, height: 30, borderRadius: 8,
-                background: "rgba(118,185,0,.18)",
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                color: BR.green,
-              }}>✦</span>
-              AI Copilot
-              <span style={{
-                fontSize: 10.5, fontWeight: 500, color: "#9aa78d",
-                background: "rgba(118,185,0,.12)", padding: "4px 10px", borderRadius: 20, marginLeft: 4,
-              }}>
-                由 Rule-Based 升級為自主決策代理
-              </span>
-            </h3>
-            <div className="text-right">
-              <div style={{ fontFamily: FONT_MONO, fontSize: 10, letterSpacing: "0.1em", color: "#8a9580" }}>最佳組合 A+B · 總可救回</div>
-              <div style={{ fontFamily: FONT_MONO, fontSize: 30, fontWeight: 700, color: BR.green, letterSpacing: "-0.01em" }}>
-                NT$ 127,000
-              </div>
-            </div>
-          </div>
-
-          {/* 4-flow */}
-          <div className="relative z-10 grid lg:grid-cols-[1fr,auto,1fr,auto,2fr] items-stretch gap-2.5 mb-5">
-            <CopilotStep no="01" label="預測 PREDICT" body={<>銅價未來 <b>60 天</b>反彈，機率 <b>92%</b>，預估突破 $10,600/MT。</>} />
-            <CopilotArrow />
-            <CopilotStep no="02" label="影響 IMPACT" body={<>波及 <b>FB64-WIRE</b> / <b>FB64-MOT</b>，預估毛利下降 <b style={{ color: "#ff8a7a" }}>−205 萬</b>。</>} />
-            <CopilotArrow />
-            <CopilotStep no="03" label="建議 RECOMMEND · 3 方案">
-              <div className="grid grid-cols-3 gap-2 mb-2.5">
-                {PLANS.map((p) => (
-                  <div key={p.rk} style={{
-                    background: p.best ? "rgba(118,185,0,.10)" : "rgba(0,0,0,.18)",
-                    border: `1px solid ${p.best ? "rgba(118,185,0,.5)" : "rgba(255,255,255,.1)"}`,
-                    borderRadius: 9, padding: 10,
-                  }}>
-                    <div style={{ fontSize: 11.5, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", gap: 6 }}>
-                      方案 {p.rk}
-                      {p.best && <span style={{ fontFamily: FONT_MONO, fontSize: 8, background: BR.green, color: "#fff", padding: "1px 5px", borderRadius: 4 }}>最佳</span>}
-                    </div>
-                    <div style={{ fontSize: 10.5, color: "#aebba0", margin: "5px 0 7px" }}>{p.title}</div>
-                    <div style={{ fontFamily: FONT_MONO, fontSize: 14, fontWeight: 700, color: BR.green }}>+{p.save} 萬</div>
-                  </div>
-                ))}
-              </div>
-              <div style={{
-                fontSize: 12, color: "#cdd6c2", background: "rgba(118,185,0,.08)",
-                borderRadius: 8, padding: "9px 12px",
-              }}>
-                ✦ AI 建議組合 <b style={{ color: BR.green }}>A + B</b> · 總回收 <b style={{ color: BR.green }}>127 萬</b> · 執行成功率 <b style={{ color: BR.green }}>87%</b>
-              </div>
-            </CopilotStep>
-          </div>
-
-          {/* Execute */}
-          <div className="relative z-10 pt-4" style={{ borderTop: `1px solid rgba(255,255,255,.1)` }}>
-            <div className="flex items-center gap-3 mb-3 flex-wrap">
-              <div className="flex items-center gap-2" style={{
-                fontFamily: FONT_MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: BR.green,
-              }}>
-                <span style={{
-                  width: 20, height: 20, borderRadius: 6,
-                  background: "rgba(118,185,0,.18)",
-                  display: "inline-flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 10, color: BR.green,
-                }}>04</span>
-                執行 EXECUTE
-              </div>
-              <span style={{ fontSize: 11, color: "#9aa78d" }}>一鍵直接生成下游單據，無需人工重打</span>
-            </div>
-            <div className="flex gap-2.5 flex-wrap items-center">
-              {DOCUMENTS.map((d) => {
-                const done = generated.includes(d.no);
-                return (
-                  <button
-                    key={d.no}
-                    onClick={() => generate(d.kind, d.no)}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 8,
-                      background: done ? "rgba(118,185,0,.16)" : "rgba(255,255,255,.06)",
-                      color: done ? "#fff" : "#e7ede0",
-                      border: `1px solid ${done ? BR.green : "rgba(255,255,255,.16)"}`,
-                      borderRadius: 9, padding: "11px 16px", fontSize: 12.5, fontWeight: 600,
-                      cursor: "pointer", transition: "all .15s",
-                    }}
-                  >
-                    {done ? "✓" : "＋"} 產生 {d.kind}
-                  </button>
-                );
-              })}
-              <button
-                onClick={executeAll}
-                style={{
-                  background: BR.green, color: "#fff", border: "none", borderRadius: 11,
-                  padding: "13px 24px", fontSize: 14, fontWeight: 700, cursor: "pointer",
-                  display: "flex", alignItems: "center", gap: 9,
-                  boxShadow: "0 8px 24px rgba(118,185,0,.35)",
-                }}
-              >
-                ⚡ 一鍵執行 A+B
-              </button>
-            </div>
-
-            {generated.length > 0 && (
-              <div className="mt-4 flex flex-col gap-2">
-                {generated.map((no) => {
-                  const d = DOCUMENTS.find((x) => x.no === no)!;
-                  return (
-                    <div key={no} style={{
-                      display: "flex", alignItems: "center", gap: 11,
-                      background: "rgba(255,255,255,.06)",
-                      border: `1px solid rgba(118,185,0,.3)`, borderLeft: `3px solid ${BR.green}`,
-                      borderRadius: 9, padding: "11px 14px",
-                    }}>
-                      <div style={{
-                        width: 30, height: 30, borderRadius: 7, background: "rgba(118,185,0,.18)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        color: BR.green, fontWeight: 700,
-                      }}>✓</div>
-                      <div className="flex-1">
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{d.kind} 已生成</div>
-                        <div style={{ fontFamily: FONT_MONO, fontSize: 10.5, color: "#9aa78d", marginTop: 2 }}>
-                          {no} · 由 AI Copilot 自動帶入 BOM 與供應商
-                        </div>
-                      </div>
-                      <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: BR.green }}>● 待簽核</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+        {/* 11 Executive Brief — 已置於頁面最上方（CEO 一分鐘看完） */}
+        <Stage badge="11" zh="高層摘要 · Executive Brief" en="Executive Brief" desc="✦ 整個管線的最終輸出 — 已置於頁面最上方供 CEO 一分鐘看完" />
+        <div className="rounded-[14px] p-4 text-xs"
+             style={{ background: BR.greenSoft, border: `1px dashed ${BR.greenLine}`, color: BR.greenInk }}>
+          上方 <b>AI Executive Brief</b> 五行重點，正是 STAGE 01–10 全管線運算後的最終輸出 ↑↑↑
         </div>
+
 
         <footer className="flex items-center gap-5 flex-wrap pt-4" style={{
           fontFamily: FONT_MONO, fontSize: 10.5, color: BR.inkFaint,
@@ -770,25 +385,22 @@ function PipelineIndicator() {
           fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
           color: "#fff", background: BR.greenInk, padding: "4px 9px", borderRadius: 5,
         }}>L5 FINAL PIPELINE</span>
-        <span style={{ fontSize: 12, color: BR.inkSoft }}>7 階段管線 — 從商品情報到自動產生 PO，全程 AI 主導</span>
+        <span style={{ fontSize: 12, color: BR.inkSoft }}>
+          11 階段管線 — Commodity Radar → Market Benchmark → Product Exposure → Cost / Impact Explosion → Supplier → Validation → Waterfall → Recovery → Buy Signal → Executive Brief
+        </span>
       </div>
-      <div className="flex items-stretch gap-1.5 flex-wrap">
-        {STAGES.map((s, i) => (
-          <div key={s.i} className="flex items-center gap-1.5" style={{ flex: "1 1 130px" }}>
-            <div className="flex-1 rounded-[10px]" style={{
-              background: BR.greenSoft, border: `1px solid ${BR.greenLine}`, padding: "10px 12px",
-            }}>
-              <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.greenDeep, letterSpacing: "0.08em" }}>
-                {s.i}
-              </div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: BR.greenInk, marginTop: 3, whiteSpace: "pre-line", lineHeight: 1.25 }}>
-                {s.k}
-              </div>
-              <div style={{ fontSize: 10.5, color: BR.greenDeep, marginTop: 2 }}>{s.zh}</div>
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-11 gap-1.5">
+        {STAGES.map((s) => (
+          <div key={s.i} className="rounded-[10px]" style={{
+            background: BR.greenSoft, border: `1px solid ${BR.greenLine}`, padding: "9px 10px",
+          }}>
+            <div style={{ fontFamily: FONT_MONO, fontSize: 9.5, fontWeight: 700, color: BR.greenDeep, letterSpacing: "0.08em" }}>
+              {s.i}
             </div>
-            {i < STAGES.length - 1 && (
-              <span style={{ color: BR.greenDeep, fontSize: 16, fontWeight: 700 }}>→</span>
-            )}
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: BR.greenInk, marginTop: 2, lineHeight: 1.25 }}>
+              {s.k}
+            </div>
+            <div style={{ fontSize: 10, color: BR.greenDeep, marginTop: 1 }}>{s.zh}</div>
           </div>
         ))}
       </div>
@@ -1446,5 +1058,783 @@ function ProfitWaterfall() {
         ))}
       </div>
     </Card>
+  );
+}
+
+// ============================================================
+// 02 Market Benchmark
+// ============================================================
+const BENCHMARK_ROWS = [
+  { metal: "銅",   curr: 9472,  base2021: 9143,   mean6m: 10258, industry: 9620, unit: "$/MT" },
+  { metal: "鋼",   curr: 1103,  base2021: 1234,   mean6m: 1156,  industry: 1180, unit: "$/MT" },
+  { metal: "鋁",   curr: 2604,  base2021: 2545,   mean6m: 2710,  industry: 2680, unit: "$/MT" },
+  { metal: "塑料", curr: 1393,  base2021: 1102,   mean6m: 1290,  industry: 1340, unit: "$/MT" },
+  { metal: "生鐵", curr: 26800, base2021: 22150,  mean6m: 25400, industry: 26100, unit: "$/MT" },
+];
+function MarketBenchmark() {
+  return (
+    <Card>
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <h3 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 700 }}>Market Benchmark · 市場對標</h3>
+        <span className="flex-1" />
+        <Pill text="vs 2021 基期 / 6 月均值 / 同業均值" tone="green" />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[680px]" style={{ borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${BR.border}` }}>
+              {["原料","現價","2021 基期","Δ 基期","6 月均值","Δ 均值","同業均值","相對位置"].map((h, i) => (
+                <th key={h} style={{
+                  fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, letterSpacing: "0.04em",
+                  color: BR.inkFaint, textAlign: i === 0 ? "left" : "right", padding: "0 8px 11px",
+                }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {BENCHMARK_ROWS.map((r) => {
+              const dB = ((r.curr - r.base2021) / r.base2021) * 100;
+              const dM = ((r.curr - r.mean6m) / r.mean6m) * 100;
+              const pos = r.curr < r.mean6m * 0.97 ? { label: "低於均值（買點）", tone: BR.green }
+                       : r.curr > r.mean6m * 1.03 ? { label: "高於均值（避買）", tone: BR.red }
+                                                  : { label: "均值附近",          tone: BR.amber };
+              return (
+                <tr key={r.metal} style={{ borderBottom: `1px solid #f3f5ef` }}>
+                  <td style={{ padding: "12px 8px", fontWeight: 700 }}>{r.metal}</td>
+                  <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700 }}>
+                    {r.curr.toLocaleString()}
+                  </td>
+                  <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, color: BR.inkSoft }}>
+                    {r.base2021.toLocaleString()}
+                  </td>
+                  <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: dB > 0 ? BR.red : BR.greenDeep }}>
+                    {dB > 0 ? "+" : ""}{dB.toFixed(1)}%
+                  </td>
+                  <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, color: BR.inkSoft }}>
+                    {r.mean6m.toLocaleString()}
+                  </td>
+                  <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: dM > 0 ? BR.red : BR.greenDeep }}>
+                    {dM > 0 ? "+" : ""}{dM.toFixed(1)}%
+                  </td>
+                  <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, color: BR.inkSoft }}>
+                    {r.industry.toLocaleString()}
+                  </td>
+                  <td style={{ padding: "12px 8px", textAlign: "right" }}>
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, color: pos.tone,
+                      padding: "3px 8px", borderRadius: 5, background: `${pos.tone}15`,
+                    }}>{pos.label}</span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+// ============================================================
+// 03 Product Exposure
+// ============================================================
+function ProductExposureCard({ activeProduct, onSelect }: { activeProduct: string; onSelect: (k: string) => void }) {
+  return (
+    <Card>
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <h3 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 700 }}>Product Exposure · 產品曝險排行</h3>
+        <span className="flex-1" />
+        <Pill text="點切換產品 → 影響後續所有階段" tone="green" />
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {PRODUCTS.map((p) => {
+          const active = activeProduct === p.key;
+          return (
+            <button
+              key={p.key}
+              onClick={() => onSelect(p.key)}
+              className="text-left rounded-[11px]"
+              style={{
+                background: active ? BR.greenSoft : BR.card,
+                border: `1.5px solid ${active ? BR.green : BR.borderHi}`,
+                padding: "14px 16px",
+                cursor: "pointer",
+              }}
+            >
+              <div className="flex items-baseline justify-between">
+                <span style={{ fontSize: 14, fontWeight: 700 }}>{p.label}</span>
+                <span style={{ fontFamily: FONT_MONO, fontSize: 12, fontWeight: 700, color: p.neg ? BR.red : BR.greenDeep }}>
+                  {p.tag}
+                </span>
+              </div>
+              <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint, marginTop: 3, letterSpacing: "0.05em" }}>
+                {p.en}
+              </div>
+              <div className="mt-3 flex items-baseline justify-between text-xs">
+                <span style={{ color: BR.inkSoft }}>毛利</span>
+                <span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.ink }}>{p.margin}</span>
+              </div>
+              <div className="flex items-baseline justify-between text-xs mt-1">
+                <span style={{ color: BR.inkSoft }}>總成本</span>
+                <span style={{ fontFamily: FONT_MONO, color: BR.inkSoft }}>{p.total}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+// ============================================================
+// 04 Cost Explosion Tree — 一次只展開一層（per附件二）
+// ============================================================
+function CostExplosionTreeL5({ product }: { product: Product }) {
+  const [path, setPath] = useState<string[]>([]);
+
+  let current: TreeN = { name: product.label, cost: product.total, pct: 100, children: product.tree };
+  const crumbs: TreeN[] = [current];
+  for (const seg of path) {
+    const next = current.children?.find((c) => c.name === seg);
+    if (!next) break;
+    current = next;
+    crumbs.push(next);
+  }
+
+  const LAYER_LABEL = ["Product 整機", "Module 模組", "Component 零件", "Commodity 原料"];
+  const LAYER_TONE  = [BR.greenInk, BR.green, BR.purple, BR.amber];
+
+  return (
+    <Card>
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
+        <h3 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 700 }}>Cost Explosion Tree</h3>
+        <span style={{ fontSize: 11, color: BR.inkSoft }}>點任一項 → 下鑽下一層（一次一層，不擠在一起）</span>
+        <span className="flex-1" />
+        {path.length > 0 && (
+          <button onClick={() => setPath([])} style={{
+            fontSize: 11, color: BR.greenDeep, background: BR.greenSoft,
+            border: `1px solid ${BR.greenLine}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer",
+          }}>
+            ↺ 回頂層
+          </button>
+        )}
+      </div>
+
+      {/* breadcrumb */}
+      <div className="flex flex-wrap items-baseline gap-1.5 mb-4 text-xs">
+        {crumbs.map((n, i) => (
+          <span key={i} className="flex items-baseline gap-1">
+            {i > 0 && <span style={{ color: BR.inkFaint }}>›</span>}
+            <button
+              onClick={() => setPath(path.slice(0, i))}
+              className="hover:underline font-semibold"
+              style={{ color: i === crumbs.length - 1 ? BR.red : BR.greenDeep }}
+            >
+              {n.name}
+            </button>
+            <span style={{
+              fontFamily: FONT_MONO, fontSize: 9, color: "#fff",
+              background: LAYER_TONE[i] ?? BR.inkFaint, padding: "2px 6px", borderRadius: 4,
+            }}>
+              {LAYER_LABEL[i] ?? `Lv${i + 1}`}
+            </span>
+          </span>
+        ))}
+      </div>
+
+      {/* current node header */}
+      <div className="rounded-[10px] p-3 mb-3" style={{
+        background: "#fbfcfa", border: `1px solid ${BR.border}`,
+      }}>
+        <div className="flex items-baseline justify-between">
+          <span style={{
+            fontFamily: FONT_HEAD, fontSize: 16, fontWeight: 700,
+            color: LAYER_TONE[crumbs.length - 1] ?? BR.ink,
+          }}>
+            ▎{current.name}
+          </span>
+          <span style={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 700, color: BR.inkSoft }}>
+            {current.cost}
+          </span>
+        </div>
+      </div>
+
+      {/* children list */}
+      <div className="space-y-2">
+        {(current.children ?? []).map((c) => {
+          const drillable = !!(c.children && c.children.length);
+          const tone = LAYER_TONE[Math.min(crumbs.length, LAYER_TONE.length - 1)];
+          return (
+            <button
+              key={c.name}
+              onClick={() => drillable && setPath([...path, c.name])}
+              disabled={!drillable}
+              className="w-full text-left rounded-[10px] transition-colors"
+              style={{
+                background: c.hot ? "#fff7f5" : "#fff",
+                border: `1px solid ${c.hot ? "#f3c4bd" : BR.border}`,
+                padding: "12px 14px",
+                cursor: drillable ? "pointer" : "default",
+              }}
+            >
+              <div className="flex items-center gap-3">
+                {c.mat === "cu" && <span style={{ fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: "#fdeeea", color: BR.red }}>Cu 銅</span>}
+                {c.mat === "fe" && <span style={{ fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: "#eef1f4", color: "#3a6ea5" }}>Fe 鋼</span>}
+                <span style={{ fontSize: 13, fontWeight: 700, color: BR.ink }}>{c.name}</span>
+                {c.hot && <span style={{ fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700, color: "#fff", background: BR.red, padding: "2px 6px", borderRadius: 4 }}>▲ 熱點</span>}
+                <span className="flex-1" />
+                <div style={{ width: 120, height: 6, borderRadius: 3, background: "#eef0ea", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${Math.min(c.pct, 100)}%`, background: c.hot ? BR.red : tone, opacity: 0.85 }} />
+                </div>
+                <span style={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 700, color: c.hot ? BR.red : tone, width: 44, textAlign: "right" }}>
+                  {c.pct}%
+                </span>
+                <span style={{ fontFamily: FONT_MONO, fontSize: 12, color: BR.inkSoft, width: 56, textAlign: "right" }}>
+                  {c.cost}
+                </span>
+                {drillable ? <span style={{ color: BR.inkFaint, fontSize: 16 }}>›</span>
+                           : <span style={{ fontSize: 9, color: BR.inkFaint, padding: "2px 6px", borderRadius: 4, background: "#f3f5ef" }}>leaf</span>}
+              </div>
+            </button>
+          );
+        })}
+        {(!current.children || current.children.length === 0) && (
+          <div className="text-center py-4" style={{ fontSize: 11, color: BR.inkFaint }}>
+            已到最末層（{LAYER_LABEL[crumbs.length - 1]}）— 無法再下鑽
+          </div>
+        )}
+      </div>
+
+      {/* layer legend */}
+      <div className="mt-4 pt-3 border-t flex flex-wrap items-center gap-x-3 gap-y-1"
+           style={{ borderColor: BR.border, fontSize: 10, color: BR.inkSoft }}>
+        <span style={{ fontWeight: 700 }}>層級：</span>
+        {LAYER_LABEL.map((l, i) => (
+          <span key={l} className="inline-flex items-center gap-1.5">
+            <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: LAYER_TONE[i] }} />
+            {l}
+          </span>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+// ============================================================
+// 05 Impact Explosion Tree — 原料 → 供應商 → 料件 → 零件 → 整機 → 客戶 → 毛利
+// ============================================================
+const IMPACT_SCENARIOS = [
+  { metal: "銅",   pct: 5, tone: BR.red,
+    supplier: "Supplier A · 漆包銅線",
+    parts:    "FB64-WIRE 電線組（+3.8%）",
+    component:"Motor 馬達（+2.25%）",
+    system:   "Drive Assy 傳動（+1.18%）",
+    product:  "橢圓機（+0.82%）",
+    customer: "客戶 A · 北美健身房連鎖",
+    marginBefore: 18.2, marginAfter: 17.4, lossMan: 320,
+  },
+  { metal: "鋼",   pct: 5, tone: BR.amber,
+    supplier: "Supplier D · 鋼板裁切",
+    parts:    "鋼板 CR-1.5T（+4.2%）",
+    component:"Frame Assy 車架（+3.4%）",
+    system:   "結構系統（+1.65%）",
+    product:  "橢圓機（+0.65%）",
+    customer: "客戶 B · 北美零售品牌",
+    marginBefore: 18.2, marginAfter: 17.55, lossMan: 250,
+  },
+  { metal: "鋁",   pct: 5, tone: "#3a6ea5",
+    supplier: "Supplier G · 鋁錠供料",
+    parts:    "鋁錠 6061-T6（+3.5%）",
+    component:"Flywheel 18kg（+2.1%）",
+    system:   "Drive Assy（+0.95%）",
+    product:  "飛輪車（+0.54%）",
+    customer: "客戶 C · 歐洲品牌",
+    marginBefore: 18.4, marginAfter: 17.9, lossMan: 120,
+  },
+];
+function ImpactExplosionTreeL5() {
+  const [scenarioIdx, setScenarioIdx] = useState(0);
+  const s = IMPACT_SCENARIOS[scenarioIdx];
+  const steps = [
+    { layer: "原料",   name: `${s.metal}價 +${s.pct}%`,        tone: s.tone,   bg: `${s.tone}18` },
+    { layer: "供應商", name: s.supplier,                       tone: BR.purple, bg: "#fdf4ff", dashed: true },
+    { layer: "料件",   name: s.parts,                          tone: BR.ink,   bg: "#fff" },
+    { layer: "零件",   name: s.component,                      tone: BR.ink,   bg: "#fff" },
+    { layer: "系統",   name: s.system,                         tone: BR.ink,   bg: "#fff" },
+    { layer: "整機",   name: s.product,                        tone: BR.ink,   bg: "#fff" },
+    { layer: "客戶",   name: s.customer,                       tone: BR.greenDeep, bg: "#eff6ff", dashed: true },
+  ];
+  return (
+    <Card>
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
+        <h3 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 700 }}>Impact Explosion Tree</h3>
+        <span style={{ fontSize: 11, color: BR.inkSoft }}>原料 → 供應商 → 料件 → 零件 → 系統 → 整機 → 客戶 → 毛利 → 損失</span>
+        <span className="flex-1" />
+        <div className="flex gap-1.5">
+          {IMPACT_SCENARIOS.map((sc, i) => (
+            <button
+              key={sc.metal}
+              onClick={() => setScenarioIdx(i)}
+              style={{
+                fontFamily: FONT_MONO, fontSize: 11, fontWeight: 700,
+                color: scenarioIdx === i ? "#fff" : BR.ink,
+                background: scenarioIdx === i ? sc.tone : "#fff",
+                border: `1px solid ${scenarioIdx === i ? sc.tone : BR.borderHi}`,
+                padding: "5px 10px", borderRadius: 6, cursor: "pointer",
+              }}
+            >
+              {sc.metal} +{sc.pct}%
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="font-mono text-sm">
+        {steps.map((st, i) => (
+          <div key={i}>
+            <div className="rounded-[8px] px-3 py-2.5 mb-1.5 flex items-baseline justify-between"
+                 style={{ background: st.bg, border: `1px ${st.dashed ? "dashed" : "solid"} ${st.tone}40` }}>
+              <span>
+                <span style={{
+                  fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: "#fff",
+                  background: st.tone, padding: "2px 8px", borderRadius: 4, marginRight: 8,
+                }}>
+                  {st.layer}
+                </span>
+                <span style={{ fontWeight: 700, color: BR.ink, fontFamily: FONT }}>{st.name}</span>
+              </span>
+            </div>
+            {i < steps.length - 1 && (
+              <div className="text-center" style={{ color: BR.inkFaint, fontSize: 14, lineHeight: 1, paddingLeft: 12 }}>↓</div>
+            )}
+          </div>
+        ))}
+
+        {/* margin + loss */}
+        <div className="text-center" style={{ color: BR.inkFaint, fontSize: 14, lineHeight: 1, paddingLeft: 12 }}>↓</div>
+        <div className="rounded-[8px] px-3 py-2.5 mb-1.5 flex items-baseline justify-between"
+             style={{ background: "#fff8e1", border: `1px solid #f59e0b` }}>
+          <span>
+            <span style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: "#fff",
+                           background: "#92400e", padding: "2px 8px", borderRadius: 4, marginRight: 8 }}>毛利率</span>
+            <span style={{ fontWeight: 700, color: "#92400e", fontFamily: FONT }}>
+              {s.marginBefore}% <span style={{ color: BR.red, margin: "0 4px" }}>↓</span>
+              <span style={{ color: BR.red }}>{s.marginAfter}%</span>
+            </span>
+          </span>
+        </div>
+        <div className="text-center" style={{ color: BR.inkFaint, fontSize: 14, lineHeight: 1, paddingLeft: 12 }}>↓</div>
+        <div className="rounded-[8px] px-3 py-3 flex items-baseline justify-between"
+             style={{ background: `${BR.red}15`, border: `1.5px solid ${BR.red}` }}>
+          <span style={{ fontFamily: FONT_HEAD, fontSize: 15, fontWeight: 700, color: BR.red }}>💸 損失</span>
+          <span style={{ fontFamily: FONT_MONO, fontSize: 18, fontWeight: 800, color: BR.red }}>−{s.lossMan} 萬</span>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ============================================================
+// 06 Supplier Exposure
+// ============================================================
+const SUPPLIER_EXPOSURE_L5 = [
+  { code: "S-A", name: "Supplier A · 漆包銅線",    metal: "銅",   amountMan: 120, products: ["橢圓機", "飛輪車"],   risk: "高" },
+  { code: "S-B", name: "Supplier B · 馬達線圈",    metal: "銅",   amountMan:  80, products: ["飛輪車"],             risk: "中" },
+  { code: "S-D", name: "Supplier D · 鋼板裁切",    metal: "鋼",   amountMan: 110, products: ["橢圓機", "重訓"],     risk: "高" },
+  { code: "S-G", name: "Supplier G · 鋁錠供料",    metal: "鋁",   amountMan:  60, products: ["飛輪車", "橢圓機"],   risk: "中" },
+  { code: "S-K", name: "Supplier K · 鑄鐵塊",      metal: "混鐵", amountMan:  55, products: ["重訓"],               risk: "高" },
+];
+function SupplierExposureCard() {
+  const total = SUPPLIER_EXPOSURE_L5.reduce((s, r) => s + r.amountMan, 0);
+  return (
+    <Card>
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <h3 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 700 }}>
+          Supplier Exposure · <span style={{ color: BR.purple }}>供應商曝險</span>
+        </h3>
+        <Pill text="CEO 最後一定問：是哪一家供應商？" tone="purple" />
+        <span className="flex-1" />
+        <Pill text={`總曝險 NT$ ${total} 萬`} tone="green" />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[660px]" style={{ borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${BR.border}` }}>
+              {["供應商","原料","影響產品","曝險金額","風險","Bar"].map((h, i) => (
+                <th key={h} style={{
+                  fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, letterSpacing: "0.04em",
+                  color: BR.inkFaint, textAlign: i === 3 ? "right" : "left", padding: "0 8px 11px",
+                }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {SUPPLIER_EXPOSURE_L5.map((r) => {
+              const riskTone = r.risk === "高" ? BR.red : r.risk === "中" ? BR.amber : BR.greenDeep;
+              return (
+                <tr key={r.code} style={{ borderBottom: `1px solid #f3f5ef` }}>
+                  <td style={{ padding: "12px 8px", fontWeight: 700, fontSize: 13 }}>{r.name}</td>
+                  <td style={{ padding: "12px 8px" }}>
+                    <span style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: "#f3f5ef", color: BR.inkSoft }}>{r.metal}</span>
+                  </td>
+                  <td style={{ padding: "12px 8px", fontSize: 12 }}>{r.products.join(" · ")}</td>
+                  <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 800, color: BR.purple }}>
+                    NT$ {r.amountMan} 萬
+                  </td>
+                  <td style={{ padding: "12px 8px" }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: riskTone, padding: "3px 8px", borderRadius: 5, background: `${riskTone}15` }}>
+                      ● {r.risk}
+                    </span>
+                  </td>
+                  <td style={{ padding: "12px 8px" }}>
+                    <div style={{ height: 6, width: 140, borderRadius: 3, background: "#eef0ea", overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${(r.amountMan / 120) * 100}%`, background: BR.purple, opacity: 0.85 }} />
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-4 rounded-[10px] p-3 text-xs" style={{ background: BR.greenSoft, border: `1px solid ${BR.greenLine}`, color: "#3c4a2e" }}>
+        <b style={{ color: BR.greenInk }}>立刻能變成 Supplier Intelligence</b> — 看單一供應商的歷史報價、議價空間、可替代性。
+      </div>
+    </Card>
+  );
+}
+
+// ============================================================
+// 07 Price Validation Card
+// ============================================================
+function PriceValidationCard() {
+  const totalRoom = RECOVERY.reduce((s, r) => s + Math.round((r.impactNTD * (r.supplierClaim - r.aiFair)) / 5), 0);
+  return (
+    <Card>
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <h3 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 700 }}>
+          漲價合理性 · <span style={{ color: BR.purple }}>Supplier Price Validation</span>
+        </h3>
+        <Pill text="L5 最強功能之一" tone="purple" />
+        <span className="flex-1" />
+        <Pill text={`已驗證 ${RECOVERY.length} 項`} tone="green" />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px]" style={{ borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${BR.border}` }}>
+              {["料號","用於","供應商漲價","AI 合理值","差距","議價空間 (估)","建議動作"].map((h, i) => (
+                <th key={h} style={{
+                  fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, letterSpacing: "0.04em",
+                  color: BR.inkFaint, textAlign: i >= 2 && i <= 5 ? "right" : "left", padding: "0 6px 11px",
+                }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {RECOVERY.map((r) => {
+              const gap = r.supplierClaim - r.aiFair;
+              const roomNTD = Math.round((r.impactNTD * gap) / 5);
+              const action = gap >= 3 ? { label: "退回 + 重新議價", tone: BR.red }
+                           : gap >= 1 ? { label: "壓 AI 合理值",     tone: BR.amber }
+                                      : { label: "可接受",             tone: BR.greenDeep };
+              return (
+                <tr key={r.code} style={{ borderBottom: `1px solid #f3f5ef` }}>
+                  <td style={{ padding: "12px 6px", fontWeight: 700, fontFamily: FONT_MONO }}>{r.code}</td>
+                  <td style={{ padding: "12px 6px", fontSize: 11.5, color: BR.inkSoft }}>{r.model}</td>
+                  <td style={{ padding: "12px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.red }}>
+                    +{r.supplierClaim.toFixed(1)}%
+                  </td>
+                  <td style={{ padding: "12px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenDeep }}>
+                    +{r.aiFair.toFixed(1)}%
+                  </td>
+                  <td style={{ padding: "12px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 800, color: BR.purple }}>
+                    −{gap.toFixed(1)}%
+                  </td>
+                  <td style={{ padding: "12px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.purple }}>
+                    NT$ {roomNTD.toLocaleString()}
+                  </td>
+                  <td style={{ padding: "12px 6px" }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: action.tone, padding: "4px 9px", borderRadius: 6, background: `${action.tone}15` }}>
+                      {action.label}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr style={{ background: BR.greenSoft }}>
+              <td colSpan={5} style={{ padding: "12px 6px", fontWeight: 700, color: BR.greenInk }}>合計議價空間</td>
+              <td style={{ padding: "12px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 800, fontSize: 16, color: BR.purple }}>
+                NT$ {totalRoom.toLocaleString()}
+              </td>
+              <td />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+// ============================================================
+// 08 Profit Cascade Card (KPI four-step)
+// ============================================================
+function ProfitCascadeCard() {
+  return (
+    <Card>
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <span style={{
+          fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
+          color: "#fff", background: BR.greenInk, padding: "4px 9px", borderRadius: 5,
+        }}>EXECUTIVE KPI</span>
+        <span style={{ fontSize: 12, color: BR.inkSoft }}>四步公式：營收影響 − 毛利影響 + AI 可救回 = 最終淨衝擊</span>
+      </div>
+      <div className="flex items-stretch gap-2 flex-wrap">
+        {CASCADE.map((c, i) => c.op ? (
+          <div key={i} className="flex items-center" style={{ fontFamily: FONT_MONO, fontSize: 22, fontWeight: 700, color: BR.inkFaint }}>
+            {c.op}
+          </div>
+        ) : (
+          <div key={i} className="flex-1 min-w-[170px] rounded-[11px]" style={{
+            background: c.final ? BR.greenInk : "#fbfcfa",
+            border: `1px solid ${c.final ? BR.greenInk : BR.border}`,
+            padding: "14px 16px", color: c.final ? "#fff" : undefined,
+          }}>
+            <div style={{ fontFamily: FONT_MONO, fontSize: 10.5, color: c.final ? "#c7d2b8" : BR.inkFaint, marginBottom: 9 }}>
+              {c.label}
+            </div>
+            <div style={{
+              fontFamily: FONT_MONO, fontSize: c.final ? 28 : 24, fontWeight: 700,
+              letterSpacing: "-0.02em", lineHeight: 1,
+              color: c.final ? "#ff8a7a" : c.tone,
+            }}>
+              {c.value}
+            </div>
+            <div style={{ fontSize: 10.5, color: c.final ? "#9aa78d" : BR.inkSoft, marginTop: 9, lineHeight: 1.4 }}>
+              {c.desc}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+// ============================================================
+// 09 Recovery Optimization Card
+// ============================================================
+function RecoveryOptimizationCard() {
+  return (
+    <Card>
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <h3 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 700 }}>Commodity Cost Recovery Center</h3>
+        <span className="flex-1" />
+        <Pill text="L4 EXECUTIVE" tone="ink" />
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-px rounded-[12px] overflow-hidden mb-5"
+           style={{ background: BR.border, border: `1px solid ${BR.border}` }}>
+        <RcStat l="受影響零件數" v="4 項" />
+        <RcStat l="庫存耗減量"   v="0.95 MT" />
+        <RcStat l="±5% 成本衝擊" v="±NT$ 205,822" tone="warn" />
+        <RcStat l="獲利影響"      v="−NT$ 205,822" sub="毛利 18.2% → 18.1%" tone="loss" />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[680px]" style={{ borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${BR.border}` }}>
+              {["#","零件 / 用料編碼","含量占比","庫存狀態","月用量","±5% 衝擊"].map((h, i) => (
+                <th key={h} style={{
+                  fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, letterSpacing: "0.04em",
+                  color: BR.inkFaint, textAlign: i >= 4 ? "right" : "left", padding: "0 6px 11px",
+                }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {RECOVERY.map((r) => (
+              <tr key={r.code} style={{ borderBottom: `1px solid #f3f5ef` }}>
+                <td style={{ padding: "12px 6px" }}>
+                  <span style={{
+                    width: 24, height: 24, borderRadius: "50%", background: "#f3f5ef",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    fontFamily: FONT_MONO, fontSize: 11, fontWeight: 700, color: BR.inkSoft,
+                  }}>{r.rk}</span>
+                </td>
+                <td style={{ padding: "12px 6px" }}>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{r.code}</div>
+                  <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint, marginTop: 1 }}>{r.model}</div>
+                </td>
+                <td style={{ padding: "12px 6px", fontFamily: FONT_MONO, fontSize: 13 }}>{r.pct}%</td>
+                <td style={{ padding: "12px 6px" }}>
+                  <span style={{
+                    fontFamily: FONT_MONO, fontSize: 10.5, fontWeight: 600,
+                    padding: "3px 8px", borderRadius: 6, display: "inline-flex", alignItems: "center", gap: 4,
+                    background: r.riskTone === BR.red ? BR.redSoft : BR.amberSoft, color: r.riskTone,
+                  }}>
+                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: r.riskTone }} />
+                    {r.days} 天
+                  </span>
+                </td>
+                <td style={{ padding: "12px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 600 }}>
+                  {r.monthly.toLocaleString()}
+                </td>
+                <td style={{ padding: "12px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.red }}>
+                  +NT$ {r.impactNTD.toLocaleString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+// ============================================================
+// 09 AI Copilot Banner (dark)
+// ============================================================
+function AICopilotBanner({ generated, generate, executeAll }: {
+  generated: string[];
+  generate: (kind: string, no: string) => void;
+  executeAll: () => void;
+}) {
+  return (
+    <div className="rounded-[16px] relative overflow-hidden" style={{ background: BR.greenInk, color: "#fff", padding: "26px 30px" }}>
+      <div style={{
+        position: "absolute", inset: 0,
+        backgroundImage: `linear-gradient(rgba(118,185,0,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(118,185,0,.07) 1px, transparent 1px)`,
+        backgroundSize: "30px 30px", pointerEvents: "none",
+      }} />
+      <div style={{
+        position: "absolute", right: -60, top: -60, width: 300, height: 300,
+        background: "radial-gradient(circle, rgba(118,185,0,.22), transparent 65%)", pointerEvents: "none",
+      }} />
+
+      <div className="relative z-10 flex items-start justify-between mb-5 flex-wrap gap-3">
+        <h3 className="flex items-center gap-2.5" style={{ fontFamily: FONT_HEAD, fontSize: 21, fontWeight: 700 }}>
+          <span style={{
+            width: 30, height: 30, borderRadius: 8, background: "rgba(118,185,0,.18)",
+            display: "inline-flex", alignItems: "center", justifyContent: "center", color: BR.green,
+          }}>✦</span>
+          AI Copilot
+          <span style={{
+            fontSize: 10.5, fontWeight: 500, color: "#9aa78d",
+            background: "rgba(118,185,0,.12)", padding: "4px 10px", borderRadius: 20, marginLeft: 4,
+          }}>
+            由 Rule-Based 升級為自主決策代理
+          </span>
+        </h3>
+        <div className="text-right">
+          <div style={{ fontFamily: FONT_MONO, fontSize: 10, letterSpacing: "0.1em", color: "#8a9580" }}>最佳組合 A+B · 總可救回</div>
+          <div style={{ fontFamily: FONT_MONO, fontSize: 30, fontWeight: 700, color: BR.green, letterSpacing: "-0.01em" }}>
+            NT$ 127,000
+          </div>
+        </div>
+      </div>
+
+      <div className="relative z-10 grid lg:grid-cols-[1fr,auto,1fr,auto,2fr] items-stretch gap-2.5 mb-5">
+        <CopilotStep no="01" label="預測 PREDICT" body={<>銅價未來 <b>60 天</b>反彈，機率 <b>92%</b>，預估突破 $10,600/MT。</>} />
+        <CopilotArrow />
+        <CopilotStep no="02" label="影響 IMPACT" body={<>波及 <b>FB64-WIRE</b> / <b>FB64-MOT</b>，預估毛利下降 <b style={{ color: "#ff8a7a" }}>−205 萬</b>。</>} />
+        <CopilotArrow />
+        <CopilotStep no="03" label="建議 RECOMMEND · 3 方案">
+          <div className="grid grid-cols-3 gap-2 mb-2.5">
+            {PLANS.map((p) => (
+              <div key={p.rk} style={{
+                background: p.best ? "rgba(118,185,0,.10)" : "rgba(0,0,0,.18)",
+                border: `1px solid ${p.best ? "rgba(118,185,0,.5)" : "rgba(255,255,255,.1)"}`,
+                borderRadius: 9, padding: 10,
+              }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", gap: 6 }}>
+                  方案 {p.rk}
+                  {p.best && <span style={{ fontFamily: FONT_MONO, fontSize: 8, background: BR.green, color: "#fff", padding: "1px 5px", borderRadius: 4 }}>最佳</span>}
+                </div>
+                <div style={{ fontSize: 10.5, color: "#aebba0", margin: "5px 0 7px" }}>{p.title}</div>
+                <div style={{ fontFamily: FONT_MONO, fontSize: 14, fontWeight: 700, color: BR.green }}>+{p.save} 萬</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: "#cdd6c2", background: "rgba(118,185,0,.08)", borderRadius: 8, padding: "9px 12px" }}>
+            ✦ AI 建議組合 <b style={{ color: BR.green }}>A + B</b> · 總回收 <b style={{ color: BR.green }}>127 萬</b> · 執行成功率 <b style={{ color: BR.green }}>87%</b>
+          </div>
+        </CopilotStep>
+      </div>
+
+      <div className="relative z-10 pt-4" style={{ borderTop: `1px solid rgba(255,255,255,.1)` }}>
+        <div className="flex items-center gap-3 mb-3 flex-wrap">
+          <div className="flex items-center gap-2" style={{ fontFamily: FONT_MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: BR.green }}>
+            <span style={{
+              width: 20, height: 20, borderRadius: 6, background: "rgba(118,185,0,.18)",
+              display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: BR.green,
+            }}>04</span>
+            執行 EXECUTE
+          </div>
+          <span style={{ fontSize: 11, color: "#9aa78d" }}>一鍵直接生成下游單據，無需人工重打</span>
+        </div>
+        <div className="flex gap-2.5 flex-wrap items-center">
+          {DOCUMENTS.map((d) => {
+            const done = generated.includes(d.no);
+            return (
+              <button
+                key={d.no}
+                onClick={() => generate(d.kind, d.no)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  background: done ? "rgba(118,185,0,.16)" : "rgba(255,255,255,.06)",
+                  color: done ? "#fff" : "#e7ede0",
+                  border: `1px solid ${done ? BR.green : "rgba(255,255,255,.16)"}`,
+                  borderRadius: 9, padding: "11px 16px", fontSize: 12.5, fontWeight: 600,
+                  cursor: "pointer", transition: "all .15s",
+                }}
+              >
+                {done ? "✓" : "＋"} 產生 {d.kind}
+              </button>
+            );
+          })}
+          <button
+            onClick={executeAll}
+            style={{
+              background: BR.green, color: "#fff", border: "none", borderRadius: 11,
+              padding: "13px 24px", fontSize: 14, fontWeight: 700, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 9,
+              boxShadow: "0 8px 24px rgba(118,185,0,.35)",
+            }}
+          >
+            ⚡ 一鍵執行 A+B
+          </button>
+        </div>
+
+        {generated.length > 0 && (
+          <div className="mt-4 flex flex-col gap-2">
+            {generated.map((no) => {
+              const d = DOCUMENTS.find((x) => x.no === no)!;
+              return (
+                <div key={no} style={{
+                  display: "flex", alignItems: "center", gap: 11,
+                  background: "rgba(255,255,255,.06)",
+                  border: `1px solid rgba(118,185,0,.3)`, borderLeft: `3px solid ${BR.green}`,
+                  borderRadius: 9, padding: "11px 14px",
+                }}>
+                  <div style={{
+                    width: 30, height: 30, borderRadius: 7, background: "rgba(118,185,0,.18)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: BR.green, fontWeight: 700,
+                  }}>✓</div>
+                  <div className="flex-1">
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{d.kind} 已生成</div>
+                    <div style={{ fontFamily: FONT_MONO, fontSize: 10.5, color: "#9aa78d", marginTop: 2 }}>
+                      {no} · 由 AI Copilot 自動帶入 BOM 與供應商
+                    </div>
+                  </div>
+                  <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: BR.green }}>● 待簽核</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
