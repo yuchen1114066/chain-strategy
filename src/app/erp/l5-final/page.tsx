@@ -242,6 +242,9 @@ export default function L5FinalPage() {
 
       <div className="max-w-[1440px] mx-auto px-9 py-7 space-y-6">
 
+        {/* AI Executive Brief — 五行重點，CEO 一分鐘看完 */}
+        <ExecutiveBrief />
+
         {/* Pipeline indicator — 7 stages */}
         <Section>
           <PipelineIndicator />
@@ -252,6 +255,9 @@ export default function L5FinalPage() {
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           {METRICS.map((m) => <MetricCard key={m.name} m={m} />)}
         </div>
+
+        {/* Buy Signal — 該不該買，一眼看到 */}
+        <BuySignal />
 
         {/* ② Cost Breakdown — Profit Cascade */}
         <Stage badge="02" zh="成本拆解 · 獲利瀑布" en="Cost Breakdown · Profit Cascade" desc="CEO 只想知道一件事：AI 介入後，這一季最後還賠多少。" />
@@ -299,6 +305,9 @@ export default function L5FinalPage() {
             ))}
           </div>
         </Card>
+
+        {/* Profit Waterfall — 誰殺掉毛利？一眼看出 */}
+        <ProfitWaterfall />
 
         {/* ③ Impact Explosion — Product Cost Digital Twin */}
         <Stage badge="03" zh="影響爆炸 · 產品成本數位分身" en="Impact Explosion · Product Cost Digital Twin" desc="點任一節點 → 下鑽到原料層，紅色為熱點路徑（銅 +5% 受影響）" />
@@ -1070,4 +1079,372 @@ function CopilotStep({ no, label, body, children }: { no: string; label: string;
 
 function CopilotArrow() {
   return <span style={{ display: "flex", alignItems: "center", color: "rgba(255,255,255,.3)", fontSize: 18 }}>→</span>;
+}
+
+// ============================================================
+// AI Executive Brief — 五行重點，CEO 一分鐘看完
+// ============================================================
+const BRIEF_LINES = [
+  { tone: BR.red,       icon: "▲", text: "銅價未來 60 天上漲機率 87%（信心 92%）" },
+  { tone: BR.red,       icon: "▼", text: "橢圓機毛利再降 100 萬，主要來自 Drive Assy" },
+  { tone: BR.purple,    icon: "!",  text: "Supplier A 漲價要求超出 AI 合理值 3.2%（議價空間 NT$ 187k）" },
+  { tone: BR.greenDeep, icon: "✦", text: "AI 已找到 78 萬可回收空間（A+B 方案組合）" },
+  { tone: BR.greenDeep, icon: "→", text: "建議本週完成鎖價採購（500 MT，扣案窗口 7 天）" },
+];
+
+function ExecutiveBrief() {
+  return (
+    <div className="rounded-[14px] overflow-hidden" style={{
+      background: BR.card, border: `1px solid ${BR.border}`,
+      boxShadow: "0 1px 2px rgba(12,18,8,.03), 0 4px 16px rgba(12,18,8,.04)",
+    }}>
+      <div className="flex items-center gap-3 flex-wrap px-6 py-4" style={{
+        background: BR.greenInk, borderBottom: `1px solid ${BR.greenInk}`,
+      }}>
+        <span style={{
+          width: 30, height: 30, borderRadius: 8, background: "rgba(118,185,0,.18)",
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          color: BR.green, fontWeight: 700,
+        }}>✦</span>
+        <div>
+          <h2 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 700, color: "#fff" }}>
+            AI Executive Brief · 今日重點
+          </h2>
+          <span style={{ fontFamily: FONT_MONO, fontSize: 10, color: "#9aa78d", letterSpacing: "0.08em" }}>
+            5 lines · 1 minute · CEO ready
+          </span>
+        </div>
+        <span className="flex-1" />
+        <span style={{
+          fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.green,
+          background: "rgba(118,185,0,.16)", border: `1px solid rgba(118,185,0,.4)`,
+          padding: "5px 10px", borderRadius: 7, letterSpacing: "0.08em",
+        }}>
+          只看這 5 行就夠
+        </span>
+      </div>
+      <div className="px-6 py-4">
+        {BRIEF_LINES.map((l, i) => (
+          <div key={i} className="flex items-baseline gap-3 py-2" style={{
+            borderBottom: i < BRIEF_LINES.length - 1 ? `1px solid #f3f5ef` : "none",
+          }}>
+            <span style={{
+              fontFamily: FONT_MONO, fontSize: 11, fontWeight: 700,
+              color: l.tone, width: 28, textAlign: "center",
+              background: `${l.tone}12`, borderRadius: 5, padding: "2px 0",
+            }}>
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            <span style={{ color: l.tone, fontSize: 14, lineHeight: 1, width: 16 }}>{l.icon}</span>
+            <span style={{ flex: 1, fontSize: 14, color: BR.ink, lineHeight: 1.5 }}>{l.text}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Buy Signal — 該不該買，一眼看到
+// ============================================================
+type BuyRow = {
+  metal: string; en: string; price: string;
+  signal: "BUY" | "WAIT" | "HOLD";
+  stars: number;
+  action: string;
+  confidence: number;
+  detail: string;
+};
+const BUY_ROWS: BuyRow[] = [
+  { metal: "銅",   en: "COPPER",   price: "$9,472/MT",
+    signal: "BUY",  stars: 5, confidence: 92, action: "立即鎖價 500 MT",     detail: "60 天反彈機率 87%，價格已低於 6 月均值 8%" },
+  { metal: "鋼",   en: "STEEL",    price: "$1,103/MT",
+    signal: "HOLD", stars: 3, confidence: 71, action: "維持現有合約",         detail: "中鋼牌價下週公告，短期觀望" },
+  { metal: "鋁",   en: "ALUMINUM", price: "$2,604/MT",
+    signal: "WAIT", stars: 4, confidence: 84, action: "預估 45 天後下降 4%", detail: "歐洲電價回穩 + 中國雲南復產，AI 預期續跌" },
+  { metal: "塑料", en: "PLASTIC",  price: "$1,393/MT",
+    signal: "BUY",  stars: 4, confidence: 80, action: "提前備料 2 個月",      detail: "Brent 原油破 90，PE/PU 聯動漲 8%" },
+  { metal: "生鐵", en: "PIG IRON", price: "$26,800/MT",
+    signal: "WAIT", stars: 3, confidence: 68, action: "等待 30 天",            detail: "越南鋼廠價回穩中" },
+];
+const SIGNAL_TONE: Record<BuyRow["signal"], { fg: string; bg: string; line: string; label: string }> = {
+  BUY:  { fg: BR.green,    bg: BR.greenSoft, line: BR.greenLine, label: "BUY · 該買" },
+  WAIT: { fg: BR.amber,    bg: BR.amberSoft, line: "#f3e1b8",    label: "WAIT · 該等" },
+  HOLD: { fg: BR.inkSoft,  bg: "#f4f6f0",    line: BR.border,    label: "HOLD · 觀望" },
+};
+
+function BuySignal() {
+  return (
+    <div className="rounded-[14px]" style={{
+      background: BR.card, border: `1px solid ${BR.border}`,
+      boxShadow: "0 1px 2px rgba(12,18,8,.03), 0 4px 16px rgba(12,18,8,.04)",
+      padding: "20px 22px",
+    }}>
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <span style={{
+          width: 30, height: 30, borderRadius: 8, background: BR.greenSoft,
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          color: BR.greenDeep, fontWeight: 700,
+        }}>$</span>
+        <div>
+          <h3 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 700 }}>
+            Buy Signal · 該不該買
+          </h3>
+          <span style={{ fontSize: 11, color: BR.inkSoft }}>Market Intelligence — 不是只看價格，是直接告訴你動作</span>
+        </div>
+        <span className="flex-1" />
+        <span style={{
+          fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.greenDeep,
+          background: BR.greenSoft, border: `1px solid ${BR.greenLine}`,
+          padding: "4px 9px", borderRadius: 7, letterSpacing: "0.06em",
+        }}>
+          DECISION-READY
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+        {BUY_ROWS.map((b) => {
+          const t = SIGNAL_TONE[b.signal];
+          return (
+            <div key={b.metal} className="rounded-[11px]" style={{
+              background: t.bg, border: `1px solid ${t.line}`, padding: "14px 16px",
+            }}>
+              <div className="flex items-baseline justify-between">
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: BR.ink }}>{b.metal}</div>
+                  <div style={{ fontFamily: FONT_MONO, fontSize: 9.5, color: BR.inkFaint, letterSpacing: "0.05em" }}>
+                    {b.en} · {b.price}
+                  </div>
+                </div>
+                <span style={{
+                  fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: "#fff",
+                  background: t.fg, padding: "4px 8px", borderRadius: 5, letterSpacing: "0.06em",
+                }}>
+                  {b.signal}
+                </span>
+              </div>
+
+              <div className="mt-3 flex items-baseline gap-1" style={{ color: t.fg, fontSize: 16 }}>
+                {"★".repeat(b.stars)}
+                <span style={{ color: BR.inkFaint }}>{"★".repeat(5 - b.stars)}</span>
+              </div>
+
+              <div className="mt-2" style={{ fontSize: 13, fontWeight: 700, color: t.fg }}>
+                {t.label}
+              </div>
+              <div className="mt-1" style={{ fontSize: 12, color: BR.ink, lineHeight: 1.45 }}>
+                {b.action}
+              </div>
+              <div className="mt-2 pt-2 flex items-center justify-between" style={{
+                borderTop: `1px solid ${t.line}`,
+                fontFamily: FONT_MONO, fontSize: 10.5, color: BR.inkSoft,
+              }}>
+                <span>{b.detail}</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between" style={{ fontSize: 10, color: BR.inkFaint }}>
+                <span>AI 信心</span>
+                <span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: t.fg }}>{b.confidence}%</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 rounded-[10px] p-3.5 text-xs leading-relaxed" style={{
+        background: BR.greenSoft, border: `1px solid ${BR.greenLine}`, color: "#3c4a2e",
+      }}>
+        <b style={{ color: BR.greenInk }}>✦ Market Intelligence</b> · 5 項原料中
+        <b style={{ color: BR.green }}> 2 BUY</b>，<b style={{ color: BR.amber }}>2 WAIT</b>，<b style={{ color: BR.inkSoft }}>1 HOLD</b> —
+        本週重點：銅<b>立即鎖價</b>、鋁<b>再等 45 天</b>。
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Profit Waterfall — 誰殺掉毛利？
+// ============================================================
+type WfStep = { label: string; delta: number; tone: string; sub?: string };
+const WATERFALL: { start: number; steps: WfStep[]; endLabel: string } = {
+  start: 18.2,
+  steps: [
+    { label: "銅價 +5%",            delta: -1.1, tone: BR.red,    sub: "Drive Assy / Motor" },
+    { label: "鋼價 +3%",            delta: -0.4, tone: BR.red,    sub: "Frame Assy" },
+    { label: "運費 +18%",           delta: -0.2, tone: BR.amber,  sub: "海運 + 燃油附加" },
+    { label: "供應商漲價",          delta: -0.5, tone: BR.purple, sub: "Supplier A 喊 +5% / AI 合理 +2.1%" },
+    { label: "AI 鎖價回收",         delta: +0.4, tone: BR.green,  sub: "提前 45 天 500 MT" },
+    { label: "AI 替代供應商",       delta: +0.3, tone: BR.green,  sub: "切換 Supplier B 折讓 4.2%" },
+  ],
+  endLabel: "目前毛利",
+};
+
+function ProfitWaterfall() {
+  const start = WATERFALL.start;
+  const end = +(start + WATERFALL.steps.reduce((s, x) => s + x.delta, 0)).toFixed(1);
+  const allValues = [start, end, ...WATERFALL.steps.map((_, i, arr) =>
+    start + arr.slice(0, i + 1).reduce((s, x) => s + x.delta, 0)
+  )];
+  const maxV = Math.max(...allValues, start);
+  const minV = Math.min(...allValues, 0);
+  const range = maxV - minV;
+  const yScale = (v: number) => 220 - ((v - minV) / range) * 200;
+
+  // running balance for waterfall bars
+  let running = start;
+  const bars: { x: number; y: number; h: number; tone: string }[] = [];
+  WATERFALL.steps.forEach((s, i) => {
+    const before = running;
+    const after = running + s.delta;
+    const top = Math.max(before, after);
+    const bot = Math.min(before, after);
+    bars.push({
+      x: 80 + (i + 1) * 130,
+      y: yScale(top),
+      h: yScale(bot) - yScale(top),
+      tone: s.tone,
+    });
+    running = after;
+  });
+
+  return (
+    <Card>
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <span style={{
+          width: 30, height: 30, borderRadius: 8, background: BR.redSoft,
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          color: BR.red, fontWeight: 700,
+        }}>▼</span>
+        <div>
+          <h3 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 700 }}>
+            Profit Waterfall · 誰殺掉毛利？
+          </h3>
+          <span style={{ fontSize: 11, color: BR.inkSoft }}>原始毛利 {start}% → 各因子拆解 → 目前毛利 {end}%</span>
+        </div>
+        <span className="flex-1" />
+        <Pill text={`Δ ${(end - start).toFixed(1)}%`} tone="ink" />
+      </div>
+
+      {/* Waterfall chart */}
+      <div className="overflow-x-auto">
+        <svg viewBox="0 0 1080 280" style={{ width: "100%", minWidth: 900, height: 280, display: "block" }}>
+          {/* baseline grid */}
+          {[18, 17, 16].map((v) => (
+            <g key={v}>
+              <line x1="60" y1={yScale(v)} x2="1060" y2={yScale(v)} stroke="#eef0ea" strokeWidth="1" />
+              <text x="50" y={yScale(v) + 4} textAnchor="end"
+                    style={{ fontFamily: FONT_MONO, fontSize: 10, fill: BR.inkFaint }}>
+                {v}%
+              </text>
+            </g>
+          ))}
+
+          {/* start bar — 原始毛利 */}
+          <rect x={80} y={yScale(start)} width={70} height={220 - yScale(start)}
+                fill={BR.greenInk} rx="3" />
+          <text x={80 + 35} y={yScale(start) - 10} textAnchor="middle"
+                style={{ fontFamily: FONT_MONO, fontSize: 12, fontWeight: 700, fill: BR.greenInk }}>
+            {start}%
+          </text>
+          <text x={80 + 35} y={250} textAnchor="middle"
+                style={{ fontSize: 11, fontWeight: 700, fill: BR.ink }}>
+            原始毛利
+          </text>
+
+          {/* dashed connectors */}
+          {WATERFALL.steps.map((s, i) => {
+            const before = start + WATERFALL.steps.slice(0, i).reduce((sum, x) => sum + x.delta, 0);
+            const after = before + s.delta;
+            const top = Math.max(before, after);
+            const xPrev = 80 + (i === 0 ? 70 : (i) * 130 + 70);
+            const xCurr = 80 + (i + 1) * 130;
+            return (
+              <line key={i} x1={xPrev} y1={yScale(before)} x2={xCurr} y2={yScale(before)}
+                    stroke={BR.inkFaint} strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
+            );
+          })}
+
+          {/* step bars */}
+          {bars.map((b, i) => {
+            const s = WATERFALL.steps[i];
+            return (
+              <g key={i}>
+                <rect x={b.x} y={b.y} width={70} height={Math.max(b.h, 2)} fill={b.tone} rx="3" opacity="0.92" />
+                <text x={b.x + 35} y={b.y - 10} textAnchor="middle"
+                      style={{ fontFamily: FONT_MONO, fontSize: 12, fontWeight: 700, fill: b.tone }}>
+                  {s.delta > 0 ? "+" : ""}{s.delta.toFixed(1)}%
+                </text>
+                <text x={b.x + 35} y={250} textAnchor="middle"
+                      style={{ fontSize: 10.5, fontWeight: 700, fill: BR.ink }}>
+                  {s.label}
+                </text>
+                {s.sub && (
+                  <text x={b.x + 35} y={264} textAnchor="middle"
+                        style={{ fontFamily: FONT_MONO, fontSize: 9, fill: BR.inkFaint }}>
+                    {s.sub}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
+          {/* end bar — 目前毛利 */}
+          {(() => {
+            const x = 80 + (WATERFALL.steps.length + 1) * 130;
+            return (
+              <g>
+                <rect x={x} y={yScale(end)} width={70} height={220 - yScale(end)}
+                      fill={end >= start ? BR.green : BR.red} rx="3" />
+                <text x={x + 35} y={yScale(end) - 10} textAnchor="middle"
+                      style={{ fontFamily: FONT_MONO, fontSize: 12, fontWeight: 700, fill: end >= start ? BR.greenDeep : BR.red }}>
+                  {end}%
+                </text>
+                <text x={x + 35} y={250} textAnchor="middle"
+                      style={{ fontSize: 11, fontWeight: 700, fill: BR.ink }}>
+                  {WATERFALL.endLabel}
+                </text>
+              </g>
+            );
+          })()}
+        </svg>
+      </div>
+
+      {/* Verdict */}
+      <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {[
+          {
+            label: "最大殺手",
+            value: "銅價 +5%",
+            sub: "−1.1% · 來自 Drive Assy / Motor 線圈",
+            tone: BR.red,
+          },
+          {
+            label: "意外殺手",
+            value: "供應商漲價",
+            sub: "−0.5% · Supplier A 喊 +5% 但 AI 合理 +2.1%",
+            tone: BR.purple,
+          },
+          {
+            label: "AI 救回",
+            value: "+0.7%",
+            sub: "鎖價 +0.4% · 替代供應商 +0.3%",
+            tone: BR.greenDeep,
+          },
+        ].map((v) => (
+          <div key={v.label} className="rounded-[10px]" style={{
+            border: `1px solid ${v.tone}30`, background: `${v.tone}08`, padding: "12px 14px",
+          }}>
+            <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint, letterSpacing: "0.08em" }}>
+              {v.label}
+            </div>
+            <div style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 700, color: v.tone, marginTop: 4 }}>
+              {v.value}
+            </div>
+            <div style={{ fontSize: 11, color: BR.inkSoft, marginTop: 4, lineHeight: 1.4 }}>
+              {v.sub}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
 }
