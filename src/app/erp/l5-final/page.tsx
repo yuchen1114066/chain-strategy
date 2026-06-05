@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 
 // ============================================================
@@ -1507,26 +1507,104 @@ function SupplierExposureCard() {
 // ============================================================
 // 07 Price Validation Card
 // ============================================================
+// ============================================================
+// 07 AI Supplier Price Validation Engine
+//    副標題：Should Cost Breakdown
+//    （吸收原 /erp/should-cost 內容 — 點開料號展開 Should-Cost 拆解）
+// ============================================================
+
+// 每料號的 should-cost 拆解（業界經驗值）+ 漲價來源
+const SHOULD_COST: Record<string, {
+  category: string;
+  breakdown: { raw: number; process: number; surface: number; packaging: number; freight: number; margin: number };
+  sources: { component: "原料" | "加工" | "表處" | "包裝" | "運費"; delta: number; reason: string }[];
+}> = {
+  "FB64-WIRE": {
+    category: "電線組（銅含量 80%）",
+    breakdown: { raw: 45, process: 28, surface: 8, packaging: 4, freight: 8, margin: 7 },
+    sources: [
+      { component: "原料", delta: +4.0, reason: "LME 銅 +4% / 6 月區間內" },
+      { component: "加工", delta: +2.0, reason: "台灣製造業最低工資 2% 調整" },
+      { component: "運費", delta: +5.0, reason: "BDI + 紅海繞航加成" },
+    ],
+  },
+  "FB64-MOT": {
+    category: "馬達（銅 65% + 矽鋼）",
+    breakdown: { raw: 52, process: 24, surface: 6, packaging: 3, freight: 7, margin: 8 },
+    sources: [
+      { component: "原料", delta: +4.0, reason: "LME 銅 +4%、矽鋼板 +2%" },
+      { component: "加工", delta: +2.0, reason: "工資 + 加工費調整" },
+      { component: "運費", delta: +5.0, reason: "海運 + 燃油附加" },
+    ],
+  },
+  "FB42-COIL": {
+    category: "磁鐵線圈（銅 45%）",
+    breakdown: { raw: 38, process: 32, surface: 10, packaging: 4, freight: 9, margin: 7 },
+    sources: [
+      { component: "原料", delta: +3.5, reason: "銅 +4%、磁鐵 +3%" },
+      { component: "加工", delta: +2.5, reason: "繞線人工 +2.5%" },
+      { component: "運費", delta: +5.0, reason: "海運" },
+    ],
+  },
+  "FB64-PSU": {
+    category: "電源變壓器（銅 35%）",
+    breakdown: { raw: 35, process: 30, surface: 9, packaging: 5, freight: 10, margin: 11 },
+    sources: [
+      { component: "原料", delta: +3.0, reason: "銅 +4%、塑料 +2%" },
+      { component: "加工", delta: +2.0, reason: "工資調整" },
+      { component: "運費", delta: +5.0, reason: "海運加成" },
+    ],
+  },
+};
+
+function computeFairBand(b: typeof SHOULD_COST[string]) {
+  // 加總得 weighted average，再 ±30% 緩衝 = 合理區間
+  const weighted = b.sources.reduce((s, src) => {
+    const w = (b.breakdown as any)[
+      src.component === "原料" ? "raw" :
+      src.component === "加工" ? "process" :
+      src.component === "表處" ? "surface" :
+      src.component === "包裝" ? "packaging" :
+      "freight"
+    ] / 100;
+    return s + src.delta * w;
+  }, 0);
+  return { low: +(weighted * 0.85).toFixed(1), mid: +weighted.toFixed(1), high: +(weighted * 1.15).toFixed(1) };
+}
+
 function PriceValidationCard() {
+  const [openCode, setOpenCode] = useState<string | null>("FB64-WIRE");
   const totalRoom = RECOVERY.reduce((s, r) => s + Math.round((r.impactNTD * (r.supplierClaim - r.aiFair)) / 5), 0);
+
   return (
     <Card>
-      <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <h3 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 700 }}>
-          漲價合理性 · <span style={{ color: BR.purple }}>Supplier Price Validation</span>
+      <div className="flex items-baseline gap-3 mb-1 flex-wrap">
+        <h3 style={{ fontFamily: FONT_HEAD, fontSize: 19, fontWeight: 700 }}>
+          <span style={{ color: BR.purple, marginRight: 6 }}>✦</span>
+          AI Supplier Price Validation Engine
+          <span style={{ fontSize: 14, fontWeight: 500, color: BR.inkSoft, marginLeft: 8 }}>· 漲價合理性引擎</span>
         </h3>
-        <Pill text="L5 最強功能之一" tone="purple" />
+      </div>
+      <div className="flex items-baseline gap-3 mb-4 flex-wrap">
+        <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: BR.purple, letterSpacing: "0.05em" }}>
+          副標 · Should Cost Breakdown
+        </span>
+        <span style={{ fontSize: 11, color: BR.inkSoft }}>
+          供應商說 vs Should-Cost 拆解反推的 AI 合理值 — 點料號展開 Should-Cost 細節
+        </span>
         <span className="flex-1" />
+        <Pill text="原 /erp/should-cost 已整合於此" tone="purple" />
         <Pill text={`已驗證 ${RECOVERY.length} 項`} tone="green" />
       </div>
+
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px]" style={{ borderCollapse: "collapse" }}>
+        <table className="w-full min-w-[760px]" style={{ borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: `1px solid ${BR.border}` }}>
-              {["料號","用於","供應商漲價","AI 合理值","差距","議價空間 (估)","建議動作"].map((h, i) => (
-                <th key={h} style={{
+              {["", "料號", "用於", "供應商漲價", "AI 合理值", "差距", "議價空間 (估)", "建議動作"].map((h, i) => (
+                <th key={i} style={{
                   fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, letterSpacing: "0.04em",
-                  color: BR.inkFaint, textAlign: i >= 2 && i <= 5 ? "right" : "left", padding: "0 6px 11px",
+                  color: BR.inkFaint, textAlign: i >= 3 && i <= 6 ? "right" : "left", padding: "0 6px 11px",
                 }}>{h}</th>
               ))}
             </tr>
@@ -1538,33 +1616,59 @@ function PriceValidationCard() {
               const action = gap >= 3 ? { label: "退回 + 重新議價", tone: BR.red }
                            : gap >= 1 ? { label: "壓 AI 合理值",     tone: BR.amber }
                                       : { label: "可接受",             tone: BR.greenDeep };
+              const open = openCode === r.code;
+              const sc = SHOULD_COST[r.code];
               return (
-                <tr key={r.code} style={{ borderBottom: `1px solid #f3f5ef` }}>
-                  <td style={{ padding: "12px 6px", fontWeight: 700, fontFamily: FONT_MONO }}>{r.code}</td>
-                  <td style={{ padding: "12px 6px", fontSize: 11.5, color: BR.inkSoft }}>{r.model}</td>
-                  <td style={{ padding: "12px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.red }}>
-                    +{r.supplierClaim.toFixed(1)}%
-                  </td>
-                  <td style={{ padding: "12px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenDeep }}>
-                    +{r.aiFair.toFixed(1)}%
-                  </td>
-                  <td style={{ padding: "12px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 800, color: BR.purple }}>
-                    −{gap.toFixed(1)}%
-                  </td>
-                  <td style={{ padding: "12px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.purple }}>
-                    NT$ {roomNTD.toLocaleString()}
-                  </td>
-                  <td style={{ padding: "12px 6px" }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: action.tone, padding: "4px 9px", borderRadius: 6, background: `${action.tone}15` }}>
-                      {action.label}
-                    </span>
-                  </td>
-                </tr>
+                <Fragment key={r.code}>
+                  <tr
+                    onClick={() => setOpenCode(open ? null : r.code)}
+                    style={{
+                      borderBottom: open ? "none" : `1px solid #f3f5ef`,
+                      background: open ? BR.greenSoft : "transparent",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <td style={{ padding: "12px 6px", width: 22 }}>
+                      <span style={{
+                        display: "inline-block", width: 16, height: 16, lineHeight: "16px", textAlign: "center",
+                        color: BR.greenDeep, fontWeight: 700,
+                        transform: open ? "rotate(90deg)" : "none", transition: "transform .2s",
+                      }}>›</span>
+                    </td>
+                    <td style={{ padding: "12px 6px", fontWeight: 700, fontFamily: FONT_MONO }}>{r.code}</td>
+                    <td style={{ padding: "12px 6px", fontSize: 11.5, color: BR.inkSoft }}>{r.model}</td>
+                    <td style={{ padding: "12px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.red }}>
+                      +{r.supplierClaim.toFixed(1)}%
+                    </td>
+                    <td style={{ padding: "12px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenDeep }}>
+                      +{r.aiFair.toFixed(1)}%
+                    </td>
+                    <td style={{ padding: "12px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 800, color: BR.purple }}>
+                      −{gap.toFixed(1)}%
+                    </td>
+                    <td style={{ padding: "12px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.purple }}>
+                      NT$ {roomNTD.toLocaleString()}
+                    </td>
+                    <td style={{ padding: "12px 6px" }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: action.tone, padding: "4px 9px", borderRadius: 6, background: `${action.tone}15` }}>
+                        {action.label}
+                      </span>
+                    </td>
+                  </tr>
+                  {open && sc && (
+                    <tr style={{ borderBottom: `1px solid #f3f5ef` }}>
+                      <td colSpan={8} style={{ padding: "4px 6px 18px", background: BR.greenSoft }}>
+                        <ShouldCostBreakdownPanel code={r.code} model={r.model} supplierClaim={r.supplierClaim} sc={sc} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
           </tbody>
           <tfoot>
             <tr style={{ background: BR.greenSoft }}>
+              <td />
               <td colSpan={5} style={{ padding: "12px 6px", fontWeight: 700, color: BR.greenInk }}>合計議價空間</td>
               <td style={{ padding: "12px 6px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 800, fontSize: 16, color: BR.purple }}>
                 NT$ {totalRoom.toLocaleString()}
@@ -1575,6 +1679,121 @@ function PriceValidationCard() {
         </table>
       </div>
     </Card>
+  );
+}
+
+// ─── Should-Cost Breakdown drill-down panel ───
+function ShouldCostBreakdownPanel({ code, model, supplierClaim, sc }: {
+  code: string;
+  model: string;
+  supplierClaim: number;
+  sc: typeof SHOULD_COST[string];
+}) {
+  const band = computeFairBand(sc);
+  const verdict = supplierClaim > band.high * 1.5 ? { tone: BR.red,    label: "🚨 嚴重超出 · 強力議價" }
+                : supplierClaim > band.high       ? { tone: BR.amber,  label: "⚠ 偏高 · 要求重議" }
+                                                  : { tone: BR.greenDeep, label: "✓ 合理 · 可接受" };
+  const excess = +(supplierClaim - band.high).toFixed(1);
+
+  return (
+    <div className="rounded-[12px]" style={{
+      background: "#fff", border: `1.5px solid ${BR.purple}30`, padding: "16px 18px",
+    }}>
+      <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+        <span style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: "#fff", background: BR.purple, padding: "3px 8px", borderRadius: 5, letterSpacing: "0.08em" }}>
+          SHOULD-COST DRILL-DOWN
+        </span>
+        <span style={{ fontFamily: FONT_HEAD, fontSize: 14, fontWeight: 700 }}>{code}</span>
+        <span style={{ fontSize: 12, color: BR.inkSoft }}>{sc.category} · {model}</span>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-4">
+        {/* ① Should Cost Breakdown */}
+        <div>
+          <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 8 }}>
+            ① SHOULD COST BREAKDOWN
+          </div>
+          <div className="space-y-1.5">
+            {[
+              { k: "原料", v: sc.breakdown.raw,       tone: "#0891b2" },
+              { k: "加工", v: sc.breakdown.process,   tone: "#3b82f6" },
+              { k: "表處", v: sc.breakdown.surface,   tone: "#8b5cf6" },
+              { k: "包裝", v: sc.breakdown.packaging, tone: "#f59e0b" },
+              { k: "運費", v: sc.breakdown.freight,   tone: "#10b981" },
+              { k: "利潤", v: sc.breakdown.margin,    tone: BR.red },
+            ].map((row) => (
+              <div key={row.k} className="flex items-center gap-2 text-xs">
+                <span style={{ width: 32, color: BR.inkSoft, fontWeight: 600 }}>{row.k}</span>
+                <div style={{ flex: 1, height: 7, background: "#eef0ea", borderRadius: 3, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${row.v}%`, background: row.tone, opacity: 0.9 }} />
+                </div>
+                <span style={{ fontFamily: FONT_MONO, fontSize: 11, fontWeight: 700, width: 36, textAlign: "right", color: row.tone }}>
+                  {row.v}%
+                </span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 10, color: BR.inkFaint, marginTop: 8, lineHeight: 1.4 }}>
+            業界經驗值，正式版接 ERP 標準成本卡
+          </div>
+        </div>
+
+        {/* ② 漲價來源 */}
+        <div>
+          <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 8 }}>
+            ② 漲價來源 PRICE DRIVERS
+          </div>
+          <div className="space-y-2">
+            {sc.sources.map((src) => (
+              <div key={src.component} className="rounded-[8px] px-2.5 py-2" style={{ border: `1px solid ${BR.border}`, background: "#fbfcfa" }}>
+                <div className="flex items-baseline justify-between">
+                  <span style={{ fontSize: 12, fontWeight: 700 }}>{src.component}</span>
+                  <span style={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 700, color: src.delta > 0 ? BR.red : BR.greenDeep }}>
+                    {src.delta > 0 ? "+" : ""}{src.delta.toFixed(1)}%
+                  </span>
+                </div>
+                <div style={{ fontSize: 10.5, color: BR.inkSoft, marginTop: 2 }}>{src.reason}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ③ AI 結論 */}
+        <div>
+          <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 8 }}>
+            ③ AI 結論 VERDICT
+          </div>
+          <div className="rounded-[10px] overflow-hidden" style={{ border: `1.5px solid ${verdict.tone}`, background: `${verdict.tone}08` }}>
+            <div className="px-3 py-2 flex items-baseline justify-between" style={{ background: verdict.tone, color: "#fff" }}>
+              <span style={{ fontSize: 12, fontWeight: 700 }}>{verdict.label}</span>
+            </div>
+            <div className="px-3 py-2.5 space-y-1.5 text-xs">
+              <div className="flex justify-between">
+                <span style={{ color: BR.inkSoft }}>合理區間</span>
+                <span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenDeep }}>
+                  {band.low}% ~ {band.high}%
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span style={{ color: BR.inkSoft }}>供應商要求</span>
+                <span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.red }}>
+                  +{supplierClaim.toFixed(1)}%
+                </span>
+              </div>
+              <div className="flex justify-between border-t pt-1.5" style={{ borderColor: `${verdict.tone}30` }}>
+                <span style={{ color: BR.inkSoft }}>超出</span>
+                <span style={{ fontFamily: FONT_MONO, fontWeight: 800, color: verdict.tone }}>
+                  {excess > 0 ? "+" : ""}{excess.toFixed(1)}%
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="mt-2 text-xs" style={{ color: BR.inkSoft, lineHeight: 1.5 }}>
+            合理區間 = 各成分當前波動 × 佔成本權重，加總 ±15% 緩衝
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
