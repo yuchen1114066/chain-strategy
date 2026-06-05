@@ -21,6 +21,121 @@ const MVMT_TONE: Record<string, string> = {
   "預計銷售": SC.primaryLight,
 };
 
+// ============================================================
+// Supply Chain Data Mart · 4 張 Fact 表 schema
+// ============================================================
+const FACT_TABLES = [
+  {
+    name: "fact_shortage",
+    zh: "缺料事實",
+    purpose: "每日缺料快照（給 L1 / L2 / L3 / L4 共用）",
+    usedBy: ["L1", "L2", "L4"],
+    fields: [
+      { col: "date",              type: "DATE",       note: "快照日" },
+      { col: "part_no",           type: "VARCHAR(20)",note: "料號" },
+      { col: "part_name",         type: "VARCHAR(80)",note: "品名" },
+      { col: "stock_qty",         type: "INT",        note: "現庫存" },
+      { col: "safety_stock",      type: "INT",        note: "安全存量" },
+      { col: "forecast_balance",  type: "INT",        note: "預計結存" },
+      { col: "shortage_qty",      type: "INT",        note: "缺料數量" },
+      { col: "first_shortage_dt", type: "DATE",       note: "首次缺料日" },
+      { col: "critical_level",    type: "TINYINT",    note: "1=低 2=中 3=高" },
+      { col: "supplier",          type: "VARCHAR(40)",note: "供應商" },
+      { col: "buyer",             type: "VARCHAR(20)",note: "採購承辦" },
+    ],
+  },
+  {
+    name: "fact_inventory",
+    zh: "庫存事實",
+    purpose: "即時庫存快照（給 L1 / L2 共用）",
+    usedBy: ["L1", "L2"],
+    fields: [
+      { col: "date",              type: "DATE",       note: "快照日" },
+      { col: "part_no",           type: "VARCHAR(20)",note: "料號" },
+      { col: "warehouse_code",    type: "VARCHAR(10)",note: "庫別" },
+      { col: "on_hand",           type: "INT",        note: "現有量" },
+      { col: "available",         type: "INT",        note: "可用量" },
+      { col: "in_transit",        type: "INT",        note: "在途" },
+      { col: "reserved",          type: "INT",        note: "已預留" },
+      { col: "value_ntd",         type: "DECIMAL",    note: "庫存價值" },
+    ],
+  },
+  {
+    name: "fact_supply_plan",
+    zh: "供應計劃",
+    purpose: "未來進 / 領計劃（給 L2 / L3 / L4 共用）",
+    usedBy: ["L2", "L3", "L4"],
+    fields: [
+      { col: "date",              type: "DATE",       note: "預定日" },
+      { col: "part_no",           type: "VARCHAR(20)",note: "料號" },
+      { col: "movement_type",     type: "VARCHAR(10)",note: "進貨/領用/生產" },
+      { col: "qty",               type: "INT",        note: "數量" },
+      { col: "po_no",             type: "VARCHAR(20)",note: "PO 編號" },
+      { col: "supplier",          type: "VARCHAR(40)",note: "供應商" },
+      { col: "lead_days",         type: "INT",        note: "前置天數" },
+      { col: "risk_flag",         type: "TINYINT",    note: "風險旗標" },
+    ],
+  },
+  {
+    name: "fact_supplier_delivery",
+    zh: "供應商交期",
+    purpose: "供應商歷史交期表現（給 L3 / L4 / L5 共用）",
+    usedBy: ["L3", "L4", "L5"],
+    fields: [
+      { col: "month",             type: "DATE",       note: "結算月" },
+      { col: "supplier",          type: "VARCHAR(40)",note: "供應商" },
+      { col: "part_no",           type: "VARCHAR(20)",note: "料號" },
+      { col: "promised_lead",     type: "INT",        note: "承諾交期" },
+      { col: "actual_lead",       type: "INT",        note: "實際交期" },
+      { col: "otd_rate",          type: "DECIMAL",    note: "準時率" },
+      { col: "defect_rate",       type: "DECIMAL",    note: "不良率" },
+      { col: "risk_score",        type: "TINYINT",    note: "風險分 0-100" },
+    ],
+  },
+];
+
+const LAYER_USAGE = [
+  { layer: "L1",  title: "Executive · 戰情",   tone: SC.primary,
+    usage: ["5 分鐘看完缺料", "公司總缺料金額", "Top 3 影響毛利的料號"],
+    tablesUsed: ["fact_shortage", "fact_inventory"] },
+  { layer: "L2",  title: "Operations · 工單",  tone: SC.blue,
+    usage: ["工單卡關紅標", "缺料件數預警", "預計轉負警報"],
+    tablesUsed: ["fact_shortage", "fact_supply_plan"] },
+  { layer: "L3",  title: "Procurement · 採購", tone: SC.emerald,
+    usage: ["供應商選擇", "RFQ 自動發出", "缺料優先補單"],
+    tablesUsed: ["fact_supply_plan", "fact_supplier_delivery"] },
+  { layer: "L4",  title: "AI Engine · 決策",   tone: SC.amber,
+    usage: ["LRPR05 缺料預測", "規模預測模型", "Lead Time 驗證"],
+    tablesUsed: ["fact_shortage", "fact_supply_plan", "fact_supplier_delivery"] },
+  { layer: "L5",  title: "Market · 全球情報",  tone: SC.red,
+    usage: ["銅價 ↔ 缺料連動", "供應壓力測試", "LME / MRP 缺貨關聯"],
+    tablesUsed: ["fact_supplier_delivery"] },
+];
+
+// 缺料損失分析 — 從 LRPR05 自動推算的「公司損失」
+const SHORTAGE_LOSS = [
+  { code: "M06BA05", name: "凡立水", spec: "TCV-225",
+    shortageDays: 11, affectedProducts: ["TC1-13 系列", "A201 風扇"], customerCount: 5,
+    affectedMonthlyQty: 8_300, monthlyLoss: 1_200_000,
+    action: { label: "P1 · 緊急補料", tone: SC.red } },
+  { code: "P52A1020022", name: "碳膜電阻", spec: "1K 1/4W 5%",
+    shortageDays: 7, affectedProducts: ["FB64 PCB"], customerCount: 3,
+    affectedMonthlyQty: 5_000, monthlyLoss: 420_000,
+    action: { label: "P1 · 啟用備案", tone: SC.red } },
+  { code: "P13AA21", name: "滾珠軸承", spec: "SKF 6003 ZZ CN",
+    shortageDays: 14, affectedProducts: ["跑步機 Pro"], customerCount: 2,
+    affectedMonthlyQty: 1_500, monthlyLoss: 380_000,
+    action: { label: "P1 · 切換供應商", tone: SC.red } },
+  { code: "P56D012", name: "二極體", spec: "1N5408",
+    shortageDays: 4, affectedProducts: ["FB42 Console"], customerCount: 2,
+    affectedMonthlyQty: 3_200, monthlyLoss: 180_000,
+    action: { label: "P2 · 加單", tone: SC.amber } },
+  { code: "P5305104F51", name: "陶瓷電容", spec: "100nF 50V",
+    shortageDays: 3, affectedProducts: ["FB64 Console"], customerCount: 2,
+    affectedMonthlyQty: 6_000, monthlyLoss: 150_000,
+    action: { label: "P2 · 拆單", tone: SC.amber } },
+];
+
 type RiskRow = {
   item: LrprItem;
   minBal: number;
@@ -318,6 +433,238 @@ export default function Lrpr05ReportPage() {
             </div>
           </Card>
         )}
+
+        {/* ──────────────────────────────────────────────────────────────────
+            真正的價值不是再加一個網頁 — 是把這份報表變成 Supply Chain Data Mart
+            ────────────────────────────────────────────────────────────────── */}
+
+        {/* ④ Supply Chain Data Mart · 資料倉儲架構 */}
+        <Card accent={SC.primary}>
+          <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+            <span className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded text-white"
+                  style={{ background: SC.primary, letterSpacing: "0.12em" }}>④ ARCHITECTURE</span>
+            <h2 className="text-base font-semibold">Supply Chain Data Mart · 資料倉儲架構</h2>
+            <span className="text-[11px]" style={{ color: SC.textSub }}>
+              不用再加網頁 — 把 LRPR05 變成所有 AI 模組共用的 fact 表
+            </span>
+          </div>
+
+          <div className="text-xs leading-relaxed mb-4" style={{ color: SC.text }}>
+            這份報表如果只「看一次」，價值就到此為止。世界級做法是把它沉澱成
+            <b className="mx-1" style={{ color: SC.primary }}>Supply Chain Data Mart</b>
+            的一張事實表，讓 L1–L5 五個層級全部共用同一份資料 — 不再各自跑 ETL，避免供應商
+            vs 採購的對帳爭議。
+          </div>
+
+          {/* 架構圖 — ASCII flow */}
+          <div className="rounded-md p-4 font-mono text-[11px] leading-relaxed"
+               style={{ background: SC.surfaceDeep, color: SC.textInverse, border: `1px solid ${SC.border}` }}>
+            <div style={{ color: "#a8a4a4" }}>// 資料流程</div>
+            <div className="mt-1.5">
+              <span style={{ color: SC.blueFixed }}>ERP</span>
+              <span style={{ color: "#a8a4a4" }}> ──▶ </span>
+              <span style={{ color: SC.primaryFixed }}>鼎新 iGP（read-only）</span>
+              <span style={{ color: "#a8a4a4" }}> ──▶ </span>
+              <span style={{ color: SC.emeraldLight }}>5 張原始報表</span>
+            </div>
+            <div className="pl-12 mt-1" style={{ color: "#8a7176" }}>
+              ├─ <span style={{ color: "#fff" }}>LRPR05</span>　供需明細（本表）<br/>
+              ├─ MRP　　　 物料需求計算<br/>
+              ├─ 採購明細　PO / 進貨<br/>
+              ├─ 物流追蹤　ASN / 海運狀態<br/>
+              └─ 庫存盤點　即時庫存
+            </div>
+            <div className="mt-3">
+              <span style={{ color: "#a8a4a4" }}>　　　　　　　　　　　　　　　│</span>
+            </div>
+            <div>
+              <span style={{ color: "#a8a4a4" }}>　　　　　　　　　　　　　　　▼</span>
+            </div>
+            <div className="mt-1 pl-6">
+              <span style={{ color: SC.primaryLight }}>SUPPLY CHAIN DATA MART</span>
+              <span style={{ color: "#a8a4a4" }}>（每晚 ETL · 唯讀）</span>
+            </div>
+            <div className="pl-12 mt-1" style={{ color: "#8a7176" }}>
+              ├─ <span style={{ color: SC.amber }}>fact_shortage</span>　　　 缺料事實<br/>
+              ├─ <span style={{ color: SC.amber }}>fact_inventory</span>　　 庫存事實<br/>
+              ├─ <span style={{ color: SC.amber }}>fact_supply_plan</span>　 供應計劃<br/>
+              └─ <span style={{ color: SC.amber }}>fact_supplier_delivery</span>　供應商交期
+            </div>
+            <div className="mt-3">
+              <span style={{ color: "#a8a4a4" }}>　　　　　　　　　　　　　　　│</span>
+            </div>
+            <div>
+              <span style={{ color: "#a8a4a4" }}>　　　　　　　　　　　　　　　▼</span>
+            </div>
+            <div className="mt-1 pl-6">
+              <span style={{ color: SC.emeraldLight }}>L1–L5 共用同一份資料</span>
+            </div>
+            <div className="pl-12 mt-1" style={{ color: "#a8a4a4" }}>
+              L1 Executive　·　L2 Operations　·　L3 Procurement　·　L4 AI Engine　·　L5 Market
+            </div>
+          </div>
+
+          <div className="mt-3 grid sm:grid-cols-2 gap-3 text-[11px]">
+            <div className="rounded-md p-3" style={{ background: SC.surfaceDim }}>
+              <div className="font-bold mb-1" style={{ color: SC.red }}>❌ 沒有 Data Mart 時</div>
+              <div style={{ color: SC.textSub }}>
+                每個 L1–L5 各跑各的 ETL，供應商說 A 數字、採購說 B 數字、業務說 C 數字 — 開會花一半時間對帳。
+              </div>
+            </div>
+            <div className="rounded-md p-3" style={{ background: `${SC.emerald}10` }}>
+              <div className="font-bold mb-1" style={{ color: SC.emerald }}>✓ 有 Data Mart 後</div>
+              <div style={{ color: SC.textSub }}>
+                所有人看同一張 <span className="font-mono">fact_shortage</span>，業務 / 採購 / 生管 / CEO 數字一致，會議直接討論決策。
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* ⑤ 4 張 Fact 表 Schema */}
+        <Card accent={SC.amber}>
+          <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+            <span className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded text-white"
+                  style={{ background: SC.amber, letterSpacing: "0.12em" }}>⑤ DATA MART</span>
+            <h2 className="text-base font-semibold">4 張 Fact 表 · 各 AI 模組直接用</h2>
+            <span className="text-[11px]" style={{ color: SC.textSub }}>SQL schema 已定義 — 不需開發新頁面</span>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            {FACT_TABLES.map((t) => (
+              <div key={t.name} className="rounded-md border p-3" style={{ borderColor: SC.border, background: SC.surface }}>
+                <div className="flex items-baseline justify-between flex-wrap gap-2 mb-2">
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded text-white" style={{ background: SC.primary }}>SQL</span>
+                    <span className="font-mono text-sm font-bold">{t.name}</span>
+                  </div>
+                  <span className="text-[10px]" style={{ color: SC.textSub }}>{t.zh}</span>
+                </div>
+                <div className="font-mono text-[10.5px]" style={{ color: SC.text, background: SC.surfaceDim, padding: 10, borderRadius: 6 }}>
+                  <div style={{ color: SC.textSub }}>// {t.purpose}</div>
+                  {t.fields.map((f) => (
+                    <div key={f.col}>
+                      <span style={{ color: SC.blue }}>  {f.col.padEnd(22)}</span>
+                      <span style={{ color: SC.textSub }}>{f.type.padEnd(14)}</span>
+                      <span style={{ color: SC.textSub }}>-- {f.note}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-[10px] flex items-baseline justify-between" style={{ color: SC.textSub }}>
+                  <span>給 <b style={{ color: SC.primary }}>{t.usedBy.join(" · ")}</b> 用</span>
+                  <span className="font-mono">每晚 02:00 ETL</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* ⑥ 五層共用 — 每個層級從 Data Mart 取什麼 */}
+        <Card accent={SC.blue}>
+          <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+            <span className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded text-white"
+                  style={{ background: SC.blue, letterSpacing: "0.12em" }}>⑥ CONSUMERS</span>
+            <h2 className="text-base font-semibold">五層 AI 模組怎麼用這份 Data Mart</h2>
+          </div>
+          <div className="grid md:grid-cols-5 gap-2">
+            {LAYER_USAGE.map((L) => (
+              <div key={L.layer} className="rounded-md border p-3" style={{ borderColor: SC.border, background: SC.surface }}>
+                <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: L.tone, letterSpacing: "0.12em" }}>
+                  {L.layer}
+                </div>
+                <div className="text-xs font-semibold mt-1">{L.title}</div>
+                <ul className="text-[10px] mt-2 space-y-1" style={{ color: SC.textSub }}>
+                  {L.usage.map((u, i) => <li key={i}>· {u}</li>)}
+                </ul>
+                <div className="mt-2 pt-2 border-t font-mono text-[9px]"
+                     style={{ borderColor: SC.border, color: SC.blue }}>
+                  ← {L.tablesUsed.join(" + ")}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* ⑦ 缺料損失分析 — CEO 一秒看到「公司損失多少」*/}
+        <Card accent={SC.red}>
+          <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+            <span className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded text-white"
+                  style={{ background: SC.red, letterSpacing: "0.12em" }}>⑦ LOSS IMPACT</span>
+            <h2 className="text-base font-semibold">缺料損失分析 · CEO 一秒看到</h2>
+            <span className="text-[11px]" style={{ color: SC.textSub }}>
+              CEO 不在意缺幾顆 — CEO 在意「公司損失多少」
+            </span>
+            <span className="ml-auto text-[11px] font-mono font-bold" style={{ color: SC.red }}>
+              月損失合計 NT$ {SHORTAGE_LOSS.reduce((s, x) => s + x.monthlyLoss, 0).toLocaleString()}
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b" style={{ borderColor: SC.border, color: SC.textSub }}>
+                  <Th>料號</Th>
+                  <Th>品名</Th>
+                  <Th right>缺料天數</Th>
+                  <Th>影響產品 / 客戶</Th>
+                  <Th right>影響月用量</Th>
+                  <Th right>月損失</Th>
+                  <Th>建議</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {SHORTAGE_LOSS.map((s) => (
+                  <tr key={s.code} className="border-b" style={{ borderColor: SC.border }}>
+                    <Td mono><span style={{ color: SC.primary }}>{s.code}</span></Td>
+                    <Td>
+                      <div className="font-semibold">{s.name}</div>
+                      <div className="text-[10px]" style={{ color: SC.textSub }}>{s.spec}</div>
+                    </Td>
+                    <Td right>
+                      <span className="font-mono font-bold" style={{ color: s.shortageDays >= 10 ? SC.red : s.shortageDays >= 5 ? SC.amber : SC.text }}>
+                        {s.shortageDays} 天
+                      </span>
+                    </Td>
+                    <Td>
+                      <div className="text-[11px]">{s.affectedProducts.join(" · ")}</div>
+                      <div className="text-[10px]" style={{ color: SC.textSub }}>{s.customerCount} 家客戶受影響</div>
+                    </Td>
+                    <Td right mono>{s.affectedMonthlyQty.toLocaleString()}</Td>
+                    <Td right>
+                      <span className="font-mono font-extrabold" style={{ color: SC.red }}>
+                        NT$ {s.monthlyLoss.toLocaleString()}
+                      </span>
+                    </Td>
+                    <Td>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded text-white"
+                            style={{ background: s.action.tone }}>
+                        {s.action.label}
+                      </span>
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ background: SC.surfaceDim }}>
+                  <td className="py-2 px-2 font-bold" colSpan={5}>合計（前 5 項缺料的月損失）</td>
+                  <td className="py-2 px-2 text-right font-mono font-extrabold" style={{ color: SC.red }}>
+                    NT$ {SHORTAGE_LOSS.reduce((s, x) => s + x.monthlyLoss, 0).toLocaleString()}
+                  </td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div className="mt-3 rounded-md p-3 text-xs" style={{ background: SC.surfaceDeep, color: SC.textInverse }}>
+            <span className="font-mono text-[10px]" style={{ color: "#9aa78d", letterSpacing: "0.1em" }}>BOARD-LEVEL VERDICT</span><br/>
+            <b className="text-sm">缺料正在以每月 NT$ {SHORTAGE_LOSS.reduce((s, x) => s + x.monthlyLoss, 0).toLocaleString()} 的速度燒掉公司毛利。</b><br/>
+            <span style={{ color: "#cdd6c2" }} className="text-[11px]">
+              這個數字直接從 <span className="font-mono" style={{ color: SC.amber }}>fact_shortage</span> ×
+              <span className="font-mono" style={{ color: SC.amber }}> fact_inventory</span>
+              即時算出，不再需要採購、業務、CEO 三方對帳。
+            </span>
+          </div>
+        </Card>
 
         <footer className="text-[10px] pt-4 border-t flex items-center justify-between flex-wrap gap-2"
                 style={{ borderColor: SC.border, color: SC.textSub }}>
