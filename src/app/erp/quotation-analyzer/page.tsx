@@ -167,7 +167,7 @@ export default function QuotationAnalyzerPage() {
       supplierClaim, supplierExcess, sc, bom: BOM_BREAKDOWN, moves: COMMODITY_MOVES,
     });
     openOrDownload(html, `L1-executive-${SELECTED.partNo}.html`,
-      "✓ L1 Executive Report（4 頁固定）已開啟 — 為什麼不合理？影響多少？有沒有備案？風險多高？+ CEO Decision Workflow");
+      "✓ L1 Executive Report（3 頁列印 · 4 段內容）已開啟 — Verdict 改為精簡 chip / Financial + Supply Risk 合併同頁");
   };
 
   // ── ④ 發送議價會議邀請 — mailto link（預先組好 href） ──
@@ -782,7 +782,7 @@ export default function QuotationAnalyzerPage() {
                     border: "1px solid rgba(118,185,0,.4)", borderRadius: 9, padding: "10px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer",
                     display: "block", textAlign: "left",
                   }}>
-                  🏛 L1 Executive Report　<span style={{ opacity: 0.85, fontWeight: 600 }}>· 4 頁 · 總經理閱讀</span>
+                  🏛 L1 Executive Report　<span style={{ opacity: 0.85, fontWeight: 600 }}>· 3 頁 · 總經理閱讀</span>
                 </button>
                 <button
                   type="button"
@@ -2414,10 +2414,11 @@ function buildPurchasingReportHtml(args: {
   .note { font-size: 11px; color: #5b6356; padding: 8px 12px; background: #f0f7e4; border-left: 3px solid #76b900; border-radius: 4px; margin-top: 6px; }
   .note b { color: #0c1908; }
 
-  .verdict-bar { background: ${verdictColor}; color: #fff; padding: 12px 18px; border-radius: 10px; display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 12px; }
-  .verdict-bar .lbl { font-family: "IBM Plex Mono"; font-size: 11px; color: rgba(255,255,255,.7); letter-spacing: .1em; }
-  .verdict-bar .lbl b { display: block; font-family: "Noto Sans TC"; font-size: 26px; font-weight: 800; color: #fff; margin-top: 2px; }
-  .verdict-bar .big { font-family: "IBM Plex Mono"; font-size: 20px; font-weight: 800; }
+  /* compact verdict chip — 與下方 grid4 同列 */
+  .verdict-chip { display: inline-flex; align-items: center; gap: 8px; background: ${verdictColor}; color: #fff; padding: 5px 12px; border-radius: 6px; font-size: 12.5px; font-weight: 700; margin: 4px 0 10px; }
+  .verdict-chip .lbl { font-family: "IBM Plex Mono"; font-size: 9.5px; letter-spacing: .12em; opacity: .8; }
+  .verdict-chip .v { font-size: 14px; font-weight: 800; }
+  .verdict-chip .icon { font-size: 13px; }
   .grid4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px 12px; margin-bottom: 12px; }
   .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
   .cell { border: 1px solid #e9ece3; border-radius: 8px; padding: 10px 12px; }
@@ -2474,17 +2475,18 @@ function buildPurchasingReportHtml(args: {
 <body>
 
   <!-- ═════════════ PAGE 1 · 為什麼不合理？ ═════════════ -->
-  <div class="meta">CHI HUA AI · L1 EXECUTIVE REPORT · PAGE 1 of 4 · 給總經理 / 採購主管</div>
+  <div class="meta">CHI HUA AI · L1 EXECUTIVE REPORT · PAGE 1 of 3 · 給總經理 / 採購主管</div>
   <h1>L1 Executive Report · ${args.partNo}</h1>
-  <div class="sub">總經理閱讀版（4 頁）· 供應商 <b>${args.supplier}</b> · 報告日 ${today}</div>
+  <div class="sub">總經理閱讀版（3 頁列印，4 段內容）· 供應商 <b>${args.supplier}</b> · 報告日 ${today}</div>
 
   <div class="question"><span class="q">總經理想知道的第 1 個問題：</span><br/>為什麼不合理？</div>
-  <h2>第 1 頁 · Executive Summary</h2>
-
-  <div class="verdict-bar nobreak">
-    <div class="lbl">AI VERDICT<b>${verdictLabel}</b></div>
-    <div class="big">${verdictIcon}</div>
-  </div>
+  <h2>第 1 頁 · Executive Summary
+    <span class="verdict-chip" style="margin-left:10px;vertical-align:middle">
+      <span class="lbl">AI VERDICT</span>
+      <span class="v">${verdictLabel}</span>
+      <span class="icon">${verdictIcon}</span>
+    </span>
+  </h2>
 
   <div class="grid4 nobreak">
     <div class="cell"><div class="k">供應商</div><div class="v" style="font-size:15px;color:#0c1208">${args.supplier}</div><div class="v2">${args.partNo}</div></div>
@@ -2532,9 +2534,9 @@ function buildPurchasingReportHtml(args: {
   <div class="pagebreak"></div>
 
   <!-- ═════════════ PAGE 2 · 影響多少？ ═════════════ -->
-  <div class="meta">CHI HUA AI · L1 EXECUTIVE REPORT · PAGE 2 of 4</div>
+  <div class="meta">CHI HUA AI · L1 EXECUTIVE REPORT · PAGE 2 of 3 · 含 Financial Impact + Supply Risk</div>
   <div class="question"><span class="q">總經理想知道的第 2 個問題：</span><br/>影響多少？</div>
-  <h2>第 2 頁 · Financial Impact</h2>
+  <h2>第 2 段 · Financial Impact</h2>
 
   <div class="grid3 nobreak">
     <div class="cell dark">
@@ -2577,12 +2579,9 @@ function buildPurchasingReportHtml(args: {
     壓回 ${targetPrice.toFixed(2)} 即守住；切換鼎能反而省 <b class="green">NT$ ${annualImpactSwitch.toLocaleString()}/年</b>，毛利可保住 <b>${grossMarginBefore}%</b>。
   </div>
 
-  <div class="pagebreak"></div>
-
-  <!-- ═════════════ PAGE 3 · 有沒有備案？風險多高？ ═════════════ -->
-  <div class="meta">CHI HUA AI · L1 EXECUTIVE REPORT · PAGE 3 of 4</div>
-  <div class="question"><span class="q">總經理想知道的第 3 & 4 個問題：</span><br/>有沒有備案？風險多高？</div>
-  <h2>第 3 頁 · Supply Risk · 替代供應商 + Supplier Risk Score</h2>
+  <!-- 接續同頁 — 第 3 段 Supply Risk（與 Financial Impact 合併於同張 A4） -->
+  <div class="question" style="margin-top:14px"><span class="q">總經理想知道的第 3 & 4 個問題：</span><br/>有沒有備案？風險多高？</div>
+  <h2>第 3 段 · Supply Risk · 替代供應商 + Supplier Risk Score</h2>
 
   <table class="nobreak">
     <thead><tr>
@@ -2644,8 +2643,8 @@ function buildPurchasingReportHtml(args: {
   <div class="pagebreak"></div>
 
   <!-- ═════════════ PAGE 4 · Action Plan + CEO Decision Workflow ═════════════ -->
-  <div class="meta">CHI HUA AI · L1 EXECUTIVE REPORT · PAGE 4 of 4</div>
-  <h2>第 4 頁 · Action Plan + CEO Decision</h2>
+  <div class="meta">CHI HUA AI · L1 EXECUTIVE REPORT · PAGE 3 of 3 · Action Plan + CEO Decision</div>
+  <h2>第 4 段 · Action Plan + CEO Decision</h2>
 
   <h3>採購行動三層 · P1 / P2 / P3</h3>
   <table class="nobreak">
@@ -2718,7 +2717,7 @@ function buildPurchasingReportHtml(args: {
   </div>
 
   <div class="footer">
-    CHI HUA AI · L1 Executive Report v2 · 為總經理 / 採購主管設計 · 4 頁固定<br/>
+    CHI HUA AI · L1 Executive Report v3 · 為總經理 / 採購主管設計 · 3 頁列印（4 段內容，Financial Impact + Supply Risk 合併同頁）<br/>
     回答 4 個問題：為什麼不合理？影響多少？有沒有備案？風險多高？<br/>
     資料來源：ERP BOM v3.2 · LME · IPCEI · 中鋼 · BDI · 勞動部　·　列印日：${today}
   </div>
