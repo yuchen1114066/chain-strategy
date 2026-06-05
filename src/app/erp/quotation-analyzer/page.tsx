@@ -37,10 +37,11 @@ const SUBMODULES = [
 ];
 
 // Step 1 — Mock OCR 抓出來的內容
+// 一份「報價單」可含多個料號 — quoteNo 為單據級識別、partNo 為料號級
 const OCR_ROWS = [
-  { supplier: "企能",  partNo: "P03M3001", oldPrice: 6.90, newPrice: 7.90, reasonText: "銅 / 電鍍 / 海運皆漲" },
-  { supplier: "企能",  partNo: "P03M3009", oldPrice: 8.20, newPrice: 9.60, reasonText: "電鍍 + 工資" },
-  { supplier: "茂晟",  partNo: "F18-COIL", oldPrice: 12.5, newPrice: 14.8, reasonText: "原料銅成本" },
+  { quoteNo: "QTE-2026-018", supplier: "企能", partNo: "P03M3001", oldPrice: 6.90, newPrice: 7.90, reasonText: "銅 / 電鍍 / 海運皆漲" },
+  { quoteNo: "QTE-2026-018", supplier: "企能", partNo: "P03M3009", oldPrice: 8.20, newPrice: 9.60, reasonText: "電鍍 + 工資" },
+  { quoteNo: "QTE-2026-022", supplier: "茂晟", partNo: "F18-COIL", oldPrice: 12.5, newPrice: 14.8, reasonText: "原料銅成本" },
 ];
 
 // 主分析對象 — 預設第 1 列，使用者可點任一列或按 ↑↓ 切換
@@ -89,6 +90,7 @@ function computeShouldCost() {
 }
 
 type OcrRow = {
+  quoteNo: string;                 // 報價單號（1 份報價單可含多筆料號）
   supplier: string; partNo: string; oldPrice: number; newPrice: number; reasonText: string;
   uploadedAt?: number;             // 使用者上傳的報價單會有時間戳
   previewUrl?: string;             // JPG/PNG 預覽圖（object URL）
@@ -362,8 +364,13 @@ export default function QuotationAnalyzerPage() {
                         const base = file.name.replace(/\.[^.]+$/, "");
                         const supMatch  = base.match(/(企能|企龍|茂晟|重邑|鼎能|力豐|新竹\s?EFG|[一-龥]{2,4})/);
                         const partMatch = base.match(/[A-Z][A-Z0-9]{3,}[-]?[A-Z0-9]*/);
-                        const newSupplier = supMatch?.[1] ?? "新供應商";
+                        // 即使是螢幕截圖，仍預設供應商為「未識別 · 請補登」讓使用者知道要填
+                        const newSupplier = supMatch?.[1] ?? "未識別供應商（請補登）";
                         const newPartNo   = partMatch?.[0] ?? `OCR-${Date.now().toString().slice(-6)}`;
+                        // 報價單號 — YYMMDD + 流水號（demo 用時間戳尾 3 碼）
+                        const today = new Date();
+                        const yymmdd = `${today.getFullYear().toString().slice(-2)}${(today.getMonth() + 1).toString().padStart(2, "0")}${today.getDate().toString().padStart(2, "0")}`;
+                        const newQuoteNo = `QTE-${yymmdd}-${Date.now().toString().slice(-3)}`;
 
                         // 合理範圍的 demo 價格（小幅變動，模擬「另一筆報價」）
                         const oldP = +(6 + Math.random() * 4).toFixed(2);   // 6.00–10.00
@@ -371,6 +378,7 @@ export default function QuotationAnalyzerPage() {
                         const newP = +(oldP * (1 + hike)).toFixed(2);
 
                         const newRow: OcrRow = {
+                          quoteNo: newQuoteNo,
                           supplier: newSupplier,
                           partNo: newPartNo,
                           oldPrice: oldP,
@@ -390,7 +398,7 @@ export default function QuotationAnalyzerPage() {
                             setSelectedIdx(newIdx);
                             return next;
                           });
-                          showToast(`✓ AI OCR 完成 · 已加入第 ${OCR_ROWS.length + uploadedRows.length + 1} 列：${newSupplier} ${newPartNo}（+${(hike * 100).toFixed(1)}%）— 下方分析自動切換到此筆`);
+                          showToast(`✓ AI OCR 完成 · ${newQuoteNo}（${newSupplier}）已加入清單 — 按下方「進入 STEP 2 查詢分析」開始`);
                         }, 900);
                         e.target.value = ""; // 允許重複上傳同一檔案
                       }}
@@ -447,7 +455,7 @@ export default function QuotationAnalyzerPage() {
             <div>
               <div className="flex items-baseline justify-between flex-wrap gap-2 mb-2">
                 <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>
-                  ② 待查詢報價單 · 點任一列或按 ↑↓ 切換，下方所有分析自動更換
+                  ② 待查詢報價單清單 · 一份報價單可含多筆料號 · 點任一列或按 ↑↓ 切換
                 </div>
                 <span style={{ fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700, color: BR.greenDeep, background: BR.greenSoft, padding: "2px 7px", borderRadius: 4, letterSpacing: "0.06em", border: `1px solid ${BR.greenLine}` }}>
                   已選 {selectedIdx + 1} / {allRows.length}
@@ -463,10 +471,10 @@ export default function QuotationAnalyzerPage() {
                 }}
                 style={{ outline: "none" }}
               >
-                <table className="w-full text-sm" style={{ borderCollapse: "collapse", minWidth: 580 }}>
+                <table className="w-full text-sm" style={{ borderCollapse: "collapse", minWidth: 640 }}>
                   <thead>
                     <tr style={{ borderBottom: `1px solid ${BR.border}`, background: "#fbfcfa" }}>
-                      {["供應商", "料號", "舊價格", "新價格", "漲幅", "原因 (供應商說)"].map((h, i) => (
+                      {["報價單號 / 供應商", "料號", "舊價格", "新價格", "漲幅", "原因 (供應商說)"].map((h, i) => (
                         <th key={h} style={{
                           fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, letterSpacing: "0.04em",
                           color: BR.inkFaint, textAlign: i >= 2 && i <= 4 ? "right" : "left",
@@ -480,9 +488,11 @@ export default function QuotationAnalyzerPage() {
                       const pct = ((r.newPrice - r.oldPrice) / r.oldPrice) * 100;
                       const selected = i === selectedIdx;
                       const isUploaded = !!r.uploadedAt;
+                      // 同一份報價單號連續出現時，把第二筆以後的 quoteNo 顯示為空（視覺上「合併」這份單）
+                      const sameQuoteAsPrev = i > 0 && allRows[i - 1].quoteNo === r.quoteNo;
                       return (
                         <tr
-                          key={`${r.partNo}-${i}`}
+                          key={`${r.quoteNo}-${r.partNo}-${i}`}
                           onClick={() => setSelectedIdx(i)}
                           style={{
                             borderBottom: `1px solid #f3f5ef`,
@@ -493,25 +503,39 @@ export default function QuotationAnalyzerPage() {
                           onMouseEnter={(e) => { if (!selected) (e.currentTarget as HTMLTableRowElement).style.background = isUploaded ? "#f9e8fb" : "#fbfcfa"; }}
                           onMouseLeave={(e) => { if (!selected) (e.currentTarget as HTMLTableRowElement).style.background = isUploaded ? "#fdf4ff" : "transparent"; }}
                         >
-                          <td style={{ padding: "12px 8px", fontWeight: 700 }}>
-                            {selected && <span style={{ color: BR.green, marginRight: 6, fontFamily: FONT_MONO, fontSize: 11 }}>▶</span>}
-                            {r.supplier}
-                            {isUploaded && <span style={{ fontFamily: FONT_MONO, fontSize: 9, marginLeft: 6, color: "#fff", background: BR.purple, padding: "1px 5px", borderRadius: 3, letterSpacing: ".04em" }}>NEW</span>}
-                          </td>
-                          <td style={{ padding: "12px 8px", fontFamily: FONT_MONO, fontWeight: 700, color: selected ? BR.greenDeep : BR.ink }}>
-                            {r.partNo}
-                            {r.previewUrl && (
-                              <a href={r.previewUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ marginLeft: 6, fontSize: 10, color: BR.purple, textDecoration: "underline" }}>
-                                看圖
+                          <td style={{ padding: "10px 8px", verticalAlign: "top", minWidth: 180 }}>
+                            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                              {selected && <span style={{ color: BR.green, fontFamily: FONT_MONO, fontSize: 11 }}>▶</span>}
+                              {!sameQuoteAsPrev && (
+                                <span style={{ fontFamily: FONT_MONO, fontWeight: 800, fontSize: 12, color: isUploaded ? BR.purple : BR.greenDeep }}>
+                                  {r.quoteNo}
+                                </span>
+                              )}
+                              {sameQuoteAsPrev && (
+                                <span style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint, letterSpacing: ".04em" }}>↳ 同單追加</span>
+                              )}
+                              {isUploaded && !sameQuoteAsPrev && (
+                                <span style={{ fontFamily: FONT_MONO, fontSize: 9, color: "#fff", background: BR.purple, padding: "1px 5px", borderRadius: 3, letterSpacing: ".04em" }}>NEW</span>
+                              )}
+                            </div>
+                            <div style={{ fontWeight: 700, fontSize: 13, marginTop: 2, color: BR.ink }}>
+                              {r.supplier}
+                            </div>
+                            {r.previewUrl && !sameQuoteAsPrev && (
+                              <a href={r.previewUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ fontSize: 10, color: BR.purple, textDecoration: "underline" }}>
+                                📷 看上傳截圖
                               </a>
                             )}
                           </td>
-                          <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, color: BR.inkSoft }}>{r.oldPrice.toFixed(2)}</td>
-                          <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700 }}>↗ {r.newPrice.toFixed(2)}</td>
-                          <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 800, color: BR.red }}>
+                          <td style={{ padding: "10px 8px", fontFamily: FONT_MONO, fontWeight: 700, color: selected ? BR.greenDeep : BR.ink, verticalAlign: "top" }}>
+                            {r.partNo}
+                          </td>
+                          <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: FONT_MONO, color: BR.inkSoft, verticalAlign: "top" }}>{r.oldPrice.toFixed(2)}</td>
+                          <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, verticalAlign: "top" }}>↗ {r.newPrice.toFixed(2)}</td>
+                          <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 800, color: BR.red, verticalAlign: "top" }}>
                             +{pct.toFixed(1)}%
                           </td>
-                          <td style={{ padding: "12px 8px", fontSize: 12, color: BR.inkSoft }}>
+                          <td style={{ padding: "10px 8px", fontSize: 12, color: BR.inkSoft, verticalAlign: "top" }}>
                             {r.reasonText}
                             {isUploaded && r.fileName && <div style={{ fontSize: 10, color: BR.purple, marginTop: 2 }}>📎 {r.fileName}</div>}
                           </td>
@@ -521,20 +545,41 @@ export default function QuotationAnalyzerPage() {
                   </tbody>
                 </table>
               </div>
-              <div className="mt-3 rounded-[10px] p-3 flex items-baseline justify-between" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
-                <span style={{ fontSize: 12 }}>
-                  AI 立即算（選中 <b style={{ color: BR.greenDeep, fontFamily: FONT_MONO }}>{SELECTED.partNo}</b> · {SELECTED.supplier}）：
-                </span>
-                <span style={{ fontFamily: FONT_MONO, fontSize: 18, fontWeight: 800, color: BR.red }}>
-                  +{supplierClaim.toFixed(1)}%
-                </span>
+              {/* 上傳 + 選擇好之後的 CTA — 解決「上傳後怎麼查詢」 */}
+              <div className="mt-3 rounded-[10px] p-3" style={{ background: BR.greenSoft, border: `1px solid ${BR.greenLine}` }}>
+                <div className="flex items-baseline justify-between flex-wrap gap-2 mb-2">
+                  <div style={{ fontSize: 12, color: BR.greenInk }}>
+                    已選報價單　<b style={{ fontFamily: FONT_MONO, color: BR.greenDeep }}>{SELECTED.quoteNo}</b>　/　<b>{SELECTED.supplier}</b>　/　料號 <b style={{ fontFamily: FONT_MONO }}>{SELECTED.partNo}</b>
+                  </div>
+                  <span style={{ fontFamily: FONT_MONO, fontSize: 18, fontWeight: 800, color: BR.red }}>
+                    AI 立即算 +{supplierClaim.toFixed(1)}%
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    document.querySelector('[data-step="2"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    showToast(`→ 進入 STEP 2 分析：${SELECTED.quoteNo} · ${SELECTED.supplier} / ${SELECTED.partNo}`);
+                  }}
+                  style={{
+                    width: "100%", background: BR.green, color: "#fff",
+                    border: "none", borderRadius: 9, padding: "11px 14px",
+                    fontSize: 13.5, fontWeight: 800, cursor: "pointer",
+                    boxShadow: "0 4px 12px rgba(118,185,0,.32)",
+                    letterSpacing: ".06em",
+                  }}
+                >
+                  → 進入 STEP 2 查詢分析（BOM 比對、Should-Cost 推導、合理性判定）
+                </button>
               </div>
             </div>
           </div>
         </Card>
 
         {/* Step 2 · 找料號 → BOM / CBS / Commodity Mapping */}
-        <StepHeader badge="STEP 2" title="AI 自動尋找料號" en="Auto-match to ERP · BOM / CBS / Commodity Mapping" desc="從 ERP 找到該料號，拉出 BOM 結構與商品 mapping" />
+        <div data-step="2">
+          <StepHeader badge="STEP 2" title="AI 自動尋找料號" en="Auto-match to ERP · BOM / CBS / Commodity Mapping" desc="從 ERP 找到該料號，拉出 BOM 結構與商品 mapping" />
+        </div>
         <Card>
           <div className="grid lg:grid-cols-[300px,1fr] gap-5">
             <div>
