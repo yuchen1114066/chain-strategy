@@ -131,6 +131,7 @@ export default function Sidebar() {
           <div>
             {[
               { href: "/erp/warroom",         label: "CEO War Room v1" },
+              { href: "/erp/cbs",             label: "CBS · 成本 DNA" },
               { href: "/erp/profit-defense",  label: "Profit Defense" },
               { href: "/erp/requisition",     label: "Requisition" },
               { href: "/roadmap",             label: "4 Phase Roadmap" },
