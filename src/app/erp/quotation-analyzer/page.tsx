@@ -48,16 +48,7 @@ const OCR_ROWS = [
 // (SELECTED 由 component state `selectedIdx` 在 render 時動態決定，見下方)
 
 // Step 2 — 找到的 BOM / CBS / Commodity Mapping
-const BOM_BREAKDOWN = [
-  { k: "銅材", pct: 58, tone: BR.red,    mapTo: "LME 銅 (Cu)" },
-  { k: "電鍍", pct: 10, tone: BR.purple, mapTo: "電鍍加工指數" },
-  { k: "加工", pct: 15, tone: BR.blue,   mapTo: "台製造業最低工資" },
-  { k: "包材", pct:  2, tone: BR.amber,  mapTo: "瓦楞紙 / 紙箱" },
-  { k: "運費", pct:  5, tone: "#10b981", mapTo: "BDI + 海運附加" },
-  { k: "利潤", pct: 10, tone: BR.inkSoft, mapTo: "—" },
-];
-
-// Step 3 — AI 抓的目前各成分變動 + 當前 vs 基期價（計算依據透明化）
+// Step 3 — AI 抓的目前各成分變動 + 當前 vs 基期價（共用、各零件都看同一份市場行情）
 const COMMODITY_MOVES = [
   { k: "LME 銅",         current: 9472,  baseline: 9021,  unit: "USD/MT", asOf: "2026-06-04 (LME spot)", source: "LME 30 日均",        delta: +5.0 },
   { k: "電鍍加工指數",   current: 134.2, baseline: 119.8, unit: "Index",  asOf: "2026 Q1",                source: "IPCEI 業界指數",      delta: +12.0 },
@@ -66,26 +57,98 @@ const COMMODITY_MOVES = [
   { k: "運費 BDI",       current: 1842,  baseline: 1721,  unit: "BDI",    asOf: "2026-06-04",             source: "Baltic Dry Index",    delta: +7.0 },
 ];
 
-// 給 PDF / on-page 用：每個 BOM 成分對應的商品計算依據
+// 每個 BOM 成分對應的商品計算依據（共用查表）
 const COMPONENT_PRICE: Record<string, { current: number; baseline: number; unit: string; asOf: string; source: string }> = {
   "銅材": { current: 9472,  baseline: 9021,  unit: "USD/MT", asOf: "LME spot 2026-06-04", source: "LME 倫敦金屬交易所 · 30 日均" },
   "電鍍": { current: 134.2, baseline: 119.8, unit: "Index",  asOf: "2026 Q1",             source: "IPCEI 電鍍加工業界指數" },
   "加工": { current: 312,   baseline: 289,   unit: "USD/MT", asOf: "2026-06 牌價",        source: "中鋼 + 寶武 鏡板 / 鎂鋁料價" },
   "運費": { current: 1842,  baseline: 1721,  unit: "BDI",    asOf: "2026-06-04",          source: "Baltic Dry Index (BDI)" },
+  "絕緣": { current: 134.2, baseline: 119.8, unit: "Index",  asOf: "2026 Q1",             source: "IPCEI 漆包指數" },
+  "繞線": { current: 31480, baseline: 30560, unit: "NT$/月", asOf: "2026 Q2 公告",        source: "勞動部 工資統計" },
 };
 
-// Step 4 — 計算 Should Cost
-// 把 BOM 成分 mapping 到 commodity 變動，加總得到合理漲幅
-function computeShouldCost() {
-  const rows: { k: string; weight: number; delta: number; contrib: number }[] = [
-    { k: "銅材", weight: 58, delta: 5,  contrib: 0 },
-    { k: "電鍍", weight: 10, delta: 12, contrib: 0 },
-    { k: "加工", weight: 15, delta: 8,  contrib: 0 },
-    { k: "運費", weight: 5,  delta: 7,  contrib: 0 },
-  ];
-  rows.forEach((r) => (r.contrib = +((r.weight * r.delta) / 100).toFixed(2)));
+// ────────────────────────────────────────────────────────────────────
+// Part profile — 每個料號有自己的 BOM + 加成結構
+// 切換料號 → BOM、Should-Cost、STEP 4 三欄、議價策略 全部跟著重算
+// ────────────────────────────────────────────────────────────────────
+type BomRow      = { k: string; pct: number; tone: string; mapTo: string };
+type WeightRow   = { k: string; weight: number; commodityIdx: number };
+type PartProfile = { category: string; bom: BomRow[]; weights: WeightRow[] };
+
+const PART_PROFILES: Record<string, PartProfile> = {
+  "P03M3001": {
+    category: "電線組（銅含量高）",
+    bom: [
+      { k: "銅材", pct: 58, tone: BR.red,     mapTo: "LME 銅 (Cu)" },
+      { k: "電鍍", pct: 10, tone: BR.purple,  mapTo: "電鍍加工指數" },
+      { k: "加工", pct: 15, tone: BR.blue,    mapTo: "工資 + 鏡板" },
+      { k: "包材", pct:  2, tone: BR.amber,   mapTo: "瓦楞紙 / 紙箱" },
+      { k: "運費", pct:  5, tone: "#10b981",  mapTo: "BDI + 海運附加" },
+      { k: "利潤", pct: 10, tone: BR.inkSoft, mapTo: "—" },
+    ],
+    weights: [
+      { k: "銅材", weight: 58, commodityIdx: 0 }, // LME 銅 +5%
+      { k: "電鍍", weight: 10, commodityIdx: 1 }, // 電鍍指數 +12%
+      { k: "加工", weight: 15, commodityIdx: 2 }, // 鏡板 +8%
+      { k: "運費", weight:  5, commodityIdx: 4 }, // BDI +7%
+    ],
+  },
+  "P03M3009": {
+    category: "電線組（含端子壓接）",
+    bom: [
+      { k: "銅材", pct: 52, tone: BR.red,     mapTo: "LME 銅 (Cu)" },
+      { k: "電鍍", pct: 14, tone: BR.purple,  mapTo: "電鍍加工指數" },
+      { k: "加工", pct: 18, tone: BR.blue,    mapTo: "工資" },
+      { k: "包材", pct:  3, tone: BR.amber,   mapTo: "瓦楞紙 / 紙箱" },
+      { k: "運費", pct:  5, tone: "#10b981",  mapTo: "BDI" },
+      { k: "利潤", pct:  8, tone: BR.inkSoft, mapTo: "—" },
+    ],
+    weights: [
+      { k: "銅材", weight: 52, commodityIdx: 0 },
+      { k: "電鍍", weight: 14, commodityIdx: 1 },
+      { k: "加工", weight: 18, commodityIdx: 3 }, // 工資 +3%
+      { k: "運費", weight:  5, commodityIdx: 4 },
+    ],
+  },
+  "F18-COIL": {
+    category: "磁阻線圈（銅佔極高）",
+    bom: [
+      { k: "銅材", pct: 72, tone: BR.red,     mapTo: "LME 銅 (Cu) · 漆包銅線" },
+      { k: "絕緣", pct:  8, tone: BR.purple,  mapTo: "漆包指數" },
+      { k: "繞線", pct: 12, tone: BR.blue,    mapTo: "工資（繞線人工）" },
+      { k: "包材", pct:  2, tone: BR.amber,   mapTo: "EPE 緩衝 + 紙箱" },
+      { k: "運費", pct:  3, tone: "#10b981",  mapTo: "BDI" },
+      { k: "利潤", pct:  3, tone: BR.inkSoft, mapTo: "—" },
+    ],
+    weights: [
+      { k: "銅材", weight: 72, commodityIdx: 0 },
+      { k: "絕緣", weight:  8, commodityIdx: 1 },
+      { k: "繞線", weight: 12, commodityIdx: 3 },
+      { k: "運費", weight:  3, commodityIdx: 4 },
+    ],
+  },
+};
+
+const DEFAULT_PROFILE = PART_PROFILES["P03M3001"];
+
+function getProfile(partNo: string): PartProfile {
+  return PART_PROFILES[partNo] ?? DEFAULT_PROFILE;
+}
+
+// Step 4 — Should Cost：從 profile + 共用 COMMODITY_MOVES 推算
+function computeShouldCost(profile: PartProfile) {
+  const rows = profile.weights.map((w) => {
+    const move = COMMODITY_MOVES[w.commodityIdx];
+    const delta = move?.delta ?? 0;
+    return {
+      k: w.k,
+      weight: w.weight,
+      delta,
+      contrib: +((w.weight * delta) / 100).toFixed(2),
+    };
+  });
   const total = +rows.reduce((s, r) => s + r.contrib, 0).toFixed(1);
-  const buffered = +(total * 1.1).toFixed(1); // ±10% 緩衝後上限
+  const buffered = +(total * 1.1).toFixed(1);
   return { rows, total, buffered };
 }
 
@@ -107,7 +170,10 @@ export default function QuotationAnalyzerPage() {
   // 報價單清單選擇（可點列、↑↓ 鍵切換、上傳完自動選新列 — 下方所有分析隨之同步）
   const [selectedIdx, setSelectedIdx] = useState(0);
   const SELECTED = allRows[selectedIdx] ?? allRows[0];
-  const sc = computeShouldCost();
+  // 依當前選中料號取對應 BOM / Should-Cost profile（換料號全部資料隨之更新）
+  const profile = getProfile(SELECTED.partNo);
+  const BOM_BREAKDOWN = profile.bom;
+  const sc = computeShouldCost(profile);
 
   // 真實的 supplier claim 漲幅
   const supplierClaim = +(((SELECTED.newPrice - SELECTED.oldPrice) / SELECTED.oldPrice) * 100).toFixed(1);
@@ -611,7 +677,7 @@ export default function QuotationAnalyzerPage() {
 
             <div>
               <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 8 }}>
-                ③ {SELECTED.partNo} 的 BOM 結構（demo · 銅件範例 — 正式版依料號自動從 ERP 標成讀取）
+                ③ {SELECTED.partNo} 的 BOM 結構 · 類別：{profile.category}
               </div>
               <div className="space-y-2">
                 {BOM_BREAKDOWN.map((b) => (
@@ -688,17 +754,10 @@ export default function QuotationAnalyzerPage() {
             {/* 左 · Cost Breakdown */}
             <div className="rounded-[12px] p-4" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
               <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 12 }}>
-                ① COST BREAKDOWN
+                ① COST BREAKDOWN · {SELECTED.partNo}
               </div>
               <div className="space-y-2.5">
-                {[
-                  { k: "銅材", pct: 58, tone: BR.red },
-                  { k: "電鍍", pct: 10, tone: BR.purple },
-                  { k: "加工", pct: 15, tone: BR.blue },
-                  { k: "包材", pct:  2, tone: BR.amber },
-                  { k: "運費", pct:  5, tone: "#10b981" },
-                  { k: "利潤", pct: 10, tone: BR.inkSoft },
-                ].map((b) => (
+                {BOM_BREAKDOWN.map((b) => (
                   <div key={b.k} className="flex items-center gap-2">
                     <span style={{ width: 40, fontWeight: 700, color: BR.ink }}>{b.k}</span>
                     <div className="flex-1" style={{ height: 8, background: "#eef0ea", borderRadius: 4, overflow: "hidden" }}>
@@ -711,38 +770,40 @@ export default function QuotationAnalyzerPage() {
                 ))}
               </div>
               <div className="mt-3 pt-3 border-t" style={{ borderColor: BR.border, fontSize: 11, color: BR.inkSoft }}>
-                來源：ERP 標準成本卡 + CBS
+                來源：ERP 標準成本卡 + CBS · 類別：{profile.category}
               </div>
             </div>
 
-            {/* 中 · Market Impact */}
+            {/* 中 · Market Impact — 標出本料用到的商品 */}
             <div className="rounded-[12px] p-4" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
               <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 12 }}>
-                ② MARKET IMPACT
+                ② MARKET IMPACT · 本料用到的商品
               </div>
               <div className="space-y-2.5">
-                {[
-                  { k: "銅",   delta: 5,  src: "LME" },
-                  { k: "電鍍", delta: 12, src: "IPCEI" },
-                  { k: "加工", delta: 8,  src: "鏡板" },
-                  { k: "包材", delta: 0,  src: "持平" },
-                  { k: "運費", delta: 7,  src: "BDI" },
-                  { k: "工資", delta: 3,  src: "勞動部" },
-                ].map((m) => (
-                  <div key={m.k} className="flex items-center gap-3">
-                    <span style={{ width: 40, fontWeight: 700, color: BR.ink }}>{m.k}</span>
-                    <span style={{ flex: 1, fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint }}>{m.src}</span>
-                    <span style={{
-                      fontFamily: FONT_MONO, fontSize: 14, fontWeight: 800,
-                      color: m.delta >= 10 ? BR.red : m.delta >= 5 ? BR.amber : m.delta > 0 ? BR.greenDeep : BR.inkFaint,
-                    }}>
-                      {m.delta > 0 ? "+" : ""}{m.delta}%
-                    </span>
-                  </div>
-                ))}
+                {(() => {
+                  const usedIdx = new Set(profile.weights.map((w) => w.commodityIdx));
+                  return COMMODITY_MOVES.map((m, idx) => {
+                    const used = usedIdx.has(idx);
+                    return (
+                      <div key={m.k} className="flex items-center gap-3" style={{ opacity: used ? 1 : 0.35 }}>
+                        <span style={{ width: 76, fontWeight: 700, color: BR.ink, fontSize: 12 }}>
+                          {used && <span style={{ color: BR.green, marginRight: 4 }}>●</span>}
+                          {m.k.replace("LME ", "").replace("運費 ", "").replace(/（.+）/, "")}
+                        </span>
+                        <span style={{ flex: 1, fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint }}>{m.source.split(" ")[0]}</span>
+                        <span style={{
+                          fontFamily: FONT_MONO, fontSize: 14, fontWeight: 800,
+                          color: m.delta >= 10 ? BR.red : m.delta >= 5 ? BR.amber : m.delta > 0 ? BR.greenDeep : BR.inkFaint,
+                        }}>
+                          {m.delta > 0 ? "+" : ""}{m.delta}%
+                        </span>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
               <div className="mt-3 pt-3 border-t" style={{ borderColor: BR.border, fontSize: 11, color: BR.inkSoft }}>
-                來源：LME · 中鋼 · BDI · 勞動部
+                來源：LME · 中鋼 · BDI · 勞動部　·　<span style={{ color: BR.green }}>●</span> 為本料用到
               </div>
             </div>
 
@@ -896,7 +957,7 @@ export default function QuotationAnalyzerPage() {
 
         {/* ▶▶▶ 補強 ② · Alternative Supplier Recommendation — 該換家了嗎 */}
         <StepHeader badge="ENHANCE 2" title="Alternative Supplier" en="替代供應商建議" desc="若議價失敗，AI 自動推薦可立即詢價的替代供應商" tone={BR.purple} />
-        <AlternativeSupplierCard buffered={sc.buffered} />
+        <AlternativeSupplierCard buffered={sc.buffered} selected={SELECTED} />
 
         {/* ▶▶▶ 補強 ③ · Negotiation Copilot — AI 直接草擬議價信 */}
         <StepHeader badge="ENHANCE 3" title="Negotiation Copilot" en="AI 草擬議價信稿" desc="業務 / 採購不會寫 — AI 都做這些（不只給數字，給文字）" tone={BR.purple} />
@@ -2108,13 +2169,32 @@ const ALT_SUPPLIERS = [
   { name: "新竹 EFG",     quote: 7.30, leadWeeks: 4, qualityScore: 89, onTime: 85, deltaVsCurrent:  -7.6, status: "觀察 · 品質次之" },
 ];
 
-function AlternativeSupplierCard({ buffered }: { buffered: number }) {
+function AlternativeSupplierCard({ buffered, selected }: { buffered: number; selected: OcrRow }) {
+  // 動態替代供應商：報價以 selected.oldPrice 為基準推算（換料號 / 換廠商都會跟著動）
+  const baseFreezePrice = +(selected.oldPrice * 1.00).toFixed(2);   // 重邑：跟 oldPrice 一樣（凍漲）
+  const baseLowPrice    = +(selected.oldPrice * 0.99).toFixed(2);   // 鼎能：略低
+  const baseFastPrice   = +(selected.oldPrice * 1.03).toFixed(2);   // 力豐：快但稍貴
+  const baseObservePrice= +(selected.oldPrice * 1.06).toFixed(2);   // 新竹 EFG：再貴一點
+  const currentPrice    = selected.newPrice;
+  const dyn = [
+    { name: "重邑",     quote: baseFreezePrice,  leadWeeks: 6, qualityScore: 90, onTime: 87, status: "最初供應商 · 今年凍漲" },
+    { name: "鼎能精密", quote: baseLowPrice,     leadWeeks: 5, qualityScore: 92, onTime: 88, status: "次選 · 報價最低" },
+    { name: "力豐電子", quote: baseFastPrice,    leadWeeks: 3, qualityScore: 95, onTime: 93, status: "急單備案 · 交期最快" },
+    { name: "新竹 EFG", quote: baseObservePrice, leadWeeks: 4, qualityScore: 89, onTime: 85, status: "觀察 · 品質次之" },
+  ].map((s) => ({
+    ...s,
+    deltaVsCurrent: +(((s.quote - currentPrice) / currentPrice) * 100).toFixed(1),
+  }));
+  const top = dyn[0];
+  const currentPct = +(((currentPrice - selected.oldPrice) / selected.oldPrice) * 100).toFixed(1);
+  const savingPct  = +(((currentPrice - top.quote) / currentPrice) * 100).toFixed(1);
+
   return (
     <Card>
       <div className="grid lg:grid-cols-[1fr,260px] gap-5">
         <div>
           <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 12 }}>
-            ① 替代供應商比較
+            ① 替代供應商比較 · {selected.partNo}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
@@ -2133,17 +2213,17 @@ function AlternativeSupplierCard({ buffered }: { buffered: number }) {
                 {/* current supplier row */}
                 <tr style={{ borderBottom: `1px solid #f3f5ef`, background: BR.redSoft }}>
                   <td style={{ padding: "12px 8px", fontWeight: 700 }}>
-                    企能（現任）
+                    {selected.supplier}（現任）
                     <span style={{ fontFamily: FONT_MONO, fontSize: 9, marginLeft: 6, color: "#fff", background: BR.red, padding: "1px 5px", borderRadius: 3 }}>NOW</span>
                   </td>
-                  <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.red }}>7.90</td>
+                  <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.red }}>{currentPrice.toFixed(2)}</td>
                   <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO }}>7 週</td>
                   <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO }}>90</td>
                   <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO }}>82%</td>
                   <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, color: BR.inkFaint }}>baseline</td>
-                  <td style={{ padding: "12px 8px", fontSize: 11, fontWeight: 700, color: BR.red }}>本次 +16.2% 不合理 → 退單</td>
+                  <td style={{ padding: "12px 8px", fontSize: 11, fontWeight: 700, color: BR.red }}>本次 +{currentPct}% 不合理 → 退單</td>
                 </tr>
-                {ALT_SUPPLIERS.map((s, i) => {
+                {dyn.map((s, i) => {
                   const action = i === 0 ? { label: "✓ 立即詢價", tone: BR.greenDeep }
                                 : i === 1 ? { label: "✓ 切換",     tone: BR.greenDeep }
                                 : i === 2 ? { label: "備案",       tone: BR.amber }
@@ -2180,48 +2260,48 @@ function AlternativeSupplierCard({ buffered }: { buffered: number }) {
           <div className="rounded-[10px] p-4" style={{ background: BR.greenSoft, border: `1.5px solid ${BR.green}` }}>
             <div className="flex items-baseline justify-between flex-wrap gap-1">
               <span style={{ fontFamily: FONT_HEAD, fontSize: 16, fontWeight: 700, color: BR.greenInk }}>
-                重邑（SUP-CY）
+                {top.name}（SUP-CY）
               </span>
               <span style={{ fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: "#fff", color: BR.greenDeep, border: `1px solid ${BR.greenLine}` }}>
                 ERP 已登錄 · 本地
               </span>
             </div>
             <div className="mt-2 space-y-1.5 text-sm">
-              <div className="flex justify-between"><span style={{ color: BR.greenDeep }}>報價</span><span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenInk }}>6.96</span></div>
-              <div className="flex justify-between"><span style={{ color: BR.greenDeep }}>交期</span><span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenInk }}>5–6 週</span></div>
+              <div className="flex justify-between"><span style={{ color: BR.greenDeep }}>報價</span><span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenInk }}>{top.quote.toFixed(2)}</span></div>
+              <div className="flex justify-between"><span style={{ color: BR.greenDeep }}>交期</span><span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenInk }}>{top.leadWeeks} 週</span></div>
               <div className="flex justify-between"><span style={{ color: BR.greenDeep }}>今年漲幅</span><span style={{ fontFamily: FONT_MONO, fontWeight: 800, color: BR.greenInk }}>0%（凍漲）</span></div>
               <div className="flex justify-between pt-2 border-t" style={{ borderColor: BR.greenLine }}>
                 <span style={{ color: BR.greenDeep }}>vs 現任省</span>
-                <span style={{ fontFamily: FONT_MONO, fontWeight: 800, fontSize: 16, color: BR.greenInk }}>−11.9%</span>
+                <span style={{ fontFamily: FONT_MONO, fontWeight: 800, fontSize: 16, color: BR.greenInk }}>−{savingPct.toFixed(1)}%</span>
               </div>
             </div>
             {(() => {
-              const rfqSubject = "[RFQ] P03M3001 報價邀請 — 重邑 · 沿用原供應商";
+              const rfqSubject = `[RFQ] ${selected.partNo} 報價邀請 — ${top.name} · 沿用原供應商`;
               const rfqBody = [
-                "Dear 重邑 業務 先進，",
+                `Dear ${top.name} 業務 先進，`,
                 "",
                 "貴司目前已是本公司登錄供應商（ERP 編號 SUP-CY，過往合作料件含 P03SB155 軸心、M14AC001 自攻螺絲）。",
-                "本次因另一供應商企龍報價由 6.90 元調漲至 7.90 元（+14.5%），超出 AI Should-Cost 合理上限，",
-                "故擬將 P03M3001 / P03NB001 之常態大貨採購回歸貴司。",
+                `本次因 ${selected.supplier} 報價由 ${selected.oldPrice.toFixed(2)} 元調漲至 ${selected.newPrice.toFixed(2)} 元（+${currentPct}%），超出 AI Should-Cost 合理上限，`,
+                `故擬將 ${selected.partNo} 之常態大貨採購回歸貴司。`,
                 "",
-                "經比對歷史進貨記錄，貴司本料維持 6.96 元（多年未調漲），AI 評分為首選備案。",
+                `經比對歷史進貨記錄，貴司本料維持 ${top.quote.toFixed(2)} 元（多年未調漲），AI 評分為首選備案。`,
                 "",
                 "詢價需求：",
-                "・料號：P03M3001（材質、表處請依現行 SS45C / M25-Bn 二價鋅）",
+                `・料號：${selected.partNo}`,
                 "・月用量：17,000 件",
                 "・年用量：204,000 件",
-                "・常態大貨：可接受 5–6 週交期，提前 5–6 週下單鎖定低成本",
-                "・緊急訂單：另由企龍以 3–4 週支援，確保產線零斷線",
+                `・常態大貨：可接受 ${top.leadWeeks} 週交期，提前下單鎖定低成本`,
+                `・緊急訂單：另由 ${selected.supplier} 以 3–4 週支援，確保產線零斷線`,
                 "",
                 "請於 7 個工作日內回覆：",
-                "1. 單價是否維持 6.96 元（或調整原因）",
+                `1. 單價是否維持 ${top.quote.toFixed(2)} 元（或調整原因）`,
                 "2. 年度合約價可否鎖定 12 個月",
                 "3. MOQ、付款條件",
                 "4. 樣品 / 標準交期",
                 "",
                 "附件（將於 RFQ 確認回覆後寄出）：",
                 "・Should-Cost 拆解 PDF",
-                "・BOM 規格書（SS45C + M25-Bn 二價鋅）",
+                "・BOM 規格書",
                 "・品質驗收標準",
                 "",
                 "謝謝。",
@@ -2247,8 +2327,8 @@ function AlternativeSupplierCard({ buffered }: { buffered: number }) {
           </div>
           <div className="rounded-[10px] p-3" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
             <div style={{ fontSize: 11, color: BR.inkSoft, lineHeight: 1.55 }}>
-              <b style={{ color: BR.ink }}>常態大貨</b>走重邑（5–6 週、6.96 凍漲）／
-              <b style={{ color: BR.ink }}>急單</b>走力豐或鼎能（3–5 週）。
+              <b style={{ color: BR.ink }}>常態大貨</b>走 {top.name}（{top.leadWeeks} 週、{top.quote.toFixed(2)} 凍漲）／
+              <b style={{ color: BR.ink }}>急單</b>走 {dyn[1].name} 或 {dyn[2].name}（{Math.min(dyn[1].leadWeeks, dyn[2].leadWeeks)}–{Math.max(dyn[1].leadWeeks, dyn[2].leadWeeks)} 週）。
               切換後可進入 <b style={{ color: BR.ink }}>L2 Lead Time Validation</b> 評估實際交期風險。
             </div>
           </div>
