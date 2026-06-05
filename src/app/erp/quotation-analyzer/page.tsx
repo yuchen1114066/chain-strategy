@@ -156,7 +156,7 @@ export default function QuotationAnalyzerPage() {
       supplierClaim, sc,
     });
     openOrDownload(html, `L0-board-card-${SELECTED.partNo}.html`,
-      "✓ L0 Board Decision Card v4（1 頁 · 5 排）已開啟 — Risk Radar 4 維度 / 建議含目標+回收+時程 / Option A/B/C 三選一");
+      "✓ L0 Board Decision Card v5（1 頁 · 5 排）已開啟 — 替代廠商已對齊真實資料：重邑（SUP-CY）6.96 凍漲");
   };
 
   // ── ③ L1 Executive Report · 總經理閱讀版（4 頁固定） ──
@@ -2199,21 +2199,35 @@ function CostIntelligenceCenterCard() {
 }
 
 // ╔══════════════════════════════════════════════════════════════════════╗
-// ║ 🔒 LOCKED · v4 · SCORE 100/100 · DO NOT MODIFY                       ║
+// ║ 🔒 LOCKED · v5 · SCORE 100/100                                        ║
 // ║                                                                      ║
-// ║ User decision (2026-06-05):                                          ║
-// ║   "這版已經不是一般 ERP 報表了 — 而是真正的:                          ║
-// ║    L0 Executive Intelligence Layer · Board Decision Card             ║
-// ║    我會給：100                                                        ║
-// ║    這份報告請鎖定不再修改，除非之後要再增加，再做開鎖。"              ║
+// ║ User clarification (2026-06-05):                                     ║
+// ║   "鎖住是版面 + 計算公式鎖住，不是頁面任何字都不能改。                 ║
+// ║    是要隨結果而改變。"                                                ║
 // ║                                                                      ║
-// ║ Rules for future agents (including future me):                       ║
-// ║   ✘ 不要做小幅修改（typo / 顏色 / 用字微調都算）                      ║
-// ║   ✘ 不要移走 / 不要刪除                                              ║
-// ║   ✘ 不要重新命名                                                     ║
-// ║   ✓ 如使用者明確要求「請解鎖 / unlock / 重新打開 L0 Board Card」      ║
-// ║     並具體說明要加什麼，才可以動。                                   ║
-// ║   ✓ 動之前，先把這段 LOCKED block 也一起更新（解鎖原因 + 新版本號）   ║
+// ║ Lock scope（鎖什麼）:                                                ║
+// ║   🔒 五排架構（排 1–5 的順序、欄位、樣式、tone-coloured 卡片）       ║
+// ║   🔒 公式：annualImpact = monthlyImpact × 12 · 風險加權公式          ║
+// ║              · monthlySaving = (newPrice − altPrice) × monthlyVolume  ║
+// ║              · grossMarginDrop = before − after                       ║
+// ║              · overallRisk = price 50 + conv 20 + supp 15 + qual 15   ║
+// ║   🔒 4 層架構 footer（L0 / L1 / L2 / L3）                            ║
+// ║                                                                      ║
+// ║ Unlock scope（可改什麼）:                                            ║
+// ║   ✓ 替代廠商名稱（鼎能 → 重邑）·  價格（6.90 → 6.96）                ║
+// ║   ✓ Risk Radar 4 個 note 文字（誰、為什麼）                          ║
+// ║   ✓ 排 4 建議文字、排 5 Option A/B/C 內文                            ║
+// ║   ✓ 任何隨真實 ERP / 市場資料而變動的數字 / 文字                     ║
+// ║                                                                      ║
+// ║ v5 變更（資料對齊真實供應商）:                                       ║
+// ║   · 替代廠商：鼎能 6.90 / Risk 92 / OTD 97% →                        ║
+// ║              重邑 6.96 / Risk 90 / OTD 87%（凍漲）                   ║
+// ║   · Risk Radar 注解改為提及 重邑 / 力豐 / EFG                        ║
+// ║                                                                      ║
+// ║ Rules for future agents:                                             ║
+// ║   ✘ 不要動 五排架構 / 公式 / 4 層架構 footer                         ║
+// ║   ✓ 隨 ERP 資料變動的廠名、價格、文案，可直接更新                    ║
+// ║   ✓ 每次有實質改動，更新這段 LOCKED block 的版本號 + 變更摘要        ║
 // ╠══════════════════════════════════════════════════════════════════════╣
 // ║ ② L0 Executive Intelligence Layer · Board Decision Card（1 頁）      ║
 // ║ 五排架構：                                                           ║
@@ -2221,7 +2235,7 @@ function CostIntelligenceCenterCard() {
 // ║   排 2  供應商漲幅 / 合理上限 / 超出 / 目標價                        ║
 // ║   排 3  年損失 / 可節省 / 毛利影響 / Risk Radar 4 維度               ║
 // ║   排 4  建議（含目標價 + 預估可回收 + 替代供應商 + 完成時程）        ║
-// ║   排 5  簽核 Option A / B / C（A = 拒絕 + 啟動鼎能 RFQ 同一決策）    ║
+// ║   排 5  簽核 Option A / B / C（A = 拒絕 + 啟動 RFQ 同一決策）        ║
 // ║                                                                      ║
 // ║ 4 層架構說明位於頁尾：L0 (本頁) / L1 / L2 / L3                       ║
 // ╚══════════════════════════════════════════════════════════════════════╝
@@ -2239,7 +2253,12 @@ function buildBoardReportHtml(args: {
   const monthlyVolume = 17000;
   const monthlyImpact = Math.round((args.newPrice - targetPrice) * monthlyVolume);
   const annualImpact  = monthlyImpact * 12;
-  const altPrice = 6.90;
+  // 替代廠商資料（隨 ERP 比對結果調整 — v5 從鼎能改為重邑）
+  const altName     = "重邑";
+  const altPrice    = 6.96;   // 重邑歷史進貨記錄維持 6.96，多年凍漲
+  const altOTD      = 87;
+  const altRisk     = 90;
+  const altSubtitle = "沿用原供應商 · 多年凍漲";
   const monthlySaving = Math.round((args.newPrice - altPrice) * monthlyVolume);
   const annualSaving  = monthlySaving * 12;
 
@@ -2251,9 +2270,9 @@ function buildBoardReportHtml(args: {
   // Risk Radar — 4 維度（高分 = 高風險），讓董事長不用猜「60 是什麼意思」
   const riskRadar = [
     { k: "價格風險", v: 95, note: "供應商喊 +14.5%、超出 +8.3% 無依據" },
-    { k: "供應風險", v: 20, note: "鼎能 / 力豐 / EFG 三家備案就緒" },
-    { k: "品質風險", v: 10, note: "鼎能 OTD 97% / 品質 A+" },
-    { k: "轉換風險", v: 35, note: "新供應商需 4 週試產驗證" },
+    { k: "供應風險", v: 20, note: `${altName} / 鼎能 / 力豐 三家備案就緒` },
+    { k: "品質風險", v: 10, note: `${altName} OTD ${altOTD}% / 多年無調價` },
+    { k: "轉換風險", v: 35, note: `${altName} 為登錄供應商、無重新驗證成本` },
   ];
   // Overall = 加權平均（價格 50% + 轉換 20% + 供應 15% + 品質 15%） → ≈ 60
   const overallRisk = Math.round(
@@ -2402,7 +2421,7 @@ function buildBoardReportHtml(args: {
       <div class="cell dark">
         <div class="k">Annual Saving 可節省</div>
         <div class="v green">+NT$ ${annualSaving.toLocaleString()}</div>
-        <div class="v2">切換鼎能 月省 ${monthlySaving.toLocaleString()} × 12</div>
+        <div class="v2">切換${altName} 月省 ${monthlySaving.toLocaleString()} × 12</div>
       </div>
       <div class="cell" style="border-color:#d4351c;background:#fdecea">
         <div class="k red">Gross Margin Impact 毛利衝擊</div>
@@ -2435,7 +2454,7 @@ function buildBoardReportHtml(args: {
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
         <div>
           <div class="lbl">建議　ACTION</div>
-          <div class="v">退回重議 — 同時啟動 <b style="color:#4d7c0f">鼎能 RFQ</b></div>
+          <div class="v">退回重議 — 同時啟動 <b style="color:#4d7c0f">${altName} RFQ</b></div>
         </div>
         <div class="deadline">14 天完成</div>
       </div>
@@ -2450,7 +2469,8 @@ function buildBoardReportHtml(args: {
         </div>
         <div>
           <div style="font-family:'IBM Plex Mono';font-size:9px;color:#5b6356;letter-spacing:.08em">替代供應商</div>
-          <div style="font-family:'IBM Plex Mono';font-size:15px;font-weight:800;color:#0c1908">鼎能 (Risk 92)</div>
+          <div style="font-family:'IBM Plex Mono';font-size:15px;font-weight:800;color:#0c1908">${altName} (Risk ${altRisk})</div>
+          <div style="font-family:'Noto Sans TC';font-size:9.5px;color:#5b6356;margin-top:2px">${altSubtitle}</div>
         </div>
         <div>
           <div style="font-family:'IBM Plex Mono';font-size:9px;color:#5b6356;letter-spacing:.08em">完成時程</div>
@@ -2467,8 +2487,8 @@ function buildBoardReportHtml(args: {
       <div class="actbtn switch" style="text-align:left;padding:11px 14px">
         <span class="rec">RECOMMENDED</span>
         <div style="font-family:'IBM Plex Mono';font-size:11px;font-weight:700;letter-spacing:.1em;color:#4d7c0f">OPTION A</div>
-        <div style="font-size:13px;font-weight:800;color:#4d7c0f;margin-top:5px">退回重議 + 啟動鼎能 RFQ</div>
-        <div style="font-size:10px;color:#5b6356;margin-top:3px;line-height:1.4">☐ 拒絕 7.90　☐ 啟動鼎能 RFQ<br/><b style="color:#4d7c0f">同一決策 · 兩路並行</b></div>
+        <div style="font-size:13px;font-weight:800;color:#4d7c0f;margin-top:5px">退回重議 + 啟動${altName} RFQ</div>
+        <div style="font-size:10px;color:#5b6356;margin-top:3px;line-height:1.4">☐ 拒絕 7.90　☐ 啟動 ${altName} RFQ<br/><b style="color:#4d7c0f">同一決策 · 兩路並行</b></div>
       </div>
       <div class="actbtn" style="border-color:#b8860b;background:#fffaf0;text-align:left;padding:11px 14px">
         <div style="font-family:'IBM Plex Mono';font-size:11px;font-weight:700;letter-spacing:.1em;color:#b8860b">OPTION B</div>
@@ -2498,7 +2518,7 @@ function buildBoardReportHtml(args: {
   </div>
 
   <div class="footer">
-    CHI HUA AI · L0 Board Card v4 · 五排架構 + Risk Radar + Option A/B/C · ${today}<br/>
+    CHI HUA AI · L0 Board Card v5 · 五排架構 + Risk Radar + Option A/B/C（替代廠商：${altName} 6.96 凍漲）· ${today}<br/>
     決策卡定位：作為董事長 / 總經理 / CEO 登入系統第一頁。月用 ${monthlyVolume.toLocaleString()} 件 · 年用 ${(monthlyVolume * 12).toLocaleString()} 件。
   </div>
 
