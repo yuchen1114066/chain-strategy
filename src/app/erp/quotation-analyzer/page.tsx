@@ -43,8 +43,8 @@ const OCR_ROWS = [
   { supplier: "茂晟",  partNo: "F18-COIL", oldPrice: 12.5, newPrice: 14.8, reasonText: "原料銅成本" },
 ];
 
-// 主分析對象 — 點選一個 row
-const SELECTED = OCR_ROWS[0];
+// 主分析對象 — 預設第 1 列，使用者可點任一列或按 ↑↓ 切換
+// (SELECTED 由 component state `selectedIdx` 在 render 時動態決定，見下方)
 
 // Step 2 — 找到的 BOM / CBS / Commodity Mapping
 const BOM_BREAKDOWN = [
@@ -91,6 +91,9 @@ function computeShouldCost() {
 export default function QuotationAnalyzerPage() {
   const [activeSub, setActiveSub] = useState("ocr");
   const [toast, setToast] = useState<string | null>(null);
+  // 報價單清單選擇（可點列、↑↓ 鍵切換 — 下方所有分析隨之同步）
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const SELECTED = OCR_ROWS[selectedIdx];
   const sc = computeShouldCost();
 
   // 真實的 supplier claim 漲幅
@@ -358,34 +361,60 @@ export default function QuotationAnalyzerPage() {
               <div className="mt-4 rounded-[10px] p-3" style={{ background: BR.greenInk, color: "#fff" }}>
                 <div style={{ fontFamily: FONT_MONO, fontSize: 9.5, color: "#9aa78d", letterSpacing: "0.1em" }}>AI 自動辨識結果</div>
                 <div style={{ fontFamily: FONT_MONO, fontSize: 22, fontWeight: 700, color: BR.green, marginTop: 4 }}>
-                  3 筆報價　·　6 欄位
+                  待查詢報價單
                 </div>
-                <div style={{ fontSize: 10.5, color: "#aebba0", marginTop: 4 }}>欄位：供應商 · 料號 · 舊單價 · 新單價 · 漲幅 · 原因</div>
+                <div style={{ fontSize: 10.5, color: "#aebba0", marginTop: 4 }}>{OCR_ROWS.length} 筆 · 欄位：供應商 / 料號 / 舊單價 / 新單價 / 漲幅 / 原因</div>
+              </div>
+
+              {/* 廠商報價歷史資料夾 · 年度評核資料庫 */}
+              <div className="mt-3 rounded-[10px] p-3" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
+                <div className="flex items-baseline justify-between">
+                  <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.greenDeep, letterSpacing: "0.1em" }}>
+                    📁 廠商報價歷史資料夾
+                  </div>
+                  <span style={{ fontFamily: FONT_MONO, fontSize: 9, color: BR.inkFaint }}>近 12 月 · 年度評核</span>
+                </div>
+                {[
+                  { sup: "企能", count: 2, avgHike: 15.8, score: 65, tone: BR.red },
+                  { sup: "茂晟", count: 1, avgHike: 18.4, score: 70, tone: BR.amber },
+                  { sup: "重邑", count: 0, avgHike:  0.0, score: 95, tone: BR.greenDeep },
+                ].map((x) => (
+                  <div key={x.sup} className="flex items-baseline justify-between mt-2 text-xs">
+                    <span style={{ color: BR.ink, fontWeight: 700, width: 38 }}>{x.sup}</span>
+                    <span style={{ fontFamily: FONT_MONO, color: BR.inkSoft, width: 46, textAlign: "right" }}>{x.count} 件</span>
+                    <span style={{ fontFamily: FONT_MONO, color: x.avgHike > 10 ? BR.red : x.avgHike > 0 ? BR.amber : BR.greenDeep, width: 52, textAlign: "right", fontWeight: 700 }}>
+                      {x.avgHike > 0 ? "+" : ""}{x.avgHike.toFixed(1)}%
+                    </span>
+                    <span style={{ fontFamily: FONT_MONO, fontWeight: 800, color: x.tone, width: 38, textAlign: "right" }}>
+                      {x.score}
+                    </span>
+                  </div>
+                ))}
+                <div style={{ fontSize: 10, color: BR.inkSoft, marginTop: 6, lineHeight: 1.5 }}>
+                  每筆報價自動歸檔 → 年度供應商評核打分（漲幅次數 / 合理超出 / 凍漲表現），<b style={{ color: BR.greenInk }}>重邑 0 次調價 = 95 分</b>，列為首選備案。
+                </div>
               </div>
             </div>
 
             <div>
               <div className="flex items-baseline justify-between flex-wrap gap-2 mb-2">
                 <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>
-                  ② OCR 抽出的報價清單 · 點任一列查看合理性
+                  ② 待查詢報價單 · 點任一列或按 ↑↓ 切換，下方所有分析自動更換
                 </div>
-                <span style={{ fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700, color: "#fff", background: BR.purple, padding: "2px 7px", borderRadius: 4, letterSpacing: "0.06em" }}>
-                  DEMO · 已預載 3 筆近期報價
+                <span style={{ fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700, color: BR.greenDeep, background: BR.greenSoft, padding: "2px 7px", borderRadius: 4, letterSpacing: "0.06em", border: `1px solid ${BR.greenLine}` }}>
+                  已選 {selectedIdx + 1} / {OCR_ROWS.length}
                 </span>
               </div>
 
-              {/* 說明這 3 筆是什麼 */}
-              <div className="mb-3 rounded-[8px] p-2.5 text-xs leading-relaxed" style={{ background: BR.greenSoft, border: `1px solid ${BR.greenLine}`, color: "#3c4a2e" }}>
-                <b style={{ color: BR.greenInk }}>這 3 筆是什麼？</b>
-                為 demo 預載「近期收到的 3 份供應商調價通知」OCR 結果：<b>企能</b>（你目前的供應商）對
-                <b className="mono"> P03M3001</b> 與 <b className="mono">P03M3009</b> 兩個料號同時調漲、
-                <b>茂晟</b>則送來 <b className="mono">F18-COIL</b> 的漲價單。預設選中第 1 列
-                <b className="mono"> P03M3001</b> 進入 STEP 2–4 的 BOM / Should-Cost / 議價分析。
-                <br/>
-                <b style={{ color: BR.greenInk }}>正式版</b>會自動串接「待簽核報價」資料夾，每收到一封新報價自動跑這個流程。
-              </div>
-
-              <div className="overflow-x-auto">
+              <div
+                className="overflow-x-auto"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowDown") { e.preventDefault(); setSelectedIdx((i) => Math.min(i + 1, OCR_ROWS.length - 1)); }
+                  if (e.key === "ArrowUp")   { e.preventDefault(); setSelectedIdx((i) => Math.max(i - 1, 0)); }
+                }}
+                style={{ outline: "none" }}
+              >
                 <table className="w-full text-sm" style={{ borderCollapse: "collapse", minWidth: 580 }}>
                   <thead>
                     <tr style={{ borderBottom: `1px solid ${BR.border}`, background: "#fbfcfa" }}>
@@ -401,13 +430,24 @@ export default function QuotationAnalyzerPage() {
                   <tbody>
                     {OCR_ROWS.map((r, i) => {
                       const pct = ((r.newPrice - r.oldPrice) / r.oldPrice) * 100;
-                      const selected = i === 0;
+                      const selected = i === selectedIdx;
                       return (
-                        <tr key={i} style={{
-                          borderBottom: `1px solid #f3f5ef`,
-                          background: selected ? BR.greenSoft : "transparent",
-                        }}>
-                          <td style={{ padding: "12px 8px", fontWeight: 700 }}>{r.supplier}</td>
+                        <tr
+                          key={i}
+                          onClick={() => setSelectedIdx(i)}
+                          style={{
+                            borderBottom: `1px solid #f3f5ef`,
+                            background: selected ? BR.greenSoft : "transparent",
+                            cursor: "pointer",
+                            borderLeft: selected ? `3px solid ${BR.green}` : "3px solid transparent",
+                          }}
+                          onMouseEnter={(e) => { if (!selected) (e.currentTarget as HTMLTableRowElement).style.background = "#fbfcfa"; }}
+                          onMouseLeave={(e) => { if (!selected) (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}
+                        >
+                          <td style={{ padding: "12px 8px", fontWeight: 700 }}>
+                            {selected && <span style={{ color: BR.green, marginRight: 6, fontFamily: FONT_MONO, fontSize: 11 }}>▶</span>}
+                            {r.supplier}
+                          </td>
                           <td style={{ padding: "12px 8px", fontFamily: FONT_MONO, fontWeight: 700, color: selected ? BR.greenDeep : BR.ink }}>{r.partNo}</td>
                           <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, color: BR.inkSoft }}>{r.oldPrice.toFixed(2)}</td>
                           <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700 }}>↗ {r.newPrice.toFixed(2)}</td>
@@ -423,7 +463,7 @@ export default function QuotationAnalyzerPage() {
               </div>
               <div className="mt-3 rounded-[10px] p-3 flex items-baseline justify-between" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
                 <span style={{ fontSize: 12 }}>
-                  AI 立即算（選中第 1 列 <b style={{ color: BR.greenDeep, fontFamily: FONT_MONO }}>{SELECTED.partNo}</b>）：
+                  AI 立即算（選中 <b style={{ color: BR.greenDeep, fontFamily: FONT_MONO }}>{SELECTED.partNo}</b> · {SELECTED.supplier}）：
                 </span>
                 <span style={{ fontFamily: FONT_MONO, fontSize: 18, fontWeight: 800, color: BR.red }}>
                   +{supplierClaim.toFixed(1)}%
