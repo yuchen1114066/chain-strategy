@@ -33,6 +33,24 @@ export default function L2OperationsPage() {
           <p className="text-sm mt-1" style={{ color: SC.textSub }}>留卡片 · 工單健康 + 端到端追蹤 + AI 卡點分析</p>
         </header>
 
+        {/* AI Lead Time Validation Engine — 新模組入口 */}
+        <Link
+          href="/erp/lead-time-validation"
+          className="block rounded-xl border-2 p-5 transition-shadow hover:shadow-lg"
+          style={{ borderColor: "#76b900", background: "linear-gradient(135deg, #f0f7e4 0%, #ffffff 100%)" }}
+        >
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <span className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded text-white" style={{ background: "#0c1908", letterSpacing: "0.12em" }}>NEW MODULE</span>
+            <h2 className="text-xl font-bold" style={{ color: "#0c1908" }}>⏱ AI Lead Time Validation Engine</h2>
+            <span className="text-xs" style={{ color: "#4d7c0f" }}>業務問「10 週交期合理嗎？」OS 直接回信</span>
+            <span className="flex-1" />
+            <span className="text-xs font-mono" style={{ color: "#4d7c0f" }}>進入模組 →</span>
+          </div>
+          <p className="text-xs mt-2" style={{ color: SC.textSub }}>
+            收信 → BOM 拆解 → 各元件交期 → 推合理交期 → 系統直接回覆 5 分鐘內 · 含 Supplier Score
+          </p>
+        </Link>
+
         {/* ① CURRENT — Order Health */}
         <Card accent={SC.primary}>
           <div className="flex items-baseline gap-2 mb-2 flex-wrap">
