@@ -427,11 +427,17 @@ export default function QuotationAnalyzerPage() {
                         const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
 
                         // 從檔名抽供應商 / 料號（demo heuristic）
+                        // 先剃掉作業系統的螢幕截圖前綴，否則會把「螢幕擷取」當成公司名
                         const base = file.name.replace(/\.[^.]+$/, "");
-                        const supMatch  = base.match(/(企能|企龍|茂晟|重邑|鼎能|力豐|新竹\s?EFG|[一-龥]{2,4})/);
+                        const cleaned = base
+                          .replace(/^(?:螢幕擷取(?:畫面)?|螢幕截圖|截圖|截屏|Screen\s?Shot|Screenshot|IMG|Image|Photo|Scan)[\s_\-]*\d*[\s_\-]*[\d\-:.]*\s*/i, "")
+                          .trim();
+                        const knownSuppliers = /(企能|企龍|茂晟|重邑|鼎能|力豐|新竹\s?EFG|聯昌|建準|友達|台積|鴻海)/;
+                        // 已知名單優先；否則找剃乾淨後的 2-4 字中文；都沒有才標未識別
+                        const supMatch  = base.match(knownSuppliers) ?? cleaned.match(/[一-龥]{2,4}/);
                         const partMatch = base.match(/[A-Z][A-Z0-9]{3,}[-]?[A-Z0-9]*/);
-                        // 即使是螢幕截圖，仍預設供應商為「未識別 · 請補登」讓使用者知道要填
-                        const newSupplier = supMatch?.[1] ?? "未識別供應商（請補登）";
+                        const newSupplier = supMatch?.[0] ?? "未識別供應商";
+                        const needsSupplierFix = newSupplier === "未識別供應商";
                         const newPartNo   = partMatch?.[0] ?? `OCR-${Date.now().toString().slice(-6)}`;
                         // 報價單號 — YYMMDD + 流水號（demo 用時間戳尾 3 碼）
                         const today = new Date();
@@ -464,7 +470,11 @@ export default function QuotationAnalyzerPage() {
                             setSelectedIdx(newIdx);
                             return next;
                           });
-                          showToast(`✓ AI OCR 完成 · ${newQuoteNo}（${newSupplier}）已加入清單 — 按下方「進入 STEP 2 查詢分析」開始`);
+                          if (needsSupplierFix) {
+                            showToast(`✓ AI OCR 完成 · ${newQuoteNo} 已加入清單 — 公司名未自動識別，請於表格內點輸入框補登後即可分析`);
+                          } else {
+                            showToast(`✓ AI OCR 完成 · ${newQuoteNo}（${newSupplier}）已加入清單 — 按下方「進入 STEP 2 查詢分析」開始`);
+                          }
                         }, 900);
                         e.target.value = ""; // 允許重複上傳同一檔案
                       }}
@@ -584,9 +594,35 @@ export default function QuotationAnalyzerPage() {
                                 <span style={{ fontFamily: FONT_MONO, fontSize: 9, color: "#fff", background: BR.purple, padding: "1px 5px", borderRadius: 3, letterSpacing: ".04em" }}>NEW</span>
                               )}
                             </div>
-                            <div style={{ fontWeight: 700, fontSize: 13, marginTop: 2, color: BR.ink }}>
-                              {r.supplier}
-                            </div>
+                            {isUploaded && r.supplier === "未識別供應商" ? (
+                              <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 2 }}>
+                                <input
+                                  type="text"
+                                  placeholder="✎ 請輸入公司名稱"
+                                  defaultValue=""
+                                  onBlur={(e) => {
+                                    const v = e.target.value.trim();
+                                    if (!v) return;
+                                    setUploadedRows((arr) => arr.map((u) => u.uploadedAt === r.uploadedAt ? { ...u, supplier: v } : u));
+                                    showToast(`✓ 已更新報價單 ${r.quoteNo} 的供應商為「${v}」— 全頁分析同步`);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                                  }}
+                                  style={{
+                                    fontFamily: FONT, fontSize: 13, fontWeight: 700,
+                                    color: BR.red, background: "#fff",
+                                    border: `1px dashed ${BR.red}`, borderRadius: 5,
+                                    padding: "3px 6px", width: 150,
+                                  }}
+                                />
+                                <div style={{ fontSize: 9.5, color: BR.red, marginTop: 2 }}>未識別 · 請補登公司名</div>
+                              </div>
+                            ) : (
+                              <div style={{ fontWeight: 700, fontSize: 13, marginTop: 2, color: BR.ink }}>
+                                {r.supplier}
+                              </div>
+                            )}
                             {r.previewUrl && !sameQuoteAsPrev && (
                               <a href={r.previewUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ fontSize: 10, color: BR.purple, textDecoration: "underline" }}>
                                 📷 看上傳截圖
