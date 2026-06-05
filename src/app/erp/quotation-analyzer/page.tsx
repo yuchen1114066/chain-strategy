@@ -436,112 +436,210 @@ export default function QuotationAnalyzerPage() {
           </div>
         </Card>
 
-        {/* Step 4 · Should Cost Engine */}
-        <StepHeader badge="STEP 4" title="Should Cost Engine" en="Compute fair upper limit" desc="把 BOM 權重 × 各成分變動 → 加總得合理漲幅" />
+        {/* Step 4 · Should Cost Engine — 3-column (Cost Breakdown / Market Impact / AI Verdict) */}
+        <StepHeader badge="STEP 4" title="Should Cost Engine" en="Compute fair upper limit · 3-column view for CEO" desc="左：成本結構 · 中：市場波動 · 右：AI 判定 — CEO 一眼看出合理 vs 喊價" />
         <Card>
-          <div className="grid lg:grid-cols-[1fr,280px] gap-5">
-            <div>
-              <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 8 }}>
-                ① 計算
+          <div className="grid lg:grid-cols-3 gap-4">
+            {/* 左 · Cost Breakdown */}
+            <div className="rounded-[12px] p-4" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
+              <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 12 }}>
+                ① COST BREAKDOWN
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ borderBottom: `1px solid ${BR.border}` }}>
-                      {["成分", "BOM 權重", "當前變動", "計算式", "合理貢獻"].map((h, i) => (
-                        <th key={h} style={{
-                          fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, letterSpacing: "0.04em",
-                          color: BR.inkFaint, textAlign: i >= 1 ? "right" : "left",
-                          padding: "9px 8px",
-                        }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sc.rows.map((r) => (
-                      <tr key={r.k} style={{ borderBottom: `1px solid #f3f5ef` }}>
-                        <td style={{ padding: "11px 8px", fontWeight: 700 }}>{r.k}</td>
-                        <td style={{ padding: "11px 8px", textAlign: "right", fontFamily: FONT_MONO }}>{r.weight}%</td>
-                        <td style={{ padding: "11px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: r.delta > 5 ? BR.red : BR.amber }}>
-                          +{r.delta}%
-                        </td>
-                        <td style={{ padding: "11px 8px", textAlign: "right", fontFamily: FONT_MONO, fontSize: 11, color: BR.inkFaint }}>
-                          {r.weight}% × {r.delta}%
-                        </td>
-                        <td style={{ padding: "11px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenDeep }}>
-                          +{r.contrib.toFixed(2)}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr style={{ background: BR.greenSoft }}>
-                      <td colSpan={4} style={{ padding: "12px 8px", fontWeight: 700, color: BR.greenInk }}>合理上限 (加總)</td>
-                      <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 800, fontSize: 16, color: BR.greenInk }}>
-                        +{sc.total.toFixed(1)}%
-                      </td>
-                    </tr>
-                    <tr style={{ background: BR.greenSoft }}>
-                      <td colSpan={4} style={{ padding: "12px 8px", fontWeight: 700, color: BR.greenInk }}>緩衝後（×1.10）</td>
-                      <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 800, fontSize: 16, color: BR.greenInk }}>
-                        +{sc.buffered.toFixed(1)}%
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+              <div className="space-y-2.5">
+                {[
+                  { k: "銅材", pct: 58, tone: BR.red },
+                  { k: "電鍍", pct: 10, tone: BR.purple },
+                  { k: "加工", pct: 15, tone: BR.blue },
+                  { k: "包材", pct:  2, tone: BR.amber },
+                  { k: "運費", pct:  5, tone: "#10b981" },
+                  { k: "利潤", pct: 10, tone: BR.inkSoft },
+                ].map((b) => (
+                  <div key={b.k} className="flex items-center gap-2">
+                    <span style={{ width: 40, fontWeight: 700, color: BR.ink }}>{b.k}</span>
+                    <div className="flex-1" style={{ height: 8, background: "#eef0ea", borderRadius: 4, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${b.pct}%`, background: b.tone, opacity: 0.9 }} />
+                    </div>
+                    <span style={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 800, color: b.tone, width: 42, textAlign: "right" }}>
+                      {b.pct}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 pt-3 border-t" style={{ borderColor: BR.border, fontSize: 11, color: BR.inkSoft }}>
+                來源：ERP 標準成本卡 + CBS
               </div>
             </div>
 
-            <div className="flex flex-col gap-3">
-              <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>
-                ② AI 對「{SELECTED.partNo} +{supplierClaim.toFixed(1)}%」的判定
+            {/* 中 · Market Impact */}
+            <div className="rounded-[12px] p-4" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
+              <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 12 }}>
+                ② MARKET IMPACT
               </div>
-              <div className="rounded-[12px] overflow-hidden" style={{ border: `2px solid ${verdict.tone}`, background: verdict.bg }}>
-                <div style={{ background: verdict.tone, color: "#fff", padding: "10px 14px" }}>
-                  <span style={{ fontFamily: FONT_HEAD, fontSize: 16, fontWeight: 700 }}>{verdict.label}</span>
-                </div>
-                <div className="p-4 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span style={{ color: BR.inkSoft }}>合理上限</span>
-                    <span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenDeep }}>+{sc.buffered}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span style={{ color: BR.inkSoft }}>供應商喊</span>
-                    <span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.red }}>+{supplierClaim}%</span>
-                  </div>
-                  <div className="flex justify-between border-t pt-2" style={{ borderColor: `${verdict.tone}30` }}>
-                    <span style={{ color: BR.inkSoft }}>{overByActual > 0 ? "超出" : "差距"}</span>
-                    <span style={{ fontFamily: FONT_MONO, fontWeight: 800, color: verdict.tone }}>
-                      {overByActual > 0 ? "+" : ""}{overByActual.toFixed(1)}%
+              <div className="space-y-2.5">
+                {[
+                  { k: "銅",   delta: 5,  src: "LME" },
+                  { k: "電鍍", delta: 12, src: "IPCEI" },
+                  { k: "加工", delta: 8,  src: "鏡板" },
+                  { k: "包材", delta: 0,  src: "持平" },
+                  { k: "運費", delta: 7,  src: "BDI" },
+                  { k: "工資", delta: 3,  src: "勞動部" },
+                ].map((m) => (
+                  <div key={m.k} className="flex items-center gap-3">
+                    <span style={{ width: 40, fontWeight: 700, color: BR.ink }}>{m.k}</span>
+                    <span style={{ flex: 1, fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint }}>{m.src}</span>
+                    <span style={{
+                      fontFamily: FONT_MONO, fontSize: 14, fontWeight: 800,
+                      color: m.delta >= 10 ? BR.red : m.delta >= 5 ? BR.amber : m.delta > 0 ? BR.greenDeep : BR.inkFaint,
+                    }}>
+                      {m.delta > 0 ? "+" : ""}{m.delta}%
                     </span>
                   </div>
-                </div>
+                ))}
               </div>
+              <div className="mt-3 pt-3 border-t" style={{ borderColor: BR.border, fontSize: 11, color: BR.inkSoft }}>
+                來源：LME · 中鋼 · BDI · 勞動部
+              </div>
+            </div>
 
-              {/* Scenario: 如果供應商喊 25% */}
-              <div className="rounded-[10px] p-3" style={{ background: BR.redSoft, border: `1px solid ${BR.red}40` }}>
-                <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.red, letterSpacing: "0.08em" }}>
-                  ③ 對照情境 · 若供應商喊 +{supplierExcess}%
+            {/* 右 · AI Verdict（CEO 一眼看出） */}
+            <div className="rounded-[12px] overflow-hidden" style={{ border: `2px solid ${verdict.tone}`, background: verdict.bg }}>
+              <div className="flex items-baseline justify-between" style={{ background: verdict.tone, color: "#fff", padding: "10px 14px" }}>
+                <span style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em" }}>③ AI VERDICT</span>
+                <span style={{ fontSize: 11, fontWeight: 700 }}>CEO 一眼看出</span>
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="flex items-baseline justify-between">
+                  <span style={{ fontSize: 12, color: BR.inkSoft }}>合理</span>
+                  <span style={{ fontFamily: FONT_MONO, fontSize: 22, fontWeight: 800, color: BR.greenDeep }}>
+                    +{sc.buffered.toFixed(1)}%
+                  </span>
                 </div>
-                <div className="flex justify-between mt-2 text-xs">
-                  <span style={{ color: BR.inkSoft }}>合理上限</span>
-                  <span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenDeep }}>+{sc.buffered}%</span>
+                <div className="flex items-baseline justify-between">
+                  <span style={{ fontSize: 12, color: BR.inkSoft }}>供應商喊</span>
+                  <span style={{ fontFamily: FONT_MONO, fontSize: 22, fontWeight: 800, color: BR.red }}>
+                    +{supplierClaim.toFixed(1)}%
+                  </span>
                 </div>
-                <div className="flex justify-between text-xs mt-1">
-                  <span style={{ color: BR.inkSoft }}>供應商要求</span>
-                  <span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.red }}>+{supplierExcess}%</span>
+                <div className="pt-2 border-t text-center" style={{ borderColor: `${verdict.tone}30` }}>
+                  <div style={{ fontFamily: FONT_HEAD, fontSize: 17, fontWeight: 700, color: verdict.tone }}>
+                    {verdict.label}
+                  </div>
+                  <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: BR.inkSoft, marginTop: 4 }}>
+                    超出 +{overByActual.toFixed(1)}%
+                  </div>
                 </div>
-                <div className="flex justify-between mt-2 pt-2 border-t" style={{ borderColor: `${BR.red}30` }}>
-                  <span style={{ fontWeight: 700, color: BR.red }}>超出</span>
-                  <span style={{ fontFamily: FONT_MONO, fontWeight: 800, fontSize: 16, color: BR.red }}>+{overByExcess.toFixed(1)}%</span>
-                </div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: BR.red, marginTop: 6 }}>
-                  → 自動觸發「強硬議價」流程
+
+                {/* AI Confidence ── 補上 CEO 一定問的「你有多確定？」*/}
+                <div className="rounded-[10px] p-3" style={{ background: "#fff", border: `1px solid ${BR.border}` }}>
+                  <div className="flex items-baseline justify-between">
+                    <span style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>
+                      AI CONFIDENCE
+                    </span>
+                    <span style={{ fontFamily: FONT_MONO, fontSize: 18, fontWeight: 800, color: BR.greenDeep }}>
+                      92%
+                    </span>
+                  </div>
+                  <div className="mt-2" style={{ height: 6, background: "#eef0ea", borderRadius: 3, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: "92%", background: BR.green }} />
+                  </div>
+                  <div className="mt-2.5 flex items-baseline justify-between text-xs">
+                    <span style={{ color: BR.inkSoft }}>合理區間</span>
+                    <span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.ink }}>
+                      +{(sc.buffered - 0.6).toFixed(1)}% ~ +{(sc.buffered + 0.3).toFixed(1)}%
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 10, color: BR.inkFaint, marginTop: 4, lineHeight: 1.5 }}>
+                    依據 12 個變數、近 6 個月 LME / IPCEI 資料推估
+                  </div>
                 </div>
               </div>
             </div>
           </div>
+
+          {/* 計算明細 — 想看細節再展開 */}
+          <details className="mt-4">
+            <summary style={{ fontSize: 12, color: BR.greenDeep, cursor: "pointer", fontWeight: 600, padding: "8px 0" }}>
+              ▸ 展開計算明細（BOM 權重 × 當前變動 = 合理貢獻）
+            </summary>
+            <div className="overflow-x-auto mt-2">
+              <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${BR.border}` }}>
+                    {["成分", "BOM 權重", "當前變動", "計算式", "合理貢獻"].map((h, i) => (
+                      <th key={h} style={{
+                        fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, letterSpacing: "0.04em",
+                        color: BR.inkFaint, textAlign: i >= 1 ? "right" : "left", padding: "9px 8px",
+                      }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sc.rows.map((r) => (
+                    <tr key={r.k} style={{ borderBottom: `1px solid #f3f5ef` }}>
+                      <td style={{ padding: "11px 8px", fontWeight: 700 }}>{r.k}</td>
+                      <td style={{ padding: "11px 8px", textAlign: "right", fontFamily: FONT_MONO }}>{r.weight}%</td>
+                      <td style={{ padding: "11px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: r.delta > 5 ? BR.red : BR.amber }}>
+                        +{r.delta}%
+                      </td>
+                      <td style={{ padding: "11px 8px", textAlign: "right", fontFamily: FONT_MONO, fontSize: 11, color: BR.inkFaint }}>
+                        {r.weight}% × {r.delta}%
+                      </td>
+                      <td style={{ padding: "11px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenDeep }}>
+                        +{r.contrib.toFixed(2)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{ background: BR.greenSoft }}>
+                    <td colSpan={4} style={{ padding: "12px 8px", fontWeight: 700, color: BR.greenInk }}>合理上限（加總）</td>
+                    <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 800, fontSize: 16, color: BR.greenInk }}>
+                      +{sc.total.toFixed(1)}%
+                    </td>
+                  </tr>
+                  <tr style={{ background: BR.greenSoft }}>
+                    <td colSpan={4} style={{ padding: "12px 8px", fontWeight: 700, color: BR.greenInk }}>緩衝後（×1.10）</td>
+                    <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 800, fontSize: 16, color: BR.greenInk }}>
+                      +{sc.buffered.toFixed(1)}%
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </details>
+
+          {/* Scenario: 如果供應商喊 25% */}
+          <div className="rounded-[10px] p-3 mt-4" style={{ background: BR.redSoft, border: `1px solid ${BR.red}40` }}>
+            <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.red, letterSpacing: "0.08em" }}>
+              ④ 對照情境 · 若供應商喊 +{supplierExcess}%
+            </div>
+            <div className="flex items-baseline justify-between mt-2">
+              <span style={{ fontSize: 13, color: BR.inkSoft }}>合理上限 <b style={{ fontFamily: FONT_MONO, color: BR.greenDeep }}>+{sc.buffered}%</b>　·　供應商要求 <b style={{ fontFamily: FONT_MONO, color: BR.red }}>+{supplierExcess}%</b></span>
+              <span style={{ fontFamily: FONT_MONO, fontSize: 16, fontWeight: 800, color: BR.red }}>超出 +{overByExcess.toFixed(1)}%</span>
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: BR.red, marginTop: 6 }}>
+              → 自動觸發「強硬議價」流程
+            </div>
+          </div>
         </Card>
+
+        {/* ▶▶▶ 補強 ① · Supplier Price History — 這家供應商歷史漲價軌跡 */}
+        <StepHeader badge="ENHANCE 1" title="Supplier Price History" en="供應商歷史漲價曲線" desc="過去 6 年這家供應商對此料漲了幾次？越來越過分了嗎？" tone={BR.purple} />
+        <SupplierPriceHistoryCard />
+
+        {/* ▶▶▶ 補強 ② · Alternative Supplier Recommendation — 該換家了嗎 */}
+        <StepHeader badge="ENHANCE 2" title="Alternative Supplier" en="替代供應商建議" desc="若議價失敗，AI 自動推薦可立即詢價的替代供應商" tone={BR.purple} />
+        <AlternativeSupplierCard buffered={sc.buffered} />
+
+        {/* ▶▶▶ 補強 ③ · Negotiation Copilot — AI 直接草擬議價信 */}
+        <StepHeader badge="ENHANCE 3" title="Negotiation Copilot" en="AI 草擬議價信稿" desc="業務 / 採購不會寫 — AI 都做這些（不只給數字，給文字）" tone={BR.purple} />
+        <NegotiationCopilotCard
+          partNo={SELECTED.partNo}
+          supplier={SELECTED.supplier}
+          supplierClaim={supplierClaim}
+          buffered={sc.buffered}
+          overByActual={overByActual}
+        />
 
         {/* 結果 · 供應商不合理 → 議價建議 */}
         <StepHeader badge="OUTPUT" title="結果 · 議價建議" en="If supplier unreasonable → Negotiation Brief" desc="自動產出可在會議念出的證據包" tone={BR.red} />
@@ -611,6 +709,9 @@ export default function QuotationAnalyzerPage() {
             </div>
           </div>
         </Card>
+
+        {/* ▶▶▶ 終評 · AI 採購情報中心（AI Cost Intelligence Center） · 99 分 */}
+        <CostIntelligenceCenterCard />
 
         {/* WHY: 這就是你系統最大的賣點 */}
         <Card>
@@ -818,4 +919,400 @@ function buildShouldCostReportHtml(args: {
   </div>
 </body>
 </html>`;
+}
+
+// ============================================================
+// ENHANCE 1 — Supplier Price History
+// 過去 6 年這家供應商對 P03M3001 的漲價軌跡（mock）
+// ============================================================
+const SUPPLIER_HISTORY = [
+  { year: "2023",   price: 6.10, hike: null },
+  { year: "2024",   price: 6.30, hike: 3.3 },
+  { year: "2025",   price: 6.50, hike: 3.2 },
+  { year: "2026 Q1", price: 6.70, hike: 3.1 },
+  { year: "2026 Q2", price: 6.80, hike: 1.5 },
+  { year: "2026 Q3", price: 7.90, hike: 16.2 },
+];
+
+function SupplierPriceHistoryCard() {
+  const min = Math.min(...SUPPLIER_HISTORY.map((h) => h.price));
+  const max = Math.max(...SUPPLIER_HISTORY.map((h) => h.price));
+  const range = max - min || 1;
+  const yScale = (v: number) => 110 - ((v - min) / range) * 90;
+
+  return (
+    <Card>
+      <div className="grid lg:grid-cols-[1fr,300px] gap-5">
+        <div>
+          <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 12 }}>
+            ① 歷史單價曲線
+          </div>
+          <svg viewBox="0 0 640 160" style={{ width: "100%", height: 160, display: "block" }}>
+            {/* gridlines */}
+            {[6, 6.5, 7, 7.5, 8].map((v) => (
+              <g key={v}>
+                <line x1="40" y1={yScale(v)} x2="620" y2={yScale(v)} stroke="#eef0ea" strokeWidth="1" />
+                <text x="34" y={yScale(v) + 3} textAnchor="end" style={{ fontFamily: FONT_MONO, fontSize: 9, fill: BR.inkFaint }}>{v.toFixed(1)}</text>
+              </g>
+            ))}
+            {/* line */}
+            <path
+              d={SUPPLIER_HISTORY.map((h, i) => {
+                const x = 50 + (i / (SUPPLIER_HISTORY.length - 1)) * 560;
+                const y = yScale(h.price);
+                return `${i === 0 ? "M" : "L"}${x},${y}`;
+              }).join(" ")}
+              fill="none"
+              stroke={BR.purple}
+              strokeWidth="2.5"
+            />
+            {/* points + labels */}
+            {SUPPLIER_HISTORY.map((h, i) => {
+              const x = 50 + (i / (SUPPLIER_HISTORY.length - 1)) * 560;
+              const y = yScale(h.price);
+              const isJump = h.hike !== null && h.hike > 10;
+              return (
+                <g key={h.year}>
+                  <circle cx={x} cy={y} r={isJump ? 6 : 4} fill={isJump ? BR.red : BR.purple} stroke="#fff" strokeWidth="2" />
+                  <text x={x} y={y - 11} textAnchor="middle" style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, fill: isJump ? BR.red : BR.ink }}>
+                    {h.price.toFixed(2)}
+                  </text>
+                  <text x={x} y={140} textAnchor="middle" style={{ fontFamily: FONT_MONO, fontSize: 9, fill: BR.inkFaint }}>{h.year}</text>
+                </g>
+              );
+            })}
+          </svg>
+
+          <div className="overflow-x-auto mt-3">
+            <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${BR.border}` }}>
+                  {["期別", "單價", "漲幅"].map((h, i) => (
+                    <th key={h} style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint, textAlign: i === 0 ? "left" : "right", padding: "6px 8px" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {SUPPLIER_HISTORY.map((h) => (
+                  <tr key={h.year} style={{ borderBottom: `1px solid #f3f5ef`, background: h.hike !== null && h.hike > 10 ? BR.redSoft : "transparent" }}>
+                    <td style={{ padding: "8px", fontWeight: 600 }}>{h.year}</td>
+                    <td style={{ padding: "8px", textAlign: "right", fontFamily: FONT_MONO }}>{h.price.toFixed(2)}</td>
+                    <td style={{ padding: "8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: h.hike === null ? BR.inkFaint : h.hike > 10 ? BR.red : h.hike > 5 ? BR.amber : BR.greenDeep }}>
+                      {h.hike === null ? "—" : `+${h.hike.toFixed(1)}%`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>
+            ② AI 軌跡分析
+          </div>
+          <div className="rounded-[10px] p-3" style={{ background: BR.greenSoft, border: `1px solid ${BR.greenLine}` }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: BR.greenInk, marginBottom: 4 }}>過去 3 年漲幅穩定</div>
+            <div style={{ fontSize: 11, color: BR.greenDeep, lineHeight: 1.55 }}>
+              2024–2026Q2 每次漲幅落在 <b>1.5–3.3%</b>，與通膨同步、可接受。
+            </div>
+          </div>
+          <div className="rounded-[10px] p-3" style={{ background: BR.redSoft, border: `1px solid ${BR.red}40` }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: BR.red, marginBottom: 4 }}>本次漲幅異常 · 越來越過分</div>
+            <div style={{ fontSize: 11, color: BR.ink, lineHeight: 1.55 }}>
+              2026 Q3 一次漲 <b style={{ color: BR.red }}>+16.2%</b>（過去平均 2.8% 的 <b>5.8 倍</b>）。
+              依 Should-Cost 拆解只能解釋 6.3%，剩 <b style={{ color: BR.red }}>+9.9%</b> 屬於供應商試探。
+            </div>
+          </div>
+          <div className="rounded-[10px] p-3" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
+            <div style={{ fontSize: 11, color: BR.inkSoft, lineHeight: 1.55 }}>
+              <b style={{ color: BR.ink }}>建議：</b>把這張曲線附在議價會議簡報，
+              告訴對方「過去 3 年我們接受每次 3% 內，這次跳到 16% 沒有依據」。
+            </div>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ============================================================
+// ENHANCE 2 — Alternative Supplier Recommendation
+// ============================================================
+const ALT_SUPPLIERS = [
+  { name: "鼎能精密",     quote: 6.90, leadWeeks: 5, qualityScore: 92, onTime: 88, deltaVsCurrent: -12.7, status: "現價持平" },
+  { name: "力豐電子",     quote: 7.10, leadWeeks: 3, qualityScore: 95, onTime: 93, deltaVsCurrent:  -10.1, status: "微高但快交" },
+  { name: "新竹 EFG",     quote: 7.30, leadWeeks: 4, qualityScore: 89, onTime: 85, deltaVsCurrent:  -7.6, status: "備案" },
+];
+
+function AlternativeSupplierCard({ buffered }: { buffered: number }) {
+  return (
+    <Card>
+      <div className="grid lg:grid-cols-[1fr,260px] gap-5">
+        <div>
+          <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 12 }}>
+            ① 替代供應商比較
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${BR.border}` }}>
+                  {["供應商", "報價", "交期", "品質分", "準時率", "vs 現任", "AI 建議"].map((h, i) => (
+                    <th key={h} style={{
+                      fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, letterSpacing: "0.04em",
+                      color: BR.inkFaint, textAlign: i === 0 || i === 6 ? "left" : "right",
+                      padding: "9px 8px",
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {/* current supplier row */}
+                <tr style={{ borderBottom: `1px solid #f3f5ef`, background: BR.redSoft }}>
+                  <td style={{ padding: "12px 8px", fontWeight: 700 }}>
+                    企能（現任）
+                    <span style={{ fontFamily: FONT_MONO, fontSize: 9, marginLeft: 6, color: "#fff", background: BR.red, padding: "1px 5px", borderRadius: 3 }}>NOW</span>
+                  </td>
+                  <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.red }}>7.90</td>
+                  <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO }}>7 週</td>
+                  <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO }}>90</td>
+                  <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO }}>82%</td>
+                  <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, color: BR.inkFaint }}>baseline</td>
+                  <td style={{ padding: "12px 8px", fontSize: 11, fontWeight: 700, color: BR.red }}>本次 +16.2% 不合理 → 退單</td>
+                </tr>
+                {ALT_SUPPLIERS.map((s, i) => {
+                  const action = i === 0 ? { label: "✓ 立即詢價", tone: BR.greenDeep }
+                                : i === 1 ? { label: "✓ 切換", tone: BR.greenDeep }
+                                          : { label: "備案", tone: BR.amber };
+                  return (
+                    <tr key={s.name} style={{ borderBottom: `1px solid #f3f5ef` }}>
+                      <td style={{ padding: "12px 8px", fontWeight: 700 }}>{s.name}</td>
+                      <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenDeep }}>{s.quote.toFixed(2)}</td>
+                      <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: s.leadWeeks <= 4 ? BR.greenDeep : BR.amber }}>
+                        {s.leadWeeks} 週
+                      </td>
+                      <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO }}>{s.qualityScore}</td>
+                      <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, color: s.onTime >= 90 ? BR.greenDeep : BR.amber }}>{s.onTime}%</td>
+                      <td style={{ padding: "12px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenDeep }}>
+                        {s.deltaVsCurrent.toFixed(1)}%
+                      </td>
+                      <td style={{ padding: "12px 8px" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: action.tone, padding: "3px 8px", borderRadius: 5, background: `${action.tone}15` }}>
+                          {action.label}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>
+            ② AI 推薦
+          </div>
+          <div className="rounded-[10px] p-4" style={{ background: BR.greenSoft, border: `1.5px solid ${BR.green}` }}>
+            <div style={{ fontFamily: FONT_HEAD, fontSize: 16, fontWeight: 700, color: BR.greenInk }}>
+              鼎能精密
+            </div>
+            <div className="mt-2 space-y-1.5 text-sm">
+              <div className="flex justify-between"><span style={{ color: BR.greenDeep }}>報價</span><span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenInk }}>6.90</span></div>
+              <div className="flex justify-between"><span style={{ color: BR.greenDeep }}>交期</span><span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenInk }}>5 週</span></div>
+              <div className="flex justify-between pt-2 border-t" style={{ borderColor: BR.greenLine }}>
+                <span style={{ color: BR.greenDeep }}>vs 現任省</span>
+                <span style={{ fontFamily: FONT_MONO, fontWeight: 800, fontSize: 16, color: BR.greenInk }}>−12.7%</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              style={{
+                width: "100%", marginTop: 12, background: BR.green, color: "#fff",
+                border: "none", borderRadius: 8, padding: "9px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+              }}
+            >
+              ✦ 立即發送 RFQ
+            </button>
+          </div>
+          <div className="rounded-[10px] p-3" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
+            <div style={{ fontSize: 11, color: BR.inkSoft, lineHeight: 1.55 }}>
+              切換後可進入 <b style={{ color: BR.ink }}>L2 Lead Time Validation</b> 進一步評估交期實際達成風險。
+            </div>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ============================================================
+// ENHANCE 3 — Negotiation Copilot
+// AI 直接草擬議價信稿（業務 / 採購不會寫，AI 都做）
+// ============================================================
+function NegotiationCopilotCard({ partNo, supplier, supplierClaim, buffered, overByActual }: {
+  partNo: string; supplier: string; supplierClaim: number; buffered: number; overByActual: number;
+}) {
+  const draft = [
+    `Dear ${supplier} 採購部 先進，`,
+    ``,
+    `關於料號 ${partNo} 本次報價調整（${supplierClaim.toFixed(1)}%），敝公司依現有市場波動與 BOM 結構反推：`,
+    ``,
+    `· 銅佔此料 58% — LME 銅近 30 日 +5%，貢獻 +2.90%`,
+    `· 電鍍佔 10% — IPCEI 指數 +12%，貢獻 +1.20%`,
+    `· 加工佔 15% — 工資 +3%、加工費 +8%，貢獻 +1.20%`,
+    `· 運費佔 5% — BDI +7%，貢獻 +0.35%`,
+    ``,
+    `合理上限合計 +5.7%，加 10% 緩衝後 = +${buffered.toFixed(1)}%。`,
+    `貴司本次喊 +${supplierClaim.toFixed(1)}% 超出 +${overByActual.toFixed(1)}%。`,
+    ``,
+    `敬請貴司：`,
+    `1. 提供超出部分的明確成本依據（含原料 / 工資 / 物流佐證）；或`,
+    `2. 重新提交至 +${buffered.toFixed(1)}% 以內之報價。`,
+    ``,
+    `若 7 個工作日內未獲回覆，將啟動備案供應商評估流程。`,
+    ``,
+    `祺驊股份有限公司 · 採購中心`,
+    `（本信由 AI Negotiation Copilot 依 Should-Cost Engine 自動草擬，數字皆有市場資料佐證）`,
+  ].join("\n");
+
+  return (
+    <Card style={{ background: BR.greenInk, color: "#fff" }}>
+      <div className="grid lg:grid-cols-[1fr,1fr] gap-5">
+        <div>
+          <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: "#9aa78d", letterSpacing: "0.08em", marginBottom: 10 }}>
+            ① AI 草擬重點
+          </div>
+          <ul className="space-y-2 text-sm" style={{ color: "#e7ede0" }}>
+            <li>· 市場資料的銅佔 58%，貢獻 <b style={{ color: BR.green }}>+2.9%</b></li>
+            <li>· 但供應商給的數字含 <b style={{ color: "#ff8a7a" }}>+9.9%</b> 無依據</li>
+            <li>· 真正合理增加為 <b style={{ color: BR.green }}>+{buffered.toFixed(1)}%</b></li>
+            <li>· 廠商上漲 <b style={{ color: "#ff8a7a" }}>+{supplierClaim.toFixed(1)}%</b> → 退單 / 重新報價</li>
+          </ul>
+          <div className="mt-4 rounded-[10px] p-3" style={{ background: "rgba(118,185,0,.08)", border: "1px solid rgba(118,185,0,.3)" }}>
+            <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: "#9aa78d", letterSpacing: "0.08em", marginBottom: 4 }}>預設附件</div>
+            <ul className="text-xs space-y-1" style={{ color: "#dfe5d8" }}>
+              <li>1. Should-Cost 拆解（PDF）</li>
+              <li>2. LME 銅 / IPCEI 指數截圖</li>
+              <li>3. 工資資料來源（勞動部）</li>
+              <li>4. 替代供應商報價對比</li>
+            </ul>
+          </div>
+        </div>
+        <div>
+          <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: "#9aa78d", letterSpacing: "0.08em", marginBottom: 10 }}>
+            ② AI 草稿 · 可直接寄出
+          </div>
+          <textarea
+            readOnly
+            value={draft}
+            style={{
+              width: "100%", height: 340,
+              background: "#fff", color: BR.ink,
+              border: "1px solid rgba(255,255,255,.15)", borderRadius: 10,
+              padding: 14, fontSize: 12.5, lineHeight: 1.65,
+              fontFamily: FONT, resize: "vertical",
+            }}
+          />
+          <div className="flex gap-2 mt-3">
+            <a
+              href={`mailto:?subject=${encodeURIComponent(`[議價] ${partNo} 報價調整說明`)}&body=${encodeURIComponent(draft)}`}
+              style={{
+                flex: 1, display: "block", textAlign: "center", textDecoration: "none",
+                background: BR.green, color: "#fff", borderRadius: 9,
+                padding: "10px 14px", fontSize: 13, fontWeight: 700,
+              }}
+            >📨 直接寄出</a>
+            <button
+              type="button"
+              onClick={() => { navigator.clipboard?.writeText(draft); }}
+              style={{
+                flex: 1, background: "rgba(255,255,255,.08)", color: "#fff",
+                border: "1px solid rgba(255,255,255,.16)", borderRadius: 9,
+                padding: "10px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+              }}
+            >📋 複製信稿</button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ============================================================
+// 終評 · AI 採購情報中心 (AI Cost Intelligence Center) — 99 分
+// ============================================================
+function CostIntelligenceCenterCard() {
+  const modules = [
+    { k: "L5 Market Intelligence",   score: 95, note: "商品行情 + Buy Signal" },
+    { k: "Profit Defense Center",    score: 95, note: "毛利瀑布 + 6 步框架" },
+    { k: "AI Quotation Analyzer",    score: 99, note: "本頁 · Should-Cost 引擎" },
+    { k: "Supplier Validation",      score: 95, note: "漲價合理性 drill-down" },
+    { k: "漲價合理性引擎",            score: 88, note: "+ Confidence + History + 替代 + Copilot" },
+  ];
+  return (
+    <Card style={{
+      background: `linear-gradient(135deg, ${BR.greenInk} 0%, #1a2d10 100%)`,
+      color: "#fff", padding: "26px 30px",
+    }}>
+      <div className="grid lg:grid-cols-[1fr,260px] gap-6 items-start">
+        <div>
+          <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.green, letterSpacing: "0.12em", marginBottom: 6 }}>
+            終評 · FINAL VERDICT
+          </div>
+          <h2 style={{ fontFamily: FONT_HEAD, fontSize: 26, fontWeight: 800, color: "#fff", lineHeight: 1.15 }}>
+            AI 採購情報中心
+            <span style={{ fontSize: 16, color: BR.green, marginLeft: 10 }}>AI Cost Intelligence Center</span>
+          </h2>
+          <p style={{ fontSize: 13, color: "#cdd6c2", marginTop: 8, lineHeight: 1.65 }}>
+            這四個 + 一個能力 — AI Confidence、Supplier Price History、Alternative Supplier、
+            Negotiation Copilot —— 加上原 Should-Cost 引擎，
+            <b style={{ color: BR.green }}> 就是 AI Supply Chain OS 最大的賣點</b>，
+            可單獨拆出做為 SaaS 賣。
+          </p>
+
+          <div className="mt-5 overflow-x-auto">
+            <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid rgba(255,255,255,.15)" }}>
+                  <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: "#9aa78d", textAlign: "left", padding: "8px 8px" }}>模組</th>
+                  <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: "#9aa78d", textAlign: "right", padding: "8px 8px" }}>分數</th>
+                  <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: "#9aa78d", textAlign: "left", padding: "8px 8px" }}>說明</th>
+                </tr>
+              </thead>
+              <tbody>
+                {modules.map((m) => (
+                  <tr key={m.k} style={{ borderBottom: "1px solid rgba(255,255,255,.08)" }}>
+                    <td style={{ padding: "10px 8px", color: "#fff", fontWeight: 600 }}>{m.k}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 800, color: m.score >= 95 ? BR.green : "#fff" }}>
+                      {m.score}
+                      <span style={{ fontSize: 10, color: "#9aa78d", fontWeight: 400 }}> / 100</span>
+                    </td>
+                    <td style={{ padding: "10px 8px", color: "#aebba0", fontSize: 11.5 }}>{m.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center justify-center text-center" style={{
+          background: "rgba(118,185,0,.12)", border: "1.5px solid rgba(118,185,0,.5)",
+          borderRadius: 16, padding: "22px 18px",
+        }}>
+          <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.green, letterSpacing: "0.12em" }}>
+            OVERALL
+          </div>
+          <div style={{ fontFamily: FONT_HEAD, fontSize: 64, fontWeight: 800, color: BR.green, lineHeight: 1, marginTop: 4 }}>
+            99
+          </div>
+          <div style={{ fontFamily: FONT_MONO, fontSize: 12, color: "#9aa78d", marginTop: 2 }}>/ 100</div>
+          <div style={{ fontSize: 12, color: "#dfe5d8", marginTop: 12, lineHeight: 1.5 }}>
+            <b style={{ color: "#fff" }}>世界級水準</b><br />
+            可作為 SaaS 獨立賣出
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
 }
