@@ -156,7 +156,7 @@ export default function QuotationAnalyzerPage() {
       supplierClaim, sc,
     });
     openOrDownload(html, `L0-board-card-${SELECTED.partNo}.html`,
-      "✓ L0 Board Decision Card（1 頁 · 5 排）已開啟 — Verdict 合併 / Risk 拆 3 項 / 含毛利衝擊");
+      "✓ L0 Board Decision Card v4（1 頁 · 5 排）已開啟 — Risk Radar 4 維度 / 建議含目標+回收+時程 / Option A/B/C 三選一");
   };
 
   // ── ③ L1 Executive Report · 總經理閱讀版（4 頁固定） ──
@@ -2116,15 +2116,21 @@ function buildBoardReportHtml(args: {
   const grossMarginAfter  = 12.5;
   const grossMarginDrop   = +(grossMarginBefore - grossMarginAfter).toFixed(1);  // 8.9
 
-  // Decision Risk 拆三項（董事長會問「高什麼？」）
-  const priceRisk    = { label: "HIGH",   tone: "#d4351c", note: "超出 +8.3%、無依據" };
-  const supplyRisk   = { label: "LOW",    tone: "#4d7c0f", note: "已找到鼎能 RFQ 備案" };
-  const qualityRisk  = { label: "LOW",    tone: "#4d7c0f", note: "鼎能 OTD 97% / 品質 A+" };
-  // Overall Risk Score（加權：價格 50% + 供應 30% + 品質 20%）
-  const riskScore = (() => {
-    const toScore = (r: string) => r === "HIGH" ? 30 : r === "MEDIUM" ? 60 : 90;
-    return Math.round(toScore(priceRisk.label) * 0.5 + toScore(supplyRisk.label) * 0.3 + toScore(qualityRisk.label) * 0.2);
-  })();
+  // Risk Radar — 4 維度（高分 = 高風險），讓董事長不用猜「60 是什麼意思」
+  const riskRadar = [
+    { k: "價格風險", v: 95, note: "供應商喊 +14.5%、超出 +8.3% 無依據" },
+    { k: "供應風險", v: 20, note: "鼎能 / 力豐 / EFG 三家備案就緒" },
+    { k: "品質風險", v: 10, note: "鼎能 OTD 97% / 品質 A+" },
+    { k: "轉換風險", v: 35, note: "新供應商需 4 週試產驗證" },
+  ];
+  // Overall = 加權平均（價格 50% + 轉換 20% + 供應 15% + 品質 15%） → ≈ 60
+  const overallRisk = Math.round(
+    riskRadar[0].v * 0.5 +
+    riskRadar[3].v * 0.2 +
+    riskRadar[1].v * 0.15 +
+    riskRadar[2].v * 0.15
+  );
+  const riskColor = (v: number) => v >= 70 ? "#d4351c" : v >= 40 ? "#b8860b" : "#4d7c0f";
 
   const verdictLabel = args.supplierClaim > args.sc.buffered * 1.5 ? "不合理"
                      : args.supplierClaim > args.sc.buffered ? "偏高" : "合理";
@@ -2221,7 +2227,7 @@ function buildBoardReportHtml(args: {
 
   <!-- ── 排 1 · AI Verdict + Confidence + Decision Risk 合併 ── -->
   <div class="row">
-    <span class="row-tag">排 1</span><span class="row-title">AI Verdict · 一條合併</span>
+    <span class="row-tag">排 1</span><span class="row-title">AI Verdict · 一條合併（Verdict + Confidence + Overall Risk）</span>
     <div class="verdict-line">
       <div class="vmain">
         <span class="dot"></span>
@@ -2235,8 +2241,8 @@ function buildBoardReportHtml(args: {
         <b>92%</b>
       </div>
       <div class="vside">
-        <span class="lbl">Decision Risk</span>
-        <b>${riskScore} / 100</b>
+        <span class="lbl">Overall Risk</span>
+        <b>${overallRisk} / 100</b>
       </div>
     </div>
   </div>
@@ -2252,9 +2258,9 @@ function buildBoardReportHtml(args: {
     </div>
   </div>
 
-  <!-- ── 排 3 · 公司財務 + 毛利衝擊 + 供應風險拆 3 項 ── -->
+  <!-- ── 排 3 · 公司財務 + 毛利衝擊 + Risk Radar 4 維度 ── -->
   <div class="row">
-    <span class="row-tag">排 3</span><span class="row-title">公司財務 + 毛利衝擊 + 風險細分（董事長最在意：賺多少）</span>
+    <span class="row-tag">排 3</span><span class="row-title">公司財務 + 毛利衝擊 + Risk Radar（董事長不用猜「60 是什麼意思」）</span>
     <div class="grid4">
       <div class="cell dark">
         <div class="k">Annual Profit Impact 年損失</div>
@@ -2271,68 +2277,96 @@ function buildBoardReportHtml(args: {
         <div class="v red">−${grossMarginDrop.toFixed(1)} pp</div>
         <div class="v2">${grossMarginBefore}% → <b style="color:#d4351c">${grossMarginAfter}%</b></div>
       </div>
-      <div class="cell" style="border-color:${priceRisk.tone};background:#fbfcfa">
-        <div class="k">Decision Risk 拆 3 項</div>
-        <div class="risk-mini">
-          <div class="r" style="background:${priceRisk.tone}15">
-            <div class="l">價格</div><div class="v" style="color:${priceRisk.tone}">${priceRisk.label}</div>
+      <div class="cell" style="border-color:#9aa291;background:#fbfcfa;padding:8px 10px">
+        <div class="k" style="margin-bottom:4px">Risk Radar · 4 維度</div>
+        ${riskRadar.map((r) => `
+          <div style="display:flex;align-items:center;gap:5px;margin:2px 0">
+            <span style="font-size:9.5px;color:#5b6356;width:46px">${r.k}</span>
+            <div style="flex:1;height:5px;background:#eef0ea;border-radius:3px;overflow:hidden">
+              <div style="height:100%;width:${r.v}%;background:${riskColor(r.v)}"></div>
+            </div>
+            <span style="font-family:'IBM Plex Mono';font-size:10px;font-weight:800;color:${riskColor(r.v)};width:24px;text-align:right">${r.v}</span>
           </div>
-          <div class="r" style="background:${supplyRisk.tone}15">
-            <div class="l">供應</div><div class="v" style="color:${supplyRisk.tone}">${supplyRisk.label}</div>
-          </div>
-          <div class="r" style="background:${qualityRisk.tone}15">
-            <div class="l">品質</div><div class="v" style="color:${qualityRisk.tone}">${qualityRisk.label}</div>
-          </div>
+        `).join("")}
+        <div style="border-top:1px solid #e9ece3;margin-top:4px;padding-top:3px;display:flex;justify-content:space-between;align-items:baseline">
+          <span style="font-family:'IBM Plex Mono';font-size:9px;letter-spacing:.06em;color:#5b6356">Overall Risk</span>
+          <span style="font-family:'IBM Plex Mono';font-size:14px;font-weight:800;color:${riskColor(overallRisk)}">${overallRisk}/100</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ── 排 4 · 建議 + 截止 ── -->
+  <!-- ── 排 4 · 建議 — 世界級 CEO 版多 4 個數字 ── -->
   <div class="row">
-    <span class="row-tag">排 4</span><span class="row-title">建議 · AI Recommendation</span>
-    <div class="advice">
-      <div>
-        <div class="lbl">建議　ACTION</div>
-        <div class="v">退回重議 — 同時啟動 <b style="color:#4d7c0f">鼎能 RFQ</b></div>
+    <span class="row-tag">排 4</span><span class="row-title">建議 · AI Recommendation（含目標價 + 可回收 + 時程 — 董事長最愛的格式）</span>
+    <div class="advice" style="display:block">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+        <div>
+          <div class="lbl">建議　ACTION</div>
+          <div class="v">退回重議 — 同時啟動 <b style="color:#4d7c0f">鼎能 RFQ</b></div>
+        </div>
+        <div class="deadline">14 天完成</div>
       </div>
-      <div class="deadline">14 天完成</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;padding-top:8px;border-top:1px solid #dcebc4">
+        <div>
+          <div style="font-family:'IBM Plex Mono';font-size:9px;color:#5b6356;letter-spacing:.08em">目標價</div>
+          <div style="font-family:'IBM Plex Mono';font-size:15px;font-weight:800;color:#c026d3">${targetPrice.toFixed(2)}</div>
+        </div>
+        <div>
+          <div style="font-family:'IBM Plex Mono';font-size:9px;color:#5b6356;letter-spacing:.08em">預估可回收</div>
+          <div style="font-family:'IBM Plex Mono';font-size:15px;font-weight:800;color:#4d7c0f">NT$ ${annualSaving.toLocaleString()}/年</div>
+        </div>
+        <div>
+          <div style="font-family:'IBM Plex Mono';font-size:9px;color:#5b6356;letter-spacing:.08em">替代供應商</div>
+          <div style="font-family:'IBM Plex Mono';font-size:15px;font-weight:800;color:#0c1908">鼎能 (Risk 92)</div>
+        </div>
+        <div>
+          <div style="font-family:'IBM Plex Mono';font-size:9px;color:#5b6356;letter-spacing:.08em">完成時程</div>
+          <div style="font-family:'IBM Plex Mono';font-size:15px;font-weight:800;color:#0c1908">14 天</div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- ── 排 5 · 簽核三選一 ── -->
+  <!-- ── 排 5 · 簽核 Option A/B/C（拒絕+RFQ 合併為同一決策） ── -->
   <div class="row">
-    <span class="row-tag">排 5</span><span class="row-title">簽核 · Sign-off（請董事勾選一項）</span>
+    <span class="row-tag">排 5</span><span class="row-title">簽核 · Sign-off（A/B/C 三方案擇一 — 拒絕 + 啟動 RFQ 是同一決策）</span>
     <div class="actbar">
-      <div class="actbtn refuse">
+      <div class="actbtn switch" style="text-align:left;padding:11px 14px">
         <span class="rec">RECOMMENDED</span>
-        <div class="cb">☐</div>
-        <div class="v">拒絕</div>
+        <div style="font-family:'IBM Plex Mono';font-size:11px;font-weight:700;letter-spacing:.1em;color:#4d7c0f">OPTION A</div>
+        <div style="font-size:13px;font-weight:800;color:#4d7c0f;margin-top:5px">退回重議 + 啟動鼎能 RFQ</div>
+        <div style="font-size:10px;color:#5b6356;margin-top:3px;line-height:1.4">☐ 拒絕 7.90　☐ 啟動鼎能 RFQ<br/><b style="color:#4d7c0f">同一決策 · 兩路並行</b></div>
       </div>
-      <div class="actbtn switch">
-        <span class="rec">RECOMMENDED</span>
-        <div class="cb">☐</div>
-        <div class="v">切換 鼎能</div>
+      <div class="actbtn" style="border-color:#b8860b;background:#fffaf0;text-align:left;padding:11px 14px">
+        <div style="font-family:'IBM Plex Mono';font-size:11px;font-weight:700;letter-spacing:.1em;color:#b8860b">OPTION B</div>
+        <div style="font-size:13px;font-weight:800;color:#b8860b;margin-top:5px">接受 ${targetPrice.toFixed(2)}</div>
+        <div style="font-size:10px;color:#5b6356;margin-top:3px;line-height:1.4">☐ 議價成功上限<br/>年化損失 NT$ ${annualImpact.toLocaleString()}</div>
       </div>
-      <div class="actbtn accept">
-        <div class="cb">☐</div>
-        <div class="v">接受 ${args.newPrice.toFixed(2)}</div>
+      <div class="actbtn accept" style="text-align:left;padding:11px 14px">
+        <div style="font-family:'IBM Plex Mono';font-size:11px;font-weight:700;letter-spacing:.1em;color:#5b6356">OPTION C</div>
+        <div style="font-size:13px;font-weight:800;color:#5b6356;margin-top:5px">接受 ${args.newPrice.toFixed(2)}</div>
+        <div style="font-size:10px;color:#5b6356;margin-top:3px;line-height:1.4">☐ 全額接受<br/>毛利 ${grossMarginBefore}% → ${grossMarginAfter}%</div>
       </div>
     </div>
   </div>
 
   <div class="sign">
-    <span class="mono">核准 □　保留 □　退回 □</span>
+    <span class="mono">Option A □　Option B □　Option C □</span>
     <span class="mono">簽核：______________　日期：__________</span>
   </div>
 
+  <!-- 4 層架構（世界級企業實際分層）-->
   <div class="layers">
-    <span class="lbl">AI SUPPLY CHAIN OS · 3 層報告系統</span><br/>
-    <b>L0</b> Executive Intelligence Layer · 董事會 1 頁（本頁）　·　<b>L1</b> Executive Report · 4 頁　·　<b>L3</b> Quotation Analyzer · 完整 11 段
+    <span class="lbl">AI SUPPLY CHAIN OS · 4 層報告系統</span><br/>
+    <b>L0</b> 董事長 · 1 頁（本頁）· 結論 / 風險 / 毛利 / 決議
+    <b>L1</b> 總經理 · 3–5 頁 · 價格 / 供應商 / 成本 / 替代方案<br/>
+    <b>L2</b> 採購主管 · 10 頁 · CBS / Should Cost / RFQ / 談判策略
+    <b>L3</b> AI Quotation Analyzer · 完整分析 · BOM / Cost / Commodity / Validation / Negotiation
   </div>
 
   <div class="footer">
-    CHI HUA AI · L0 Board Card v3 · 五排架構 · ${today}<br/>
+    CHI HUA AI · L0 Board Card v4 · 五排架構 + Risk Radar + Option A/B/C · ${today}<br/>
     決策卡定位：作為董事長 / 總經理 / CEO 登入系統第一頁。月用 ${monthlyVolume.toLocaleString()} 件 · 年用 ${(monthlyVolume * 12).toLocaleString()} 件。
   </div>
 
