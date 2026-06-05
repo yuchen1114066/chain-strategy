@@ -16,6 +16,7 @@ const L_NAV = [
   { href: "/erp/procurement",label: "L3 PROCUREMENT",        zh: "AI 採購中心",     icon: "◈" },
   { href: "/erp/ai-engine",  label: "L4 AI ENGINE",          zh: "AI 決策中心",     icon: "✦" },
   { href: "/erp/market",     label: "L5 MARKET",             zh: "全球市場情報中心",icon: "◉" },
+  { href: "/erp/l5-final",   label: "L5 FINAL ✦",            zh: "Profit Defense 最終版", icon: "▲" },
 ];
 
 const FOOTER_NAV = [

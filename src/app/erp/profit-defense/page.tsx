@@ -171,6 +171,22 @@ const METAL_TO_CODE: Record<string, string> = {
   銅: "CU", 鋼: "STEEL", 鋁: "AL", 塑料: "PLASTIC", 混鐵: "PIG_IRON", IC: "CU",
 };
 
+// Supplier Price Validation — 供應商喊漲 vs AI 合理值
+// 同一料號可能有不同供應商，各自喊漲幅度
+const SUPPLIER_CLAIM: Record<string, number> = {
+  "FB64-WIRE":  5.0,  // 供應商喊 +5%
+  "FB64-MOT":   8.0,  // 供應商喊 +8%
+  "FB42-COIL":  6.5,
+  "FB64-PSU":   4.2,
+  "FB64-FRM":   7.5,
+  "FB42-FRM":   6.0,
+  "FB64-SHF":   5.5,
+  "FB42-PED-S": 4.8,
+  "FB64-FLY18": 6.8,
+  "FB64-RIM":   7.2,
+  "FB42-PED-A": 5.0,
+};
+
 const USD_TWD = 31.5;
 
 export default function ProfitDefensePage() {
@@ -718,11 +734,17 @@ export default function ProfitDefensePage() {
                 <div className="rounded-lg border bg-white p-4" style={{ borderColor: C.border, borderLeft: `4px solid ${C.primary}` }}>
                   {/* Header */}
                   <div className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
-                    <h3 className="text-base font-bold">📦 Commodity Cost Recovery Center</h3>
-                    <span className="text-[9px] font-bold px-2 py-0.5 rounded" style={{ background: C.primary, color: "#fff" }}>L4·EXECUTIVE</span>
+                    <h3 className="text-base font-bold">📦 Commodity Cost Recovery Center → <span style={{ color: "#c026d3" }}>Supplier Price Validation</span></h3>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded" style={{ background: "#c026d3", color: "#fff" }}>UPGRADED · 漲價合理性</span>
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded" style={{ background: C.primary, color: "#fff" }}>L4·EXECUTIVE</span>
+                    </div>
                   </div>
                   <div className="text-[11px] mb-3" style={{ color: C.textSub }}>
                     原料成本回收中心 · {c.name} 影響零件 + AI 回收策略　·　當前單價 ${lastPrice.toLocaleString()}/{c.unit.split("/")[1] ?? "MT"} · USD/TWD {USD_TWD}
+                    <span className="ml-2 px-1.5 py-0.5 rounded text-[10px]" style={{ background: "#fdf4ff", color: "#c026d3", border: "1px solid #f5d0fe" }}>
+                      新增：供應商喊漲 vs AI 合理值 → 揭露議價空間
+                    </span>
                   </div>
 
                   {/* 4 KPI 摘要（加入獲利衝擊 — 主管不看成本，看獲利） */}
@@ -748,7 +770,7 @@ export default function ProfitDefensePage() {
 
                   {/* 零件明細表 — 依影響度排序 + 風險等級 + 庫存天數 */}
                   <div className="overflow-x-auto">
-                    <table className="w-full text-xs min-w-[920px]">
+                    <table className="w-full text-xs min-w-[1180px]">
                       <thead>
                         <tr className="text-left border-b" style={{ borderColor: C.border, color: C.textSub }}>
                           <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-center">排名</th>
@@ -757,7 +779,9 @@ export default function ProfitDefensePage() {
                           <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">庫存天數</th>
                           <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-center">風險</th>
                           <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">月用量</th>
-                          <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">合理漲幅</th>
+                          <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right" style={{ color: C.red }}>供應商漲價</th>
+                          <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right" style={{ color: C.primary }}>AI 合理值</th>
+                          <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">議價空間</th>
                           <th className="py-2 font-semibold uppercase tracking-widest text-[9px] text-right">±5% 衝擊</th>
                         </tr>
                       </thead>
@@ -799,12 +823,38 @@ export default function ProfitDefensePage() {
                                 <span className="text-xs font-bold" style={{ color: risk.color }}>● {risk.label}</span>
                               </td>
                               <td className="py-2 text-right font-mono" style={{ color: C.textSub }}>{p.monthlyQty.toLocaleString()}</td>
-                              <td className="py-2 text-right">
-                                <span className="font-mono font-bold" style={{ color: reasonableTone }}>
-                                  {reasonablePct >= 0 ? "+" : ""}{reasonablePct.toFixed(2)}%
-                                </span>
-                                <div className="text-[9px]" style={{ color: C.outline }}>議價上限</div>
-                              </td>
+                              {(() => {
+                                const supplierClaim = SUPPLIER_CLAIM[p.code] ?? 0;
+                                const aiFair = reasonablePct;
+                                const gap = supplierClaim - aiFair;
+                                const monthlyRevenue = (p.monthlyQty * p.unitMetalKg * lastPrice * USD_TWD) / 1000;
+                                const negotiationRoom = Math.round((monthlyRevenue * gap) / 100);
+                                const hasClaim = supplierClaim > 0;
+                                return (
+                                  <>
+                                    <td className="py-2 text-right">
+                                      {hasClaim ? (
+                                        <>
+                                          <span className="font-mono font-bold" style={{ color: C.red }}>+{supplierClaim.toFixed(1)}%</span>
+                                          <div className="text-[9px]" style={{ color: C.outline }}>供應商說</div>
+                                        </>
+                                      ) : <span className="text-[10px]" style={{ color: C.outline }}>—</span>}
+                                    </td>
+                                    <td className="py-2 text-right">
+                                      <span className="font-mono font-bold" style={{ color: C.primary }}>+{Math.max(aiFair, 0).toFixed(1)}%</span>
+                                      <div className="text-[9px]" style={{ color: C.outline }}>AI 合理</div>
+                                    </td>
+                                    <td className="py-2 text-right">
+                                      {hasClaim && gap > 0 ? (
+                                        <>
+                                          <span className="font-mono font-extrabold" style={{ color: "#c026d3" }}>−{gap.toFixed(1)}%</span>
+                                          <div className="text-[9px] font-mono" style={{ color: "#c026d3" }}>NT$ {negotiationRoom.toLocaleString()}</div>
+                                        </>
+                                      ) : <span className="text-[10px]" style={{ color: C.outline }}>—</span>}
+                                    </td>
+                                  </>
+                                );
+                              })()}
                               <td className="py-2 text-right font-mono font-bold" style={{ color: C.red }}>±${p._impact.toLocaleString()}</td>
                             </tr>
                           );
@@ -818,9 +868,31 @@ export default function ProfitDefensePage() {
                           <td className="py-2 text-right font-mono font-bold">—</td>
                           <td className="py-2 text-center text-[10px]" style={{ color: C.textSub }}>—</td>
                           <td className="py-2 text-right font-mono font-bold" style={{ color: C.textSub }}>{parts.reduce((s,p)=>s+p.monthlyQty,0).toLocaleString()}</td>
-                          <td className="py-2 text-right font-mono font-bold" style={{ color: metalPctChange >= 0 ? C.red : C.primary }}>
-                            金屬 {metalPctChange >= 0 ? "+" : ""}{metalPctChange.toFixed(2)}%
-                          </td>
+                          {(() => {
+                            const claimedAvg = parts.reduce((s, p) => s + (SUPPLIER_CLAIM[p.code] ?? 0), 0) / Math.max(parts.length, 1);
+                            const fairAvg = parts.reduce((s, p) => s + (p.metalPct / 100) * metalPctChange, 0) / Math.max(parts.length, 1);
+                            const totalGapMan = parts.reduce((s, p) => {
+                              const claim = SUPPLIER_CLAIM[p.code] ?? 0;
+                              if (!claim) return s;
+                              const fair = (p.metalPct / 100) * metalPctChange;
+                              const gap = claim - fair;
+                              const monthlyRev = (p.monthlyQty * p.unitMetalKg * lastPrice * USD_TWD) / 1000;
+                              return s + (monthlyRev * gap) / 100;
+                            }, 0);
+                            return (
+                              <>
+                                <td className="py-2 text-right font-mono font-bold" style={{ color: C.red }}>
+                                  +{claimedAvg.toFixed(1)}%
+                                </td>
+                                <td className="py-2 text-right font-mono font-bold" style={{ color: C.primary }}>
+                                  +{Math.max(fairAvg, 0).toFixed(1)}%
+                                </td>
+                                <td className="py-2 text-right font-mono font-extrabold" style={{ color: "#c026d3" }}>
+                                  NT$ {Math.round(totalGapMan).toLocaleString()}
+                                </td>
+                              </>
+                            );
+                          })()}
                           <td className="py-2 text-right font-mono font-extrabold" style={{ color: C.red }}>±NT$ {totalImpact.toLocaleString()}</td>
                         </tr>
                       </tfoot>
