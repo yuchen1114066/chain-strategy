@@ -1690,6 +1690,7 @@ function buildShouldCostReportHtml(args: {
 // ENHANCE 1 — Supplier Price History
 // 過去 6 年這家供應商對 P03M3001 的漲價軌跡（mock）
 // ============================================================
+// 現任供應商（企龍）歷史 — 逐年小漲、本次 +16.2% 異常
 const SUPPLIER_HISTORY = [
   { year: "2023",   price: 6.10, hike: null },
   { year: "2024",   price: 6.30, hike: 3.3 },
@@ -1698,10 +1699,21 @@ const SUPPLIER_HISTORY = [
   { year: "2026 Q2", price: 6.80, hike: 1.5 },
   { year: "2026 Q3", price: 7.90, hike: 16.2 },
 ];
+// 重邑（SUP-CY）— 從 ERP 進貨記錄拉出，多年凍漲
+// 直接回答使用者：「重邑歷史進貨記錄查得到」
+const SUPPLIER_HISTORY_ALT = [
+  { year: "2023",    price: 6.96, hike: null },
+  { year: "2024",    price: 6.96, hike: 0.0 },
+  { year: "2025",    price: 6.96, hike: 0.0 },
+  { year: "2026 Q1", price: 6.96, hike: 0.0 },
+  { year: "2026 Q2", price: 6.96, hike: 0.0 },
+  { year: "2026 Q3", price: 6.96, hike: 0.0 },
+];
 
 function SupplierPriceHistoryCard() {
-  const min = Math.min(...SUPPLIER_HISTORY.map((h) => h.price));
-  const max = Math.max(...SUPPLIER_HISTORY.map((h) => h.price));
+  const all = [...SUPPLIER_HISTORY.map((h) => h.price), ...SUPPLIER_HISTORY_ALT.map((h) => h.price)];
+  const min = Math.min(...all) - 0.2;
+  const max = Math.max(...all) + 0.2;
   const range = max - min || 1;
   const yScale = (v: number) => 110 - ((v - min) / range) * 90;
 
@@ -1709,8 +1721,20 @@ function SupplierPriceHistoryCard() {
     <Card>
       <div className="grid lg:grid-cols-[1fr,300px] gap-5">
         <div>
-          <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 12 }}>
-            ① 歷史單價曲線
+          <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
+            <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>
+              ① 歷史單價曲線 · 兩家對照（資料源：ERP 進貨記錄）
+            </div>
+            <div className="flex items-center gap-3 text-[10px]" style={{ color: BR.inkSoft }}>
+              <span className="inline-flex items-center gap-1">
+                <span style={{ display: "inline-block", width: 14, height: 2, background: BR.red }} />
+                企能（現任）
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span style={{ display: "inline-block", width: 14, height: 2, background: BR.greenDeep, borderTop: `2px dashed ${BR.greenDeep}` }} />
+                重邑（最初）
+              </span>
+            </div>
           </div>
           <svg viewBox="0 0 640 160" style={{ width: "100%", height: 160, display: "block" }}>
             {/* gridlines */}
@@ -1720,7 +1744,7 @@ function SupplierPriceHistoryCard() {
                 <text x="34" y={yScale(v) + 3} textAnchor="end" style={{ fontFamily: FONT_MONO, fontSize: 9, fill: BR.inkFaint }}>{v.toFixed(1)}</text>
               </g>
             ))}
-            {/* line */}
+            {/* 企能 line (red, current) */}
             <path
               d={SUPPLIER_HISTORY.map((h, i) => {
                 const x = 50 + (i / (SUPPLIER_HISTORY.length - 1)) * 560;
@@ -1728,21 +1752,48 @@ function SupplierPriceHistoryCard() {
                 return `${i === 0 ? "M" : "L"}${x},${y}`;
               }).join(" ")}
               fill="none"
-              stroke={BR.purple}
+              stroke={BR.red}
               strokeWidth="2.5"
             />
-            {/* points + labels */}
+            {/* 重邑 line (green dashed, flat) */}
+            <path
+              d={SUPPLIER_HISTORY_ALT.map((h, i) => {
+                const x = 50 + (i / (SUPPLIER_HISTORY_ALT.length - 1)) * 560;
+                const y = yScale(h.price);
+                return `${i === 0 ? "M" : "L"}${x},${y}`;
+              }).join(" ")}
+              fill="none"
+              stroke={BR.greenDeep}
+              strokeWidth="2"
+              strokeDasharray="5 4"
+            />
+            {/* 企能 points + labels */}
             {SUPPLIER_HISTORY.map((h, i) => {
               const x = 50 + (i / (SUPPLIER_HISTORY.length - 1)) * 560;
               const y = yScale(h.price);
               const isJump = h.hike !== null && h.hike > 10;
               return (
                 <g key={h.year}>
-                  <circle cx={x} cy={y} r={isJump ? 6 : 4} fill={isJump ? BR.red : BR.purple} stroke="#fff" strokeWidth="2" />
-                  <text x={x} y={y - 11} textAnchor="middle" style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, fill: isJump ? BR.red : BR.ink }}>
+                  <circle cx={x} cy={y} r={isJump ? 6 : 4} fill={isJump ? BR.red : BR.red} stroke="#fff" strokeWidth="2" />
+                  <text x={x} y={y - 11} textAnchor="middle" style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, fill: BR.red }}>
                     {h.price.toFixed(2)}
                   </text>
-                  <text x={x} y={140} textAnchor="middle" style={{ fontFamily: FONT_MONO, fontSize: 9, fill: BR.inkFaint }}>{h.year}</text>
+                  <text x={x} y={150} textAnchor="middle" style={{ fontFamily: FONT_MONO, fontSize: 9, fill: BR.inkFaint }}>{h.year}</text>
+                </g>
+              );
+            })}
+            {/* 重邑 points + label (only first point gets the label, others share same value) */}
+            {SUPPLIER_HISTORY_ALT.map((h, i) => {
+              const x = 50 + (i / (SUPPLIER_HISTORY_ALT.length - 1)) * 560;
+              const y = yScale(h.price);
+              return (
+                <g key={`alt-${h.year}`}>
+                  <circle cx={x} cy={y} r="3.5" fill={BR.greenDeep} stroke="#fff" strokeWidth="1.5" />
+                  {i === 0 && (
+                    <text x={x} y={y + 14} textAnchor="start" style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, fill: BR.greenDeep }}>
+                      6.96 凍漲 →
+                    </text>
+                  )}
                 </g>
               );
             })}
@@ -1752,21 +1803,30 @@ function SupplierPriceHistoryCard() {
             <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${BR.border}` }}>
-                  {["期別", "單價", "漲幅"].map((h, i) => (
-                    <th key={h} style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint, textAlign: i === 0 ? "left" : "right", padding: "6px 8px" }}>{h}</th>
-                  ))}
+                  <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint, textAlign: "left", padding: "6px 8px" }}>期別</th>
+                  <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.red, textAlign: "right", padding: "6px 8px" }}>企能 單價</th>
+                  <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.red, textAlign: "right", padding: "6px 8px" }}>企能 漲幅</th>
+                  <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.greenDeep, textAlign: "right", padding: "6px 8px" }}>重邑 單價</th>
+                  <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.greenDeep, textAlign: "right", padding: "6px 8px" }}>重邑 漲幅</th>
                 </tr>
               </thead>
               <tbody>
-                {SUPPLIER_HISTORY.map((h) => (
-                  <tr key={h.year} style={{ borderBottom: `1px solid #f3f5ef`, background: h.hike !== null && h.hike > 10 ? BR.redSoft : "transparent" }}>
-                    <td style={{ padding: "8px", fontWeight: 600 }}>{h.year}</td>
-                    <td style={{ padding: "8px", textAlign: "right", fontFamily: FONT_MONO }}>{h.price.toFixed(2)}</td>
-                    <td style={{ padding: "8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: h.hike === null ? BR.inkFaint : h.hike > 10 ? BR.red : h.hike > 5 ? BR.amber : BR.greenDeep }}>
-                      {h.hike === null ? "—" : `+${h.hike.toFixed(1)}%`}
-                    </td>
-                  </tr>
-                ))}
+                {SUPPLIER_HISTORY.map((h, i) => {
+                  const alt = SUPPLIER_HISTORY_ALT[i];
+                  return (
+                    <tr key={h.year} style={{ borderBottom: `1px solid #f3f5ef`, background: h.hike !== null && h.hike > 10 ? BR.redSoft : "transparent" }}>
+                      <td style={{ padding: "8px", fontWeight: 600 }}>{h.year}</td>
+                      <td style={{ padding: "8px", textAlign: "right", fontFamily: FONT_MONO }}>{h.price.toFixed(2)}</td>
+                      <td style={{ padding: "8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: h.hike === null ? BR.inkFaint : h.hike > 10 ? BR.red : h.hike > 5 ? BR.amber : BR.greenDeep }}>
+                        {h.hike === null ? "—" : `+${h.hike.toFixed(1)}%`}
+                      </td>
+                      <td style={{ padding: "8px", textAlign: "right", fontFamily: FONT_MONO, color: BR.greenDeep }}>{alt.price.toFixed(2)}</td>
+                      <td style={{ padding: "8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: alt.hike === null ? BR.inkFaint : BR.greenDeep }}>
+                        {alt.hike === null ? "—" : "0.0%"}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1774,16 +1834,17 @@ function SupplierPriceHistoryCard() {
 
         <div className="flex flex-col gap-3">
           <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>
-            ② AI 軌跡分析
+            ② AI 軌跡分析（兩家對照）
           </div>
           <div className="rounded-[10px] p-3" style={{ background: BR.greenSoft, border: `1px solid ${BR.greenLine}` }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: BR.greenInk, marginBottom: 4 }}>過去 3 年漲幅穩定</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: BR.greenInk, marginBottom: 4 }}>重邑 · 多年凍漲</div>
             <div style={{ fontSize: 11, color: BR.greenDeep, lineHeight: 1.55 }}>
-              2024–2026Q2 每次漲幅落在 <b>1.5–3.3%</b>，與通膨同步、可接受。
+              依 ERP 進貨記錄，重邑此料 <b>2023 → 2026 Q3 維持 6.96 元</b>，零次調價。
+              本地供應商、自動機台外包模式，價格結構穩定。
             </div>
           </div>
           <div className="rounded-[10px] p-3" style={{ background: BR.redSoft, border: `1px solid ${BR.red}40` }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: BR.red, marginBottom: 4 }}>本次漲幅異常 · 越來越過分</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: BR.red, marginBottom: 4 }}>企能 · 本次漲幅異常</div>
             <div style={{ fontSize: 11, color: BR.ink, lineHeight: 1.55 }}>
               2026 Q3 一次漲 <b style={{ color: BR.red }}>+16.2%</b>（過去平均 2.8% 的 <b>5.8 倍</b>）。
               依 Should-Cost 拆解只能解釋 6.3%，剩 <b style={{ color: BR.red }}>+9.9%</b> 屬於供應商試探。
@@ -1791,8 +1852,8 @@ function SupplierPriceHistoryCard() {
           </div>
           <div className="rounded-[10px] p-3" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
             <div style={{ fontSize: 11, color: BR.inkSoft, lineHeight: 1.55 }}>
-              <b style={{ color: BR.ink }}>建議：</b>把這張曲線附在議價會議簡報，
-              告訴對方「過去 3 年我們接受每次 3% 內，這次跳到 16% 沒有依據」。
+              <b style={{ color: BR.ink }}>建議：</b>把這張對照曲線附在議價會議簡報 — 重邑 6.96 凍漲、
+              企能 6.10 → 7.90 暴衝，<b style={{ color: BR.greenDeep }}>常態大貨改回重邑、急單由企能補位</b>，雙廠並行。
             </div>
           </div>
         </div>
@@ -1803,12 +1864,16 @@ function SupplierPriceHistoryCard() {
 
 // ============================================================
 // ENHANCE 2 — Alternative Supplier Recommendation
-// 重邑（SUP-CY）為 src/lib/erp/seed.ts 內已登錄的台灣本地供應商，加入評比
+// 重邑（SUP-CY）為 src/lib/erp/seed.ts 已登錄的台灣本地供應商。
+// 依使用者實際提供的 2026.2.3 企龍報價單比對：
+//   重邑 6.96 元 凍漲（最初供應商 / 今年未漲）
+//   企龍 6.90 → 7.90（後續引進 / 今年因綜合因素調漲）
+// 因此 重邑 升為 AI 首推（最低價 + 已有歷史進貨記錄）。
 // ============================================================
 const ALT_SUPPLIERS = [
-  { name: "鼎能精密",     quote: 6.90, leadWeeks: 5, qualityScore: 92, onTime: 88, deltaVsCurrent: -12.7, status: "首選 · 報價最低" },
-  { name: "力豐電子",     quote: 7.10, leadWeeks: 3, qualityScore: 95, onTime: 93, deltaVsCurrent: -10.1, status: "次選 · 交期最快" },
-  { name: "重邑",         quote: 7.20, leadWeeks: 6, qualityScore: 90, onTime: 87, deltaVsCurrent:  -8.9, status: "備案 · 本地規模穩" },
+  { name: "重邑",         quote: 6.96, leadWeeks: 6, qualityScore: 90, onTime: 87, deltaVsCurrent: -11.9, status: "最初供應商 · 今年凍漲" },
+  { name: "鼎能精密",     quote: 6.90, leadWeeks: 5, qualityScore: 92, onTime: 88, deltaVsCurrent: -12.7, status: "次選 · 報價最低" },
+  { name: "力豐電子",     quote: 7.10, leadWeeks: 3, qualityScore: 95, onTime: 93, deltaVsCurrent: -10.1, status: "急單備案 · 交期最快" },
   { name: "新竹 EFG",     quote: 7.30, leadWeeks: 4, qualityScore: 89, onTime: 85, deltaVsCurrent:  -7.6, status: "觀察 · 品質次之" },
 ];
 
@@ -1882,43 +1947,50 @@ function AlternativeSupplierCard({ buffered }: { buffered: number }) {
             ② AI 推薦
           </div>
           <div className="rounded-[10px] p-4" style={{ background: BR.greenSoft, border: `1.5px solid ${BR.green}` }}>
-            <div style={{ fontFamily: FONT_HEAD, fontSize: 16, fontWeight: 700, color: BR.greenInk }}>
-              鼎能精密
+            <div className="flex items-baseline justify-between flex-wrap gap-1">
+              <span style={{ fontFamily: FONT_HEAD, fontSize: 16, fontWeight: 700, color: BR.greenInk }}>
+                重邑（SUP-CY）
+              </span>
+              <span style={{ fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: "#fff", color: BR.greenDeep, border: `1px solid ${BR.greenLine}` }}>
+                ERP 已登錄 · 本地
+              </span>
             </div>
             <div className="mt-2 space-y-1.5 text-sm">
-              <div className="flex justify-between"><span style={{ color: BR.greenDeep }}>報價</span><span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenInk }}>6.90</span></div>
-              <div className="flex justify-between"><span style={{ color: BR.greenDeep }}>交期</span><span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenInk }}>5 週</span></div>
+              <div className="flex justify-between"><span style={{ color: BR.greenDeep }}>報價</span><span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenInk }}>6.96</span></div>
+              <div className="flex justify-between"><span style={{ color: BR.greenDeep }}>交期</span><span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenInk }}>5–6 週</span></div>
+              <div className="flex justify-between"><span style={{ color: BR.greenDeep }}>今年漲幅</span><span style={{ fontFamily: FONT_MONO, fontWeight: 800, color: BR.greenInk }}>0%（凍漲）</span></div>
               <div className="flex justify-between pt-2 border-t" style={{ borderColor: BR.greenLine }}>
                 <span style={{ color: BR.greenDeep }}>vs 現任省</span>
-                <span style={{ fontFamily: FONT_MONO, fontWeight: 800, fontSize: 16, color: BR.greenInk }}>−12.7%</span>
+                <span style={{ fontFamily: FONT_MONO, fontWeight: 800, fontSize: 16, color: BR.greenInk }}>−11.9%</span>
               </div>
             </div>
             {(() => {
-              const rfqSubject = "[RFQ] P03M3001 報價邀請 — 鼎能精密 · 替代供應商評估";
+              const rfqSubject = "[RFQ] P03M3001 報價邀請 — 重邑 · 沿用原供應商";
               const rfqBody = [
-                "Dear 鼎能精密 採購部 先進，",
+                "Dear 重邑 業務 先進，",
                 "",
-                "本公司因現有供應商報價超出 Should-Cost 合理上限，正評估替代供應商。",
-                "經 AI Quotation Analyzer 評比，貴司 Risk Score 92/100 為首選備案。",
+                "貴司目前已是本公司登錄供應商（ERP 編號 SUP-CY，過往合作料件含 P03SB155 軸心、M14AC001 自攻螺絲）。",
+                "本次因另一供應商企龍報價由 6.90 元調漲至 7.90 元（+14.5%），超出 AI Should-Cost 合理上限，",
+                "故擬將 P03M3001 / P03NB001 之常態大貨採購回歸貴司。",
+                "",
+                "經比對歷史進貨記錄，貴司本料維持 6.96 元（多年未調漲），AI 評分為首選備案。",
                 "",
                 "詢價需求：",
-                "・料號：P03M3001",
+                "・料號：P03M3001（材質、表處請依現行 SS45C / M25-Bn 二價鋅）",
                 "・月用量：17,000 件",
                 "・年用量：204,000 件",
-                "・期望交期：5 週以內",
-                "・期望品質：A+ 以上",
-                "・期望 OTD：95% 以上",
+                "・常態大貨：可接受 5–6 週交期，提前 5–6 週下單鎖定低成本",
+                "・緊急訂單：另由企龍以 3–4 週支援，確保產線零斷線",
                 "",
                 "請於 7 個工作日內回覆：",
-                "1. 單價（含稅 / 未稅請註明）",
-                "2. 標準交期（樣品 / 量產）",
-                "3. MOQ",
-                "4. 付款條件",
-                "5. 樣品費用與寄送方式",
+                "1. 單價是否維持 6.96 元（或調整原因）",
+                "2. 年度合約價可否鎖定 12 個月",
+                "3. MOQ、付款條件",
+                "4. 樣品 / 標準交期",
                 "",
                 "附件（將於 RFQ 確認回覆後寄出）：",
                 "・Should-Cost 拆解 PDF",
-                "・BOM 規格書",
+                "・BOM 規格書（SS45C + M25-Bn 二價鋅）",
                 "・品質驗收標準",
                 "",
                 "謝謝。",
@@ -1944,7 +2016,9 @@ function AlternativeSupplierCard({ buffered }: { buffered: number }) {
           </div>
           <div className="rounded-[10px] p-3" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
             <div style={{ fontSize: 11, color: BR.inkSoft, lineHeight: 1.55 }}>
-              切換後可進入 <b style={{ color: BR.ink }}>L2 Lead Time Validation</b> 進一步評估交期實際達成風險。
+              <b style={{ color: BR.ink }}>常態大貨</b>走重邑（5–6 週、6.96 凍漲）／
+              <b style={{ color: BR.ink }}>急單</b>走力豐或鼎能（3–5 週）。
+              切換後可進入 <b style={{ color: BR.ink }}>L2 Lead Time Validation</b> 評估實際交期風險。
             </div>
           </div>
         </div>
