@@ -1803,11 +1803,13 @@ function SupplierPriceHistoryCard() {
 
 // ============================================================
 // ENHANCE 2 — Alternative Supplier Recommendation
+// 重邑（SUP-CY）為 src/lib/erp/seed.ts 內已登錄的台灣本地供應商，加入評比
 // ============================================================
 const ALT_SUPPLIERS = [
-  { name: "鼎能精密",     quote: 6.90, leadWeeks: 5, qualityScore: 92, onTime: 88, deltaVsCurrent: -12.7, status: "現價持平" },
-  { name: "力豐電子",     quote: 7.10, leadWeeks: 3, qualityScore: 95, onTime: 93, deltaVsCurrent:  -10.1, status: "微高但快交" },
-  { name: "新竹 EFG",     quote: 7.30, leadWeeks: 4, qualityScore: 89, onTime: 85, deltaVsCurrent:  -7.6, status: "備案" },
+  { name: "鼎能精密",     quote: 6.90, leadWeeks: 5, qualityScore: 92, onTime: 88, deltaVsCurrent: -12.7, status: "首選 · 報價最低" },
+  { name: "力豐電子",     quote: 7.10, leadWeeks: 3, qualityScore: 95, onTime: 93, deltaVsCurrent: -10.1, status: "次選 · 交期最快" },
+  { name: "重邑",         quote: 7.20, leadWeeks: 6, qualityScore: 90, onTime: 87, deltaVsCurrent:  -8.9, status: "備案 · 本地規模穩" },
+  { name: "新竹 EFG",     quote: 7.30, leadWeeks: 4, qualityScore: 89, onTime: 85, deltaVsCurrent:  -7.6, status: "觀察 · 品質次之" },
 ];
 
 function AlternativeSupplierCard({ buffered }: { buffered: number }) {
@@ -1847,8 +1849,9 @@ function AlternativeSupplierCard({ buffered }: { buffered: number }) {
                 </tr>
                 {ALT_SUPPLIERS.map((s, i) => {
                   const action = i === 0 ? { label: "✓ 立即詢價", tone: BR.greenDeep }
-                                : i === 1 ? { label: "✓ 切換", tone: BR.greenDeep }
-                                          : { label: "備案", tone: BR.amber };
+                                : i === 1 ? { label: "✓ 切換",     tone: BR.greenDeep }
+                                : i === 2 ? { label: "備案",       tone: BR.amber }
+                                          : { label: "觀察",       tone: BR.amber };
                   return (
                     <tr key={s.name} style={{ borderBottom: `1px solid #f3f5ef` }}>
                       <td style={{ padding: "12px 8px", fontWeight: 700 }}>{s.name}</td>
@@ -1890,15 +1893,54 @@ function AlternativeSupplierCard({ buffered }: { buffered: number }) {
                 <span style={{ fontFamily: FONT_MONO, fontWeight: 800, fontSize: 16, color: BR.greenInk }}>−12.7%</span>
               </div>
             </div>
-            <button
-              type="button"
-              style={{
-                width: "100%", marginTop: 12, background: BR.green, color: "#fff",
-                border: "none", borderRadius: 8, padding: "9px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer",
-              }}
-            >
-              ✦ 立即發送 RFQ
-            </button>
+            {(() => {
+              const rfqSubject = "[RFQ] P03M3001 報價邀請 — 鼎能精密 · 替代供應商評估";
+              const rfqBody = [
+                "Dear 鼎能精密 採購部 先進，",
+                "",
+                "本公司因現有供應商報價超出 Should-Cost 合理上限，正評估替代供應商。",
+                "經 AI Quotation Analyzer 評比，貴司 Risk Score 92/100 為首選備案。",
+                "",
+                "詢價需求：",
+                "・料號：P03M3001",
+                "・月用量：17,000 件",
+                "・年用量：204,000 件",
+                "・期望交期：5 週以內",
+                "・期望品質：A+ 以上",
+                "・期望 OTD：95% 以上",
+                "",
+                "請於 7 個工作日內回覆：",
+                "1. 單價（含稅 / 未稅請註明）",
+                "2. 標準交期（樣品 / 量產）",
+                "3. MOQ",
+                "4. 付款條件",
+                "5. 樣品費用與寄送方式",
+                "",
+                "附件（將於 RFQ 確認回覆後寄出）：",
+                "・Should-Cost 拆解 PDF",
+                "・BOM 規格書",
+                "・品質驗收標準",
+                "",
+                "謝謝。",
+                "",
+                "祺驊股份有限公司 · 採購中心",
+                "（此信由 L3 AI Quotation Analyzer · Alternative Supplier 模組自動草擬）",
+              ].join("\n");
+              const rfqHref = `mailto:?subject=${encodeURIComponent(rfqSubject)}&body=${encodeURIComponent(rfqBody)}`;
+              return (
+                <a
+                  href={rfqHref}
+                  style={{
+                    display: "block", textAlign: "center", textDecoration: "none",
+                    width: "100%", marginTop: 12, background: BR.green, color: "#fff",
+                    borderRadius: 8, padding: "10px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  ✦ 立即發送 RFQ
+                </a>
+              );
+            })()}
           </div>
           <div className="rounded-[10px] p-3" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
             <div style={{ fontSize: 11, color: BR.inkSoft, lineHeight: 1.55 }}>
