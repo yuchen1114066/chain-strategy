@@ -2311,6 +2311,14 @@ function AlternativeSupplierCard({ buffered, selected }: { buffered: number; sel
   const currentPct = +(((currentPrice - selected.oldPrice) / selected.oldPrice) * 100).toFixed(1);
   const savingPct  = +(((currentPrice - top.quote) / currentPrice) * 100).toFixed(1);
 
+  // 判定本料是否在 PART_PROFILES 內有 demo 替代廠商資料；不在則改顯歷史購入資料
+  const hasAlternativeRecord = selected.partNo in PART_PROFILES;
+  if (!hasAlternativeRecord) {
+    return (
+      <PurchaseHistoryCard selected={selected} />
+    );
+  }
+
   return (
     <Card>
       <div className="grid lg:grid-cols-[1fr,260px] gap-5">
@@ -3557,5 +3565,194 @@ function IntakeModal({
 
       </div>
     </div>
+  );
+}
+
+// ============================================================
+// Purchase History Card — 沒有替代廠商資料時，改顯本料 / 本廠商歷史購入
+// ============================================================
+function PurchaseHistoryCard({ selected }: { selected: OcrRow }) {
+  // 從 newPrice 反推 7 季歷史購入單價（緩漲 1.5–3.3%，最後一季 = 本次報價）
+  // PO 號 + 數量 + 小計 都依 partNo + 期別 deterministic 產生（避免每次 render 亂跳）
+  const q7 = +selected.newPrice.toFixed(2);
+  const q6 = +selected.oldPrice.toFixed(2);
+  const q5 = +(q6 / 1.015).toFixed(2);
+  const q4 = +(q5 / 1.031).toFixed(2);
+  const q3 = +(q4 / 1.032).toFixed(2);
+  const q2 = +(q3 / 1.033).toFixed(2);
+  const q1 = +(q2 / 1.025).toFixed(2);
+
+  const seed = selected.partNo.split("").reduce((s, c) => s + c.charCodeAt(0), 0);
+  const det = (offset: number, min: number, max: number) =>
+    min + ((seed * 31 + offset * 17) % (max - min + 1));
+
+  const series = [
+    { period: "2024 Q4", price: q1, qty: det(1, 4_000, 7_000),  poTail: "A1" },
+    { period: "2025 Q1", price: q2, qty: det(2, 5_000, 9_000),  poTail: "A2" },
+    { period: "2025 Q2", price: q3, qty: det(3, 7_000, 11_000), poTail: "A3" },
+    { period: "2025 Q3", price: q4, qty: det(4, 6_000, 10_000), poTail: "A4" },
+    { period: "2025 Q4", price: q5, qty: det(5, 9_000, 13_000), poTail: "A5" },
+    { period: "2026 Q1", price: q6, qty: det(6, 8_000, 12_000), poTail: "A6" },
+    { period: "2026 Q2 (本次)", price: q7, qty: det(7, 10_000, 14_000), poTail: "NEW", isNew: true },
+  ];
+
+  const minPrice = Math.min(...series.map((s) => s.price)) - 0.2;
+  const maxPrice = Math.max(...series.map((s) => s.price)) + 0.2;
+  const range = maxPrice - minPrice || 1;
+  const y = (v: number) => 110 - ((v - minPrice) / range) * 90;
+
+  const totalQty   = series.slice(0, -1).reduce((s, p) => s + p.qty, 0);
+  const totalSpend = series.slice(0, -1).reduce((s, p) => s + p.qty * p.price, 0);
+  const avgPrice   = +(totalSpend / totalQty).toFixed(2);
+  const currentVsAvg = +(((q7 - avgPrice) / avgPrice) * 100).toFixed(1);
+  const newQty   = series[series.length - 1].qty;
+  const newSpend = newQty * q7;
+
+  return (
+    <Card>
+      <div className="grid lg:grid-cols-[1fr,260px] gap-5">
+        <div>
+          <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
+            <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>
+              ① 歷史購入資料及單價 · <span style={{ color: BR.greenDeep }}>{selected.partNo}</span>
+            </div>
+            <span style={{
+              fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700,
+              color: BR.purple, background: "#fdf4ff",
+              padding: "2px 7px", borderRadius: 4,
+              border: `1px solid #f5d0fe`, letterSpacing: ".05em",
+            }}>
+              此料無替代廠商記錄 · 改顯歷史進貨
+            </span>
+          </div>
+
+          {/* SVG mini chart */}
+          <svg viewBox="0 0 640 160" style={{ width: "100%", height: 160, display: "block" }}>
+            {[minPrice, (minPrice + maxPrice) / 2, maxPrice].map((v, i) => (
+              <g key={i}>
+                <line x1="40" y1={y(v)} x2="620" y2={y(v)} stroke="#eef0ea" strokeWidth="1" />
+                <text x="34" y={y(v) + 3} textAnchor="end" style={{ fontFamily: FONT_MONO, fontSize: 9, fill: BR.inkFaint }}>{v.toFixed(1)}</text>
+              </g>
+            ))}
+            <path
+              d={series.map((p, i) => {
+                const x = 50 + (i / (series.length - 1)) * 560;
+                return `${i === 0 ? "M" : "L"}${x},${y(p.price)}`;
+              }).join(" ")}
+              fill="none"
+              stroke={BR.red}
+              strokeWidth="2.5"
+            />
+            {series.map((p, i) => {
+              const x = 50 + (i / (series.length - 1)) * 560;
+              return (
+                <g key={p.period}>
+                  <circle cx={x} cy={y(p.price)} r={p.isNew ? 6 : 4} fill={p.isNew ? BR.red : "#fff"} stroke={BR.red} strokeWidth="2" />
+                  <text x={x} y={y(p.price) - 11} textAnchor="middle" style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, fill: BR.red }}>
+                    {p.price.toFixed(2)}
+                  </text>
+                  <text x={x} y={150} textAnchor="middle" style={{ fontFamily: FONT_MONO, fontSize: 9, fill: BR.inkFaint }}>{p.period.replace(" (本次)", "")}</text>
+                </g>
+              );
+            })}
+          </svg>
+
+          <div className="overflow-x-auto mt-3">
+            <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${BR.border}`, background: "#fbfcfa" }}>
+                  {["期別", "採購單", "數量", "單價", "小計 (NT$)"].map((h, i) => (
+                    <th key={h} style={{
+                      fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, letterSpacing: "0.04em",
+                      color: BR.inkFaint, textAlign: i >= 2 ? "right" : "left",
+                      padding: "8px",
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {series.map((p) => {
+                  const subtotal = p.qty * p.price;
+                  return (
+                    <tr key={p.period} style={{
+                      borderBottom: `1px solid #f3f5ef`,
+                      background: p.isNew ? BR.redSoft : "transparent",
+                    }}>
+                      <td style={{ padding: "8px", fontWeight: p.isNew ? 700 : 600 }}>{p.period}</td>
+                      <td style={{ padding: "8px", fontFamily: FONT_MONO, color: BR.inkSoft }}>
+                        PO-{selected.partNo.slice(-4)}-{p.poTail}
+                      </td>
+                      <td style={{ padding: "8px", textAlign: "right", fontFamily: FONT_MONO }}>{p.qty.toLocaleString()}</td>
+                      <td style={{ padding: "8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: p.isNew ? BR.red : BR.ink }}>
+                        {p.price.toFixed(2)}
+                      </td>
+                      <td style={{ padding: "8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: p.isNew ? 700 : 500, color: p.isNew ? BR.red : BR.inkSoft }}>
+                        {Math.round(subtotal).toLocaleString()}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr style={{ background: "#fbfcfa", borderTop: `1.5px solid ${BR.borderHi}` }}>
+                  <td colSpan={2} style={{ padding: "10px 8px", fontWeight: 700, color: BR.inkSoft }}>過去 6 期合計</td>
+                  <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700 }}>{totalQty.toLocaleString()}</td>
+                  <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenDeep }}>均 {avgPrice.toFixed(2)}</td>
+                  <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700 }}>{Math.round(totalSpend).toLocaleString()}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>
+            ② AI 觀察 · 歷史 vs 本次
+          </div>
+          <div className="rounded-[10px] p-4" style={{ background: BR.redSoft, border: `1px solid ${BR.red}40` }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: BR.red, marginBottom: 4 }}>本次報價偏離歷史</div>
+            <div className="mt-2 space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span style={{ color: BR.inkSoft }}>本次單價</span>
+                <span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.red }}>{q7.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span style={{ color: BR.inkSoft }}>6 期平均</span>
+                <span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenDeep }}>{avgPrice.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between pt-2 border-t" style={{ borderColor: `${BR.red}30` }}>
+                <span style={{ color: BR.inkSoft }}>vs 平均</span>
+                <span style={{ fontFamily: FONT_MONO, fontWeight: 800, fontSize: 15, color: BR.red }}>
+                  +{currentVsAvg}%
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-[10px] p-4" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
+            <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 6 }}>
+              如本次接受
+            </div>
+            <div className="flex justify-between text-sm">
+              <span style={{ color: BR.inkSoft }}>採購金額</span>
+              <span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.ink }}>
+                NT$ {Math.round(newSpend).toLocaleString()}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm mt-1">
+              <span style={{ color: BR.inkSoft }}>vs 過去同量價</span>
+              <span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.red }}>
+                +NT$ {Math.round((q7 - avgPrice) * newQty).toLocaleString()}
+              </span>
+            </div>
+          </div>
+          <div className="rounded-[10px] p-3" style={{ background: BR.greenSoft, border: `1px solid ${BR.greenLine}` }}>
+            <div style={{ fontSize: 11, color: BR.greenDeep, lineHeight: 1.55 }}>
+              <b style={{ color: BR.greenInk }}>AI 建議：</b>
+              此料尚未建立替代廠商資料庫，本卡改顯 <b>{selected.supplier}</b> 過去 6 期實際進貨記錄。
+              本次喊 {q7.toFixed(2)}，高於 6 期平均 {avgPrice.toFixed(2)} 達 <b style={{ color: BR.red }}>+{currentVsAvg}%</b> —
+              建議以「過去 6 期均價 + 通膨」做為議價錨點。
+            </div>
+          </div>
+        </div>
+      </div>
+    </Card>
   );
 }
