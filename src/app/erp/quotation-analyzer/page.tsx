@@ -193,7 +193,7 @@ export default function QuotationAnalyzerPage() {
 
   // 共用：把檔案吃進來 → 跑 OCR mock → 加進 uploadedRows → 自動選中
   // 入口 intake modal 和頁面中的 STEP 1 上傳卡共用同一條路徑
-  const ingestFile = (file: File, fmt: string, opts?: { closeIntakeOnSuccess?: boolean; email?: string; company?: string }) => {
+  const ingestFile = (file: File, fmt: string, opts?: { closeIntakeOnSuccess?: boolean }) => {
     const sizeKB = (file.size / 1024).toFixed(0);
     showToast(`📂 ${fmt} 上傳中：${file.name}（${sizeKB} KB）· AI OCR 處理中…`);
     const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
@@ -206,7 +206,7 @@ export default function QuotationAnalyzerPage() {
     const supMatch  = base.match(knownSuppliers) ?? cleaned.match(/[一-龥]{2,4}/);
     const partMatch = base.match(/[A-Z][A-Z0-9]{3,}[-]?[A-Z0-9]*/);
     // 若使用者在 modal 內手填公司名，優先使用
-    const newSupplier = (opts?.company && opts.company.trim()) || supMatch?.[0] || "未識別供應商";
+    const newSupplier = supMatch?.[0] || "未識別供應商";
     const needsSupplierFix = newSupplier === "未識別供應商";
     const newPartNo   = partMatch?.[0] ?? `OCR-${Date.now().toString().slice(-6)}`;
     const today = new Date();
@@ -415,12 +415,18 @@ export default function QuotationAnalyzerPage() {
         </div>
       )}
 
-      {/* 入口 Intake Modal — 上傳完直接進入下方分析頁 */}
+      {/* 入口 Intake Modal — 送出後進入下方分析頁；關閉鍵回上一頁 */}
       {showIntake && (
         <IntakeModal
-          onSubmit={(file, email, company) => ingestFile(file, fmtOfFile(file), { closeIntakeOnSuccess: true, email, company })}
-          onClose={() => setShowIntake(false)}
-          allowClose={uploadedRows.length > 0}
+          onSubmit={(file) => ingestFile(file, fmtOfFile(file), { closeIntakeOnSuccess: true })}
+          onClose={() => {
+            // 關閉鍵 = 結束對話框，回到上一頁（若無歷史則僅關閉 modal）
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              window.history.back();
+            } else {
+              setShowIntake(false);
+            }
+          }}
         />
       )}
 
@@ -3365,15 +3371,12 @@ function fmtOfFile(file: File): string {
 }
 
 function IntakeModal({
-  onSubmit, onClose, allowClose,
+  onSubmit, onClose,
 }: {
-  onSubmit: (file: File, email: string, company: string) => void;
+  onSubmit: (file: File) => void;
   onClose: () => void;
-  allowClose: boolean;
 }) {
   const [file, setFile] = useState<File | null>(null);
-  const [email, setEmail] = useState("");
-  const [company, setCompany] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -3394,7 +3397,7 @@ function IntakeModal({
     if (!file) return;
     setSubmitting(true);
     // 稍微 delay 一下讓使用者看到「分析中」的回饋
-    setTimeout(() => onSubmit(file, email.trim(), company.trim()), 200);
+    setTimeout(() => onSubmit(file), 200);
   };
 
   return (
@@ -3405,7 +3408,7 @@ function IntakeModal({
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: 24,
       }}
-      onClick={(e) => { if (allowClose && e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
         style={{
@@ -3418,17 +3421,16 @@ function IntakeModal({
           fontFamily: FONT,
         }}
       >
-        {allowClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              position: "absolute", top: 16, right: 18, zIndex: 1,
-              background: "transparent", border: "none", color: "#9aa78d",
-              fontSize: 22, cursor: "pointer", lineHeight: 1,
-            }}
-          >×</button>
-        )}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="關閉"
+          style={{
+            position: "absolute", top: 16, right: 18, zIndex: 1,
+            background: "transparent", border: "none", color: "#9aa78d",
+            fontSize: 22, cursor: "pointer", lineHeight: 1,
+          }}
+        >×</button>
 
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <div style={{
@@ -3516,69 +3518,43 @@ function IntakeModal({
             )}
           </label>
 
-          {/* 右：email + 公司 + 送出 */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="您的 Email（接收分析結果）"
-              style={{
-                background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.18)",
-                color: "#fff", borderRadius: 11, padding: "16px 18px", fontSize: 14,
-                fontFamily: FONT, outline: "none",
-              }}
-            />
-            <input
-              type="text"
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-              placeholder="公司名稱（供應商，建議填寫）"
-              style={{
-                background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.18)",
-                color: "#fff", borderRadius: 11, padding: "16px 18px", fontSize: 14,
-                fontFamily: FONT, outline: "none",
-              }}
-            />
+          {/* 右：送出 + 關閉 */}
+          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 12 }}>
             <button
               type="button"
               disabled={!file || submitting}
               onClick={submit}
               style={{
-                marginTop: 4,
                 background: !file || submitting ? "rgba(255,255,255,.1)" : "#c9a36a",
                 color: !file || submitting ? "#9aa78d" : "#1a1410",
                 border: "none", borderRadius: 11,
-                padding: "17px 22px", fontSize: 15, fontWeight: 800,
+                padding: "20px 22px", fontSize: 16, fontWeight: 800,
                 cursor: !file || submitting ? "not-allowed" : "pointer",
                 letterSpacing: ".04em",
                 boxShadow: !file || submitting ? "none" : "0 6px 18px rgba(201,163,106,.35)",
                 transition: "background .15s",
               }}
             >
-              {submitting ? "分析中… 請稍候" : "送出，免費分析 →"}
+              {submitting ? "分析中… 請稍候" : "送出分析 →"}
             </button>
-            <div style={{ fontSize: 11, color: "#9aa78d", textAlign: "center", marginTop: 6, lineHeight: 1.6 }}>
-              🔒 上傳即代表同意僅供本次採購分析使用　·　不轉售、不外流
-            </div>
-          </div>
-        </div>
-
-        {allowClose && (
-          <div style={{ textAlign: "center", marginTop: 24 }}>
             <button
               type="button"
               onClick={onClose}
               style={{
-                background: "transparent", border: "none",
-                color: "#9aa78d", fontSize: 11, cursor: "pointer",
-                letterSpacing: ".06em",
+                background: "transparent",
+                color: "#cdd6c2",
+                border: "1px solid rgba(255,255,255,.18)",
+                borderRadius: 11,
+                padding: "16px 22px", fontSize: 14, fontWeight: 600,
+                cursor: "pointer",
+                letterSpacing: ".04em",
               }}
             >
-              或先看上次的分析結果
+              關閉
             </button>
           </div>
-        )}
+        </div>
+
       </div>
     </div>
   );
