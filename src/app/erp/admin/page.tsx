@@ -64,6 +64,14 @@ export default function AdminHomePage() {
       {/* 一般管理區塊 */}
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <AdminCard
+          href="/erp/admin/downloads"
+          icon="📦"
+          tone="emerald"
+          title="模組程式碼下載"
+          desc="WMS / Quotation Analyzer standalone ZIP，需 ADMIN_DOWNLOAD_TOKEN"
+          tag="內部僅見"
+        />
+        <AdminCard
           href="/erp/admin/cost-intelligence"
           icon="📊"
           tone="emerald"
