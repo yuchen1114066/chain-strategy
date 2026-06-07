@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 
 // ============================================================
 // L3 PROCUREMENT · AI Quotation Analyzer
@@ -471,24 +470,6 @@ export default function QuotationAnalyzerPage() {
             <b style={{ color: BR.ink }}>關鍵不是報價</b>，而是 <b style={{ color: BR.purple }}>Cost Breakdown</b>。
             供應商給的價我們不直接收 — 先 OCR、找 BOM、抓商品價、跑 Should-Cost，再決定接不接。
           </p>
-          <div style={{ marginTop: 10 }}>
-            <a
-              href="/downloads/quotation-analyzer-standalone.zip"
-              download
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                padding: "6px 12px", borderRadius: 6,
-                fontFamily: FONT_MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.04em",
-                background: BR.greenSoft, color: BR.greenInk,
-                border: `1px solid ${BR.greenLine}`, textDecoration: "none",
-              }}
-            >
-              ⬇ 下載 standalone 程式碼（含上傳→分析→PDF 報告）
-            </a>
-            <span style={{ marginLeft: 8, fontSize: 11, color: BR.inkFaint }}>
-              ZIP · Next.js 16 + React 19 · npm install 即可獨立執行
-            </span>
-          </div>
         </header>
 
         {/* 子模組 nav strip */}
@@ -1239,8 +1220,7 @@ export default function QuotationAnalyzerPage() {
           fontFamily: FONT_MONO, fontSize: 10.5, color: BR.inkFaint,
         }}>
           <span style={{ color: BR.greenDeep, fontWeight: 600 }}>● AI Confidence 92%</span>
-          <Link href="/erp/l5-final" style={{ color: BR.greenDeep, textDecoration: "underline" }}>→ 看 L5 Final · Price Validation Engine</Link>
-          <Link href="/erp/procurement" style={{ color: BR.greenDeep, textDecoration: "underline" }}>← 回 L3 採購中心</Link>
+          <span style={{ color: BR.inkFaint }}>standalone build · 跨模組連結已停用</span>
           <span className="flex-1" />
           <span>CHI HUA AI · L3 · AI Quotation Analyzer · /erp/quotation-analyzer</span>
         </footer>
