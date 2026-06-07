@@ -2108,16 +2108,22 @@ function buildSupplierHistoryAlt(oldP: number) {
 }
 
 function SupplierPriceHistoryCard({ selected }: { selected: OcrRow }) {
+  // 只有當前選中料號是有 demo 替代廠商記錄的（PART_PROFILES 內），
+  // 才把「重邑」拉出來作同質性對照；否則只畫現任那條，避免拿不同產業的廠商硬比。
+  const hasAltComparison = selected.partNo in PART_PROFILES;
+
   // 依當前選中的料號 / 供應商動態產生歷史曲線
   const seriesCurr = buildSupplierHistory(selected.oldPrice, selected.newPrice);
-  const seriesAlt  = buildSupplierHistoryAlt(selected.oldPrice);
-  const altFlat    = seriesAlt[0].price;
+  const seriesAlt  = hasAltComparison ? buildSupplierHistoryAlt(selected.oldPrice) : [];
+  const altFlat    = seriesAlt[0]?.price ?? 0;
   const altName    = "重邑";
   const supplier   = selected.supplier;
   const q3Hike     = seriesCurr[5].hike ?? 0;
   const earlierAvg = +(seriesCurr.slice(1, 5).reduce((s, h) => s + (h.hike ?? 0), 0) / 4).toFixed(1);
   const multiple   = earlierAvg > 0 ? +(q3Hike / earlierAvg).toFixed(1) : 0;
-  const all = [...seriesCurr.map((h) => h.price), ...seriesAlt.map((h) => h.price)];
+  const all = hasAltComparison
+    ? [...seriesCurr.map((h) => h.price), ...seriesAlt.map((h) => h.price)]
+    : seriesCurr.map((h) => h.price);
   const min = Math.min(...all) - 0.2;
   const max = Math.max(...all) + 0.2;
   const range = max - min || 1;
@@ -2132,17 +2138,19 @@ function SupplierPriceHistoryCard({ selected }: { selected: OcrRow }) {
         <div>
           <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
             <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>
-              ① 歷史單價曲線 · 兩家對照 · <span style={{ color: BR.greenDeep }}>{selected.partNo}</span>（資料源：ERP 進貨記錄）
+              ① 歷史單價曲線 {hasAltComparison ? "· 兩家對照" : `· ${supplier} 單獨`} · <span style={{ color: BR.greenDeep }}>{selected.partNo}</span>（資料源：ERP 進貨記錄）
             </div>
             <div className="flex items-center gap-3 text-[10px]" style={{ color: BR.inkSoft }}>
               <span className="inline-flex items-center gap-1">
                 <span style={{ display: "inline-block", width: 14, height: 2, background: BR.red }} />
                 {supplier}（現任）
               </span>
-              <span className="inline-flex items-center gap-1">
-                <span style={{ display: "inline-block", width: 14, height: 2, background: BR.greenDeep, borderTop: `2px dashed ${BR.greenDeep}` }} />
-                {altName}（最初）
-              </span>
+              {hasAltComparison && (
+                <span className="inline-flex items-center gap-1">
+                  <span style={{ display: "inline-block", width: 14, height: 2, background: BR.greenDeep, borderTop: `2px dashed ${BR.greenDeep}` }} />
+                  {altName}（同質性對照）
+                </span>
+              )}
             </div>
           </div>
           <svg viewBox="0 0 640 160" style={{ width: "100%", height: 160, display: "block" }}>
@@ -2164,18 +2172,20 @@ function SupplierPriceHistoryCard({ selected }: { selected: OcrRow }) {
               stroke={BR.red}
               strokeWidth="2.5"
             />
-            {/* alt line (green dashed) */}
-            <path
-              d={seriesAlt.map((h, i) => {
-                const x = 50 + (i / (seriesAlt.length - 1)) * 560;
-                const y = yScale(h.price);
-                return `${i === 0 ? "M" : "L"}${x},${y}`;
-              }).join(" ")}
-              fill="none"
-              stroke={BR.greenDeep}
-              strokeWidth="2"
-              strokeDasharray="5 4"
-            />
+            {/* alt line (green dashed) — 僅在同質性對照時繪製 */}
+            {hasAltComparison && (
+              <path
+                d={seriesAlt.map((h, i) => {
+                  const x = 50 + (i / (seriesAlt.length - 1)) * 560;
+                  const y = yScale(h.price);
+                  return `${i === 0 ? "M" : "L"}${x},${y}`;
+                }).join(" ")}
+                fill="none"
+                stroke={BR.greenDeep}
+                strokeWidth="2"
+                strokeDasharray="5 4"
+              />
+            )}
             {/* current points + labels */}
             {seriesCurr.map((h, i) => {
               const x = 50 + (i / (seriesCurr.length - 1)) * 560;
@@ -2191,8 +2201,8 @@ function SupplierPriceHistoryCard({ selected }: { selected: OcrRow }) {
                 </g>
               );
             })}
-            {/* alt points + label */}
-            {seriesAlt.map((h, i) => {
+            {/* alt points + label — 僅在同質性對照時繪製 */}
+            {hasAltComparison && seriesAlt.map((h, i) => {
               const x = 50 + (i / (seriesAlt.length - 1)) * 560;
               const y = yScale(h.price);
               return (
@@ -2215,13 +2225,15 @@ function SupplierPriceHistoryCard({ selected }: { selected: OcrRow }) {
                   <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint, textAlign: "left", padding: "6px 8px" }}>期別</th>
                   <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.red, textAlign: "right", padding: "6px 8px" }}>{supplier} 單價</th>
                   <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.red, textAlign: "right", padding: "6px 8px" }}>{supplier} 漲幅</th>
-                  <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.greenDeep, textAlign: "right", padding: "6px 8px" }}>{altName} 單價</th>
-                  <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.greenDeep, textAlign: "right", padding: "6px 8px" }}>{altName} 漲幅</th>
+                  {hasAltComparison && (<>
+                    <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.greenDeep, textAlign: "right", padding: "6px 8px" }}>{altName} 單價</th>
+                    <th style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.greenDeep, textAlign: "right", padding: "6px 8px" }}>{altName} 漲幅</th>
+                  </>)}
                 </tr>
               </thead>
               <tbody>
                 {seriesCurr.map((h, i) => {
-                  const alt = seriesAlt[i];
+                  const alt = hasAltComparison ? seriesAlt[i] : null;
                   return (
                     <tr key={h.year} style={{ borderBottom: `1px solid #f3f5ef`, background: h.hike !== null && h.hike > 10 ? BR.redSoft : "transparent" }}>
                       <td style={{ padding: "8px", fontWeight: 600 }}>{h.year}</td>
@@ -2229,10 +2241,12 @@ function SupplierPriceHistoryCard({ selected }: { selected: OcrRow }) {
                       <td style={{ padding: "8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: h.hike === null ? BR.inkFaint : h.hike > 10 ? BR.red : h.hike > 5 ? BR.amber : BR.greenDeep }}>
                         {h.hike === null ? "—" : `+${h.hike.toFixed(1)}%`}
                       </td>
-                      <td style={{ padding: "8px", textAlign: "right", fontFamily: FONT_MONO, color: BR.greenDeep }}>{alt.price.toFixed(2)}</td>
-                      <td style={{ padding: "8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: alt.hike === null ? BR.inkFaint : BR.greenDeep }}>
-                        {alt.hike === null ? "—" : "0.0%"}
-                      </td>
+                      {alt && (<>
+                        <td style={{ padding: "8px", textAlign: "right", fontFamily: FONT_MONO, color: BR.greenDeep }}>{alt.price.toFixed(2)}</td>
+                        <td style={{ padding: "8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, color: alt.hike === null ? BR.inkFaint : BR.greenDeep }}>
+                          {alt.hike === null ? "—" : "0.0%"}
+                        </td>
+                      </>)}
                     </tr>
                   );
                 })}
@@ -2243,15 +2257,17 @@ function SupplierPriceHistoryCard({ selected }: { selected: OcrRow }) {
 
         <div className="flex flex-col gap-3">
           <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>
-            ② AI 軌跡分析（兩家對照）· {selected.partNo}
+            ② AI 軌跡分析{hasAltComparison ? "（兩家對照）" : `（${supplier} 單獨）`} · {selected.partNo}
           </div>
-          <div className="rounded-[10px] p-3" style={{ background: BR.greenSoft, border: `1px solid ${BR.greenLine}` }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: BR.greenInk, marginBottom: 4 }}>{altName} · 多年凍漲</div>
-            <div style={{ fontSize: 11, color: BR.greenDeep, lineHeight: 1.55 }}>
-              依 ERP 進貨記錄，{altName}此料 <b>2023 → 2026 Q3 維持 {altFlat.toFixed(2)} 元</b>，零次調價。
-              本地供應商、自動機台外包模式，價格結構穩定。
+          {hasAltComparison && (
+            <div className="rounded-[10px] p-3" style={{ background: BR.greenSoft, border: `1px solid ${BR.greenLine}` }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: BR.greenInk, marginBottom: 4 }}>{altName} · 多年凍漲</div>
+              <div style={{ fontSize: 11, color: BR.greenDeep, lineHeight: 1.55 }}>
+                依 ERP 進貨記錄，{altName}此料 <b>2023 → 2026 Q3 維持 {altFlat.toFixed(2)} 元</b>，零次調價。
+                本地供應商、自動機台外包模式，價格結構穩定。
+              </div>
             </div>
-          </div>
+          )}
           <div className="rounded-[10px] p-3" style={{ background: BR.redSoft, border: `1px solid ${BR.red}40` }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: BR.red, marginBottom: 4 }}>{supplier} · 本次漲幅異常</div>
             <div style={{ fontSize: 11, color: BR.ink, lineHeight: 1.55 }}>
@@ -2260,11 +2276,21 @@ function SupplierPriceHistoryCard({ selected }: { selected: OcrRow }) {
             </div>
           </div>
           <div className="rounded-[10px] p-3" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
-            <div style={{ fontSize: 11, color: BR.inkSoft, lineHeight: 1.55 }}>
-              <b style={{ color: BR.ink }}>建議：</b>把這張對照曲線附在議價會議簡報 — {altName} {altFlat.toFixed(2)} 凍漲、
-              {supplier} {seriesCurr[0].price.toFixed(2)} → {seriesCurr[5].price.toFixed(2)} 暴衝，
-              <b style={{ color: BR.greenDeep }}>常態大貨改回 {altName}、急單由 {supplier} 補位</b>，雙廠並行。
-            </div>
+            {hasAltComparison ? (
+              <div style={{ fontSize: 11, color: BR.inkSoft, lineHeight: 1.55 }}>
+                <b style={{ color: BR.ink }}>建議：</b>把這張對照曲線附在議價會議簡報 — {altName} {altFlat.toFixed(2)} 凍漲、
+                {supplier} {seriesCurr[0].price.toFixed(2)} → {seriesCurr[5].price.toFixed(2)} 暴衝，
+                <b style={{ color: BR.greenDeep }}>常態大貨改回 {altName}、急單由 {supplier} 補位</b>，雙廠並行。
+              </div>
+            ) : (
+              <div style={{ fontSize: 11, color: BR.inkSoft, lineHeight: 1.55 }}>
+                <b style={{ color: BR.ink }}>建議：</b>本料 ERP 未登錄同質性替代供應商，{altName} 屬不同產業故不列入對照。
+                以本身過去 6 期均價
+                <b style={{ color: BR.greenDeep }}> {(seriesCurr.slice(0, 6).reduce((s, h) => s + h.price, 0) / 6).toFixed(2)} 元 </b>
+                作為議價錨點，要求 {supplier} 拆解本次 <b style={{ color: BR.red }}>+{q3Hike.toFixed(1)}%</b> 漲幅的成本來源；
+                同時請採購部門評估 ERP 同產業候選廠商作後續備案。
+              </div>
+            )}
           </div>
         </div>
       </div>
