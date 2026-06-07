@@ -64,6 +64,14 @@ export default function AdminHomePage() {
       {/* 一般管理區塊 */}
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <AdminCard
+          href="/erp/admin/cost-intelligence"
+          icon="📊"
+          tone="emerald"
+          title="AI 採購情報中心 · 終評"
+          desc="OVERALL 99 / 100 · 模組評分卡（已從 quotation-analyzer 公開頁搬離）"
+          tag="內部僅見"
+        />
+        <AdminCard
           href="/erp/admin/qr-generator"
           icon="📱"
           tone="cyan"
