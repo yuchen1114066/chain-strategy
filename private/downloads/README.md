@@ -7,6 +7,7 @@
 | 檔案 | API Route | 權限 |
 |------|-----------|------|
 | `quotation-analyzer-standalone.zip` | `GET /api/admin/downloads/quotation-analyzer-standalone` | 管理員（`ADMIN_DOWNLOAD_TOKEN`） |
+| `wms-standalone.zip` | `GET /api/admin/downloads/wms-standalone` | 管理員（`ADMIN_DOWNLOAD_TOKEN`） |
 
 ## 重新打包 standalone ZIP
 
@@ -16,6 +17,15 @@
 rm private/downloads/quotation-analyzer-standalone.zip
 zip -r private/downloads/quotation-analyzer-standalone.zip \
   standalone-quotation-analyzer \
+  -x "*/node_modules/*" "*/.next/*"
+```
+
+當 `standalone-wms/` 內容更新後：
+
+```bash
+rm private/downloads/wms-standalone.zip
+zip -r private/downloads/wms-standalone.zip \
+  standalone-wms \
   -x "*/node_modules/*" "*/.next/*"
 ```
 
