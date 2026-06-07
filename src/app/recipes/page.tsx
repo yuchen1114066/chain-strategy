@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Search, Filter, Clock, Star, ChefHat, Users } from "lucide-react";
 import { recipes, constitutions } from "@/lib/data";
 
@@ -213,14 +212,10 @@ export default function RecipesPage() {
                 className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 border border-stone-100 group"
               >
                 {/* Recipe Image */}
-                <div className={`h-44 bg-gradient-to-br ${recipe.imageColor} relative flex items-center justify-center overflow-hidden`}>
-                  {recipe.image ? (
-                    <Image src={recipe.image} alt={recipe.title} fill className="object-cover" />
-                  ) : (
-                    <span className="text-6xl filter drop-shadow-sm">
-                      {recipe.category === "湯品" ? "🍲" : recipe.category === "粥品" ? "🥣" : recipe.category === "茶飲" ? "🍵" : "🍮"}
-                    </span>
-                  )}
+                <div className={`h-44 bg-gradient-to-br ${recipe.imageColor} relative flex items-center justify-center`}>
+                  <span className="text-6xl filter drop-shadow-sm">
+                    {recipe.category === "湯品" ? "🍲" : recipe.category === "粥品" ? "🥣" : recipe.category === "茶飲" ? "🍵" : "🍮"}
+                  </span>
                   <div className="absolute top-3 left-3">
                     <span className="bg-white/80 backdrop-blur-sm text-xs font-medium text-stone-700 px-2 py-1 rounded-full">
                       {recipe.category}

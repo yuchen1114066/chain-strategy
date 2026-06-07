@@ -2,34 +2,36 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, X, ShoppingCart, Search, User, Leaf } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Menu, X, ShoppingCart, Search, User, Heart } from "lucide-react";
 
 const navLinks = [
-  { href: "/today", label: "🌿 今日養生", highlight: true },
-  { href: "/beauty", label: "✨ 代謝美顏" },
-  { href: "/quiz", label: "體質測評" },
+  { href: "/beauty", label: "✨ 代謝美顏", highlight: true },
   { href: "/recipes", label: "食療食譜" },
-  { href: "/tracking", label: "打卡追蹤" },
-  { href: "/herb-checker", label: "本草查詢" },
+  { href: "/quiz", label: "體質測評" },
+  { href: "/tracking", label: "🗓️ 打卡追蹤" },
+  { href: "/herb-checker", label: "藥物查詢" },
   { href: "/community", label: "養生社群" },
   { href: "/shop", label: "養生商城" },
 ];
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
+  if (pathname?.startsWith("/erp") || pathname?.startsWith("/os") || pathname?.startsWith("/roadmap") || pathname?.startsWith("/architecture")) return null;
 
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-sm border-b shadow-sm" style={{ background: "#faf6ee", borderColor: "#e0d8cc" }}>
+    <header className="sticky top-0 z-50 bg-[#fdf7f2]/95 backdrop-blur-sm border-b border-rose-100 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-9 h-9 rounded-full flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow" style={{ background: "#3d5c3a" }}>
-              <Leaf className="w-4 h-4 text-white" />
+            <div className="w-9 h-9 bg-gradient-to-br from-rose-300 to-[#5a8a6a] rounded-full flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
+              <Heart className="w-4 h-4 text-white fill-white" />
             </div>
             <div className="flex flex-col leading-tight">
-              <span className="text-lg font-bold tracking-wide" style={{ color: "#3d5c3a" }}>WarmCare</span>
-              <span className="text-xs hidden sm:block" style={{ color: "#7a9b7a" }}>養生道・溫心家</span>
+              <span className="text-lg font-bold text-[#5c3a4a] tracking-wide">WarmCare</span>
+              <span className="text-xs text-rose-400 hidden sm:block">養生道</span>
             </div>
           </Link>
 
@@ -39,22 +41,11 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="px-3 py-2 text-sm font-medium rounded-full transition-colors"
-                style={link.highlight
-                  ? { color: "#3d5c3a", background: "#dceedd", fontWeight: 600 }
-                  : { color: "#4a3a2a" }}
-                onMouseEnter={e => {
-                  if (!link.highlight) {
-                    (e.currentTarget as HTMLElement).style.background = "#ede6d8";
-                    (e.currentTarget as HTMLElement).style.color = "#3d5c3a";
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!link.highlight) {
-                    (e.currentTarget as HTMLElement).style.background = "";
-                    (e.currentTarget as HTMLElement).style.color = "#4a3a2a";
-                  }
-                }}
+                className={`px-3 py-2 text-sm font-medium rounded-full transition-colors ${
+                  link.highlight
+                    ? "text-rose-600 bg-rose-50 hover:bg-rose-100 font-semibold"
+                    : "text-[#5c3a4a] hover:text-rose-600 hover:bg-rose-50"
+                }`}
               >
                 {link.label}
               </Link>
@@ -63,18 +54,20 @@ export default function Navbar() {
 
           {/* Right icons */}
           <div className="flex items-center gap-2">
-            <button className="p-2 rounded-full transition-colors hidden sm:flex" style={{ color: "#7a6a5a" }}>
+            <button className="p-2 text-[#9a6a7a] hover:text-rose-600 hover:bg-rose-50 rounded-full transition-colors hidden sm:flex">
               <Search className="w-5 h-5" />
             </button>
-            <button className="p-2 rounded-full transition-colors hidden sm:flex" style={{ color: "#7a6a5a" }}>
+            <button className="p-2 text-[#9a6a7a] hover:text-rose-600 hover:bg-rose-50 rounded-full transition-colors hidden sm:flex">
               <User className="w-5 h-5" />
             </button>
-            <Link href="/shop" className="p-2 rounded-full transition-colors hidden sm:flex" style={{ color: "#7a6a5a" }}>
+            <Link
+              href="/shop"
+              className="p-2 text-[#9a6a7a] hover:text-rose-600 hover:bg-rose-50 rounded-full transition-colors hidden sm:flex"
+            >
               <ShoppingCart className="w-5 h-5" />
             </Link>
             <button
-              className="md:hidden p-2 rounded-full transition-colors"
-              style={{ color: "#3d5c3a" }}
+              className="md:hidden p-2 text-[#5c3a4a] hover:text-rose-600 hover:bg-rose-50 rounded-full transition-colors"
               onClick={() => setMobileOpen(!mobileOpen)}
             >
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -85,15 +78,14 @@ export default function Navbar() {
 
       {/* Mobile Menu */}
       {mobileOpen && (
-        <div className="md:hidden border-t" style={{ background: "#faf6ee", borderColor: "#e0d8cc" }}>
+        <div className="md:hidden border-t border-rose-100 bg-[#fdf7f2]">
           <nav className="px-4 py-3 flex flex-col gap-1">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
-                className="px-4 py-2.5 text-sm font-medium rounded-full transition-colors"
-                style={{ color: "#3d5c3a" }}
+                className="px-4 py-2.5 text-sm font-medium text-[#5c3a4a] hover:text-rose-600 hover:bg-rose-50 rounded-full transition-colors"
               >
                 {link.label}
               </Link>
