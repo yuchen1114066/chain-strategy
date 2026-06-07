@@ -190,6 +190,8 @@ export default function QuotationAnalyzerPage() {
   const [uploadedRows, setUploadedRows] = useState<OcrRow[]>([]);
   // 入口 intake modal — 預設打開，使用者上傳完才看見全頁分析
   const [showIntake, setShowIntake] = useState(true);
+  // 廠商報價歷史資料夾 — 是否展開
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // 共用：把檔案吃進來 → 跑 OCR mock → 加進 uploadedRows → 自動選中
   // 入口 intake modal 和頁面中的 STEP 1 上傳卡共用同一條路徑
@@ -603,44 +605,71 @@ export default function QuotationAnalyzerPage() {
                   待查詢報價單
                 </div>
                 <div style={{ fontSize: 10.5, color: "#aebba0", marginTop: 4 }}>
-                  {allRows.length} 筆{uploadedRows.length > 0 ? " · 自上傳報價（demo 種子已隱藏）" : " · demo 種子"} · 欄位：供應商 / 料號 / 舊單價 / 新單價 / 漲幅 / 原因
+                  查詢中：<b style={{ color: BR.green }}>{SELECTED.quoteNo} · {SELECTED.supplier}</b>
+                  {allRows.length > 1 && <span style={{ color: "#7e8a73" }}>　·　其他 {allRows.length - 1} 筆已收合，不在此查詢範圍</span>}
+                  　·　欄位：供應商 / 料號 / 舊單價 / 新單價 / 漲幅 / 原因
                 </div>
               </div>
 
-              {/* 廠商報價歷史資料夾 · 年度評核資料庫 */}
-              <div className="mt-3 rounded-[10px] p-3" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
-                <div className="flex items-baseline justify-between">
-                  <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.greenDeep, letterSpacing: "0.1em" }}>
-                    📁 廠商報價歷史資料夾
+              {/* 廠商報價歷史資料夾 · 只列查詢中的供應商，可開啟看年度評核 */}
+              {(() => {
+                // 從當前可見資料推導本供應商的年度評核（不寫死其他廠商）
+                const supRows = allRows.filter((r) => r.supplier === SELECTED.supplier);
+                const count   = supRows.length;
+                const avgHike = count > 0
+                  ? +(supRows.reduce((s, r) => s + ((r.newPrice - r.oldPrice) / r.oldPrice) * 100, 0) / count).toFixed(1)
+                  : 0;
+                // 評核：漲幅越高分數越低（凍漲 = 95；>15% = 65）
+                const score = avgHike <= 0   ? 95
+                            : avgHike <  5   ? 88
+                            : avgHike < 10   ? 78
+                            : avgHike < 15   ? 70
+                                             : 65;
+                const tone  = score >= 90 ? BR.greenDeep
+                            : score >= 75 ? BR.amber
+                                          : BR.red;
+                return (
+                  <div className="mt-3 rounded-[10px]" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
+                    <button
+                      type="button"
+                      onClick={() => setHistoryOpen((v) => !v)}
+                      className="w-full flex items-baseline justify-between p-3"
+                      style={{ background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}
+                    >
+                      <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.greenDeep, letterSpacing: "0.1em" }}>
+                        <span style={{ display: "inline-block", width: 12 }}>{historyOpen ? "▾" : "▸"}</span>
+                        📁 廠商報價歷史資料夾 · <b style={{ color: BR.ink }}>{SELECTED.supplier}</b>
+                      </div>
+                      <span style={{ fontFamily: FONT_MONO, fontSize: 9, color: BR.inkFaint }}>近 12 月 · 年度評核</span>
+                    </button>
+                    {historyOpen && (
+                      <div className="px-3 pb-3">
+                        <div className="flex items-baseline justify-between mt-1 text-xs">
+                          <span style={{ color: BR.ink, fontWeight: 700, width: 60 }}>{SELECTED.supplier}</span>
+                          <span style={{ fontFamily: FONT_MONO, color: BR.inkSoft, width: 56, textAlign: "right" }}>{count} 件</span>
+                          <span style={{ fontFamily: FONT_MONO, color: avgHike > 10 ? BR.red : avgHike > 0 ? BR.amber : BR.greenDeep, width: 64, textAlign: "right", fontWeight: 700 }}>
+                            {avgHike > 0 ? "+" : ""}{avgHike.toFixed(1)}%
+                          </span>
+                          <span style={{ fontFamily: FONT_MONO, fontWeight: 800, color: tone, width: 40, textAlign: "right" }}>
+                            {score}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 10, color: BR.inkSoft, marginTop: 6, lineHeight: 1.5 }}>
+                          每筆報價自動歸檔 → 年度供應商評核打分（漲幅次數 / 合理超出 / 凍漲表現）。
+                          本次查詢之供應商 <b style={{ color: BR.ink }}>{SELECTED.supplier}</b> 評核分數 <b style={{ color: tone }}>{score}</b>。
+                          其他供應商不在此查詢範圍。
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <span style={{ fontFamily: FONT_MONO, fontSize: 9, color: BR.inkFaint }}>近 12 月 · 年度評核</span>
-                </div>
-                {[
-                  { sup: "企能", count: 2, avgHike: 15.8, score: 65, tone: BR.red },
-                  { sup: "茂晟", count: 1, avgHike: 18.4, score: 70, tone: BR.amber },
-                  { sup: "重邑", count: 0, avgHike:  0.0, score: 95, tone: BR.greenDeep },
-                ].map((x) => (
-                  <div key={x.sup} className="flex items-baseline justify-between mt-2 text-xs">
-                    <span style={{ color: BR.ink, fontWeight: 700, width: 38 }}>{x.sup}</span>
-                    <span style={{ fontFamily: FONT_MONO, color: BR.inkSoft, width: 46, textAlign: "right" }}>{x.count} 件</span>
-                    <span style={{ fontFamily: FONT_MONO, color: x.avgHike > 10 ? BR.red : x.avgHike > 0 ? BR.amber : BR.greenDeep, width: 52, textAlign: "right", fontWeight: 700 }}>
-                      {x.avgHike > 0 ? "+" : ""}{x.avgHike.toFixed(1)}%
-                    </span>
-                    <span style={{ fontFamily: FONT_MONO, fontWeight: 800, color: x.tone, width: 38, textAlign: "right" }}>
-                      {x.score}
-                    </span>
-                  </div>
-                ))}
-                <div style={{ fontSize: 10, color: BR.inkSoft, marginTop: 6, lineHeight: 1.5 }}>
-                  每筆報價自動歸檔 → 年度供應商評核打分（漲幅次數 / 合理超出 / 凍漲表現），<b style={{ color: BR.greenInk }}>重邑 0 次調價 = 95 分</b>，列為首選備案。
-                </div>
-              </div>
+                );
+              })()}
             </div>
 
             <div>
               <div className="flex items-baseline justify-between flex-wrap gap-2 mb-2">
                 <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>
-                  ② 待查詢報價單清單 · 一份報價單可含多筆料號 · 點任一列或按 ↑↓ 切換
+                  ② 待查詢報價單清單 · 只顯示本次查詢的一筆，其他廠商不列入
                 </div>
                 <div className="flex items-baseline gap-2">
                   {uploadedRows.length > 0 && (
@@ -657,20 +686,12 @@ export default function QuotationAnalyzerPage() {
                     </button>
                   )}
                   <span style={{ fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700, color: BR.greenDeep, background: BR.greenSoft, padding: "2px 7px", borderRadius: 4, letterSpacing: "0.06em", border: `1px solid ${BR.greenLine}` }}>
-                    已選 {selectedIdx + 1} / {allRows.length}
+                    查詢中　1 / 1
                   </span>
                 </div>
               </div>
 
-              <div
-                className="overflow-x-auto"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "ArrowDown") { e.preventDefault(); setSelectedIdx((i) => Math.min(i + 1, allRows.length - 1)); }
-                  if (e.key === "ArrowUp")   { e.preventDefault(); setSelectedIdx((i) => Math.max(i - 1, 0)); }
-                }}
-                style={{ outline: "none" }}
-              >
+              <div className="overflow-x-auto" style={{ outline: "none" }}>
                 <table className="w-full text-sm" style={{ borderCollapse: "collapse", minWidth: 640 }}>
                   <thead>
                     <tr style={{ borderBottom: `1px solid ${BR.border}`, background: "#fbfcfa" }}>
@@ -684,12 +705,13 @@ export default function QuotationAnalyzerPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {allRows.map((r, i) => {
+                    {allRows.map((r, i) => i).filter((i) => i === selectedIdx).map((i) => {
+                      const r = allRows[i];
                       const pct = ((r.newPrice - r.oldPrice) / r.oldPrice) * 100;
-                      const selected = i === selectedIdx;
+                      const selected = true;
                       const isUploaded = !!r.uploadedAt;
-                      // 同一份報價單號連續出現時，把第二筆以後的 quoteNo 顯示為空（視覺上「合併」這份單）
-                      const sameQuoteAsPrev = i > 0 && allRows[i - 1].quoteNo === r.quoteNo;
+                      // 此清單已收斂為「只顯示查詢中那一筆」，不再有合併同單需求
+                      const sameQuoteAsPrev = false;
                       return (
                         <tr
                           key={`${r.quoteNo}-${r.partNo}-${i}`}
