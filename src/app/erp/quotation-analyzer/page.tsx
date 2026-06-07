@@ -188,6 +188,63 @@ export default function QuotationAnalyzerPage() {
   const [toast, setToast] = useState<string | null>(null);
   // 使用者上傳的報價單會自動加進 allRows（demo OCR 模擬）
   const [uploadedRows, setUploadedRows] = useState<OcrRow[]>([]);
+  // 入口 intake modal — 預設打開，使用者上傳完才看見全頁分析
+  const [showIntake, setShowIntake] = useState(true);
+
+  // 共用：把檔案吃進來 → 跑 OCR mock → 加進 uploadedRows → 自動選中
+  // 入口 intake modal 和頁面中的 STEP 1 上傳卡共用同一條路徑
+  const ingestFile = (file: File, fmt: string, opts?: { closeIntakeOnSuccess?: boolean; email?: string; company?: string }) => {
+    const sizeKB = (file.size / 1024).toFixed(0);
+    showToast(`📂 ${fmt} 上傳中：${file.name}（${sizeKB} KB）· AI OCR 處理中…`);
+    const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
+
+    const base = file.name.replace(/\.[^.]+$/, "");
+    const cleaned = base
+      .replace(/^(?:螢幕擷取(?:畫面)?|螢幕截圖|截圖|截屏|Screen\s?Shot|Screenshot|IMG|Image|Photo|Scan)[\s_\-]*\d*[\s_\-]*[\d\-:.]*\s*/i, "")
+      .trim();
+    const knownSuppliers = /(企能|企龍|茂晟|重邑|鼎能|力豐|新竹\s?EFG|聯昌|建準|友達|台積|鴻海)/;
+    const supMatch  = base.match(knownSuppliers) ?? cleaned.match(/[一-龥]{2,4}/);
+    const partMatch = base.match(/[A-Z][A-Z0-9]{3,}[-]?[A-Z0-9]*/);
+    // 若使用者在 modal 內手填公司名，優先使用
+    const newSupplier = (opts?.company && opts.company.trim()) || supMatch?.[0] || "未識別供應商";
+    const needsSupplierFix = newSupplier === "未識別供應商";
+    const newPartNo   = partMatch?.[0] ?? `OCR-${Date.now().toString().slice(-6)}`;
+    const today = new Date();
+    const yymmdd = `${today.getFullYear().toString().slice(-2)}${(today.getMonth() + 1).toString().padStart(2, "0")}${today.getDate().toString().padStart(2, "0")}`;
+    const newQuoteNo = `QTE-${yymmdd}-${Date.now().toString().slice(-3)}`;
+
+    const oldP = +(6 + Math.random() * 4).toFixed(2);
+    const hike = +(0.05 + Math.random() * 0.2).toFixed(3);
+    const newP = +(oldP * (1 + hike)).toFixed(2);
+
+    const newRow: OcrRow = {
+      quoteNo: newQuoteNo,
+      supplier: newSupplier,
+      partNo: newPartNo,
+      oldPrice: oldP,
+      newPrice: newP,
+      reasonText: "自上傳檔案 OCR · 等待 STEP 2–4 分析",
+      uploadedAt: Date.now(),
+      previewUrl,
+      fileName: file.name,
+      fmt,
+    };
+
+    setTimeout(() => {
+      setUploadedRows((arr: OcrRow[]) => {
+        const next = [...arr, newRow];
+        const newIdx = next.length - 1;
+        setSelectedIdx(newIdx);
+        return next;
+      });
+      if (opts?.closeIntakeOnSuccess) setShowIntake(false);
+      if (needsSupplierFix) {
+        showToast(`✓ AI OCR 完成 · ${newQuoteNo} 已加入清單 — 公司名未自動識別，請於表格內點輸入框補登後即可分析`);
+      } else {
+        showToast(`✓ AI OCR 完成 · ${newQuoteNo}（${newSupplier}）已加入清單 — 下方所有分析已自動切換到此筆`);
+      }
+    }, 900);
+  };
   // 使用者上傳後直接「換掉」demo 種子，避免頁面殘留無關報價單
   const allRows: OcrRow[] = uploadedRows.length > 0 ? uploadedRows : OCR_ROWS;
   // 報價單清單選擇（可點列、↑↓ 鍵切換、上傳完自動選新列 — 下方所有分析隨之同步）
@@ -358,6 +415,33 @@ export default function QuotationAnalyzerPage() {
         </div>
       )}
 
+      {/* 入口 Intake Modal — 上傳完直接進入下方分析頁 */}
+      {showIntake && (
+        <IntakeModal
+          onSubmit={(file, email, company) => ingestFile(file, fmtOfFile(file), { closeIntakeOnSuccess: true, email, company })}
+          onClose={() => setShowIntake(false)}
+          allowClose={uploadedRows.length > 0}
+        />
+      )}
+
+      {/* 浮動「新查詢」按鈕 — 隨時可重新打開 intake modal */}
+      {!showIntake && (
+        <button
+          type="button"
+          onClick={() => setShowIntake(true)}
+          style={{
+            position: "fixed", bottom: 80, right: 20, zIndex: 90,
+            background: BR.greenInk, color: "#fff",
+            border: `1px solid ${BR.green}`,
+            padding: "10px 16px", borderRadius: 999,
+            fontSize: 12, fontWeight: 700, letterSpacing: ".08em",
+            boxShadow: "0 8px 20px rgba(12,18,8,.18)", cursor: "pointer",
+          }}
+        >
+          📥 新報價分析
+        </button>
+      )}
+
       <div className="max-w-[1440px] mx-auto px-9 py-7 space-y-6">
 
         {/* Top bar / breadcrumb */}
@@ -444,63 +528,8 @@ export default function QuotationAnalyzerPage() {
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
-                        const sizeKB = (file.size / 1024).toFixed(0);
-                        showToast(`📂 ${f.fmt} 上傳中：${file.name}（${sizeKB} KB）· AI OCR 處理中…`);
-                        // 為圖片產生預覽 URL（PDF/Excel 無）
-                        const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
-
-                        // 從檔名抽供應商 / 料號（demo heuristic）
-                        // 先剃掉作業系統的螢幕截圖前綴，否則會把「螢幕擷取」當成公司名
-                        const base = file.name.replace(/\.[^.]+$/, "");
-                        const cleaned = base
-                          .replace(/^(?:螢幕擷取(?:畫面)?|螢幕截圖|截圖|截屏|Screen\s?Shot|Screenshot|IMG|Image|Photo|Scan)[\s_\-]*\d*[\s_\-]*[\d\-:.]*\s*/i, "")
-                          .trim();
-                        const knownSuppliers = /(企能|企龍|茂晟|重邑|鼎能|力豐|新竹\s?EFG|聯昌|建準|友達|台積|鴻海)/;
-                        // 已知名單優先；否則找剃乾淨後的 2-4 字中文；都沒有才標未識別
-                        const supMatch  = base.match(knownSuppliers) ?? cleaned.match(/[一-龥]{2,4}/);
-                        const partMatch = base.match(/[A-Z][A-Z0-9]{3,}[-]?[A-Z0-9]*/);
-                        const newSupplier = supMatch?.[0] ?? "未識別供應商";
-                        const needsSupplierFix = newSupplier === "未識別供應商";
-                        const newPartNo   = partMatch?.[0] ?? `OCR-${Date.now().toString().slice(-6)}`;
-                        // 報價單號 — YYMMDD + 流水號（demo 用時間戳尾 3 碼）
-                        const today = new Date();
-                        const yymmdd = `${today.getFullYear().toString().slice(-2)}${(today.getMonth() + 1).toString().padStart(2, "0")}${today.getDate().toString().padStart(2, "0")}`;
-                        const newQuoteNo = `QTE-${yymmdd}-${Date.now().toString().slice(-3)}`;
-
-                        // 合理範圍的 demo 價格（小幅變動，模擬「另一筆報價」）
-                        const oldP = +(6 + Math.random() * 4).toFixed(2);   // 6.00–10.00
-                        const hike = +(0.05 + Math.random() * 0.2).toFixed(3); // +5%–25%
-                        const newP = +(oldP * (1 + hike)).toFixed(2);
-
-                        const newRow: OcrRow = {
-                          quoteNo: newQuoteNo,
-                          supplier: newSupplier,
-                          partNo: newPartNo,
-                          oldPrice: oldP,
-                          newPrice: newP,
-                          reasonText: "自上傳檔案 OCR · 等待 STEP 2–4 分析",
-                          uploadedAt: Date.now(),
-                          previewUrl,
-                          fileName: file.name,
-                          fmt: f.fmt,
-                        };
-
-                        setTimeout(() => {
-                          setUploadedRows((arr) => {
-                            const next = [...arr, newRow];
-                            // 自動切換到新上傳的這一列
-                            // allRows 已經切到 uploadedRows，所以 idx 直接是 next.length - 1
-                            const newIdx = next.length - 1;
-                            setSelectedIdx(newIdx);
-                            return next;
-                          });
-                          if (needsSupplierFix) {
-                            showToast(`✓ AI OCR 完成 · ${newQuoteNo} 已加入清單 — 公司名未自動識別，請於表格內點輸入框補登後即可分析`);
-                          } else {
-                            showToast(`✓ AI OCR 完成 · ${newQuoteNo}（${newSupplier}）已加入清單 — 按下方「進入 STEP 2 查詢分析」開始`);
-                          }
-                        }, 900);
-                        e.target.value = ""; // 允許重複上傳同一檔案
+                        ingestFile(file, f.fmt);
+                        e.target.value = "";
                       }}
                     />
                     <span style={{ fontSize: 22 }}>{f.icon}</span>
@@ -3321,4 +3350,236 @@ function buildPurchasingReportHtml(args: {
   </div>
 
 </body></html>`;
+}
+
+// ============================================================
+// 入口 Intake Modal — 報價單分析的單獨彈窗（landing-page 風）
+// 上傳完直接關閉、進入下方既有頁面分析
+// ============================================================
+function fmtOfFile(file: File): string {
+  const ext = (file.name.match(/\.([^.]+)$/)?.[1] ?? "").toLowerCase();
+  if (ext === "pdf") return "PDF";
+  if (["xlsx", "xls", "csv"].includes(ext)) return "Excel";
+  if (["jpg", "jpeg", "png", "gif", "webp", "heic"].includes(ext)) return "JPG";
+  return "檔案";
+}
+
+function IntakeModal({
+  onSubmit, onClose, allowClose,
+}: {
+  onSubmit: (file: File, email: string, company: string) => void;
+  onClose: () => void;
+  allowClose: boolean;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [email, setEmail] = useState("");
+  const [company, setCompany] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const ACCEPT = ".pdf,.xlsx,.xls,.csv,image/*";
+  const MAX_MB = 20;
+
+  const handleFiles = (files: FileList | null) => {
+    const f = files?.[0];
+    if (!f) return;
+    if (f.size > MAX_MB * 1024 * 1024) {
+      alert(`檔案太大（上限 ${MAX_MB} MB）`);
+      return;
+    }
+    setFile(f);
+  };
+
+  const submit = () => {
+    if (!file) return;
+    setSubmitting(true);
+    // 稍微 delay 一下讓使用者看到「分析中」的回饋
+    setTimeout(() => onSubmit(file, email.trim(), company.trim()), 200);
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 100,
+        background: "rgba(12,18,8,.55)", backdropFilter: "blur(4px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 24,
+      }}
+      onClick={(e) => { if (allowClose && e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        style={{
+          background: BR.greenInk, color: "#fff",
+          borderRadius: 18, maxWidth: 1050, width: "100%", maxHeight: "90vh",
+          overflow: "auto", boxShadow: "0 30px 60px rgba(0,0,0,.4)",
+          border: `1px solid ${BR.green}`,
+          position: "relative",
+          padding: "44px 48px 36px",
+          fontFamily: FONT,
+        }}
+      >
+        {allowClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              position: "absolute", top: 16, right: 18, zIndex: 1,
+              background: "transparent", border: "none", color: "#9aa78d",
+              fontSize: 22, cursor: "pointer", lineHeight: 1,
+            }}
+          >×</button>
+        )}
+
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <div style={{
+            fontFamily: FONT_MONO, fontSize: 11, fontWeight: 700,
+            color: BR.green, letterSpacing: ".4em", marginBottom: 14,
+          }}>
+            FREE QUOTE ANALYSIS
+          </div>
+          <h2 style={{
+            fontFamily: FONT_HEAD, fontSize: 34, fontWeight: 800,
+            color: "#fff", letterSpacing: ".02em", lineHeight: 1.2, margin: 0,
+          }}>
+            上傳報價單，5 分鐘拿回初步診斷
+          </h2>
+          <p style={{
+            color: "#cdd6c2", fontSize: 14, marginTop: 14, lineHeight: 1.6,
+            maxWidth: 640, marginLeft: "auto", marginRight: "auto",
+          }}>
+            支援 PDF、Excel、CSV 與報價單照片。AI 自動拆解成本結構，
+            標出不合理漲幅與議價空間。<b style={{ color: "#fff" }}>檔案僅供本次分析使用，不對外揭露。</b>
+          </p>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 22 }}>
+          {/* 左：dropzone */}
+          <label
+            htmlFor="intake-file"
+            onDragEnter={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFiles(e.dataTransfer.files); }}
+            style={{
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              padding: "44px 30px", borderRadius: 14, cursor: "pointer",
+              background: isDragging ? "rgba(118,185,0,.18)" : "rgba(255,255,255,.04)",
+              border: `2px dashed ${isDragging ? BR.green : "rgba(118,185,0,.45)"}`,
+              transition: "background .15s, border-color .15s",
+              minHeight: 240,
+            }}
+          >
+            <input
+              id="intake-file" type="file" accept={ACCEPT} hidden
+              onChange={(e) => handleFiles(e.target.files)}
+            />
+            {!file ? (
+              <>
+                <div style={{
+                  width: 56, height: 56, borderRadius: 12,
+                  background: "rgba(255,255,255,.08)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  border: `1px solid ${BR.green}`, marginBottom: 18,
+                }}>
+                  <span style={{ fontSize: 22, color: BR.green }}>⬆</span>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>
+                  把報價單拖進來，或<u style={{ color: BR.green }}>點此選擇檔案</u>
+                </div>
+                <div style={{ fontFamily: FONT_MONO, fontSize: 10.5, color: "#9aa78d", marginTop: 14, letterSpacing: ".1em" }}>
+                  PDF · EXCEL · CSV · 圖片　│　單檔上限 {MAX_MB}MB
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 32, marginBottom: 10 }}>
+                  {fmtOfFile(file) === "PDF" ? "📄" : fmtOfFile(file) === "Excel" ? "📊" : fmtOfFile(file) === "JPG" ? "📷" : "📁"}
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", textAlign: "center", wordBreak: "break-all" }}>
+                  {file.name}
+                </div>
+                <div style={{ fontFamily: FONT_MONO, fontSize: 10.5, color: "#9aa78d", marginTop: 8 }}>
+                  {fmtOfFile(file)} · {(file.size / 1024).toFixed(0)} KB
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); setFile(null); }}
+                  style={{
+                    marginTop: 14, background: "transparent", border: "1px solid rgba(255,255,255,.2)",
+                    color: "#cdd6c2", padding: "6px 12px", borderRadius: 7,
+                    fontSize: 11, cursor: "pointer",
+                  }}
+                >
+                  ✕ 重新選擇
+                </button>
+              </>
+            )}
+          </label>
+
+          {/* 右：email + 公司 + 送出 */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="您的 Email（接收分析結果）"
+              style={{
+                background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.18)",
+                color: "#fff", borderRadius: 11, padding: "16px 18px", fontSize: 14,
+                fontFamily: FONT, outline: "none",
+              }}
+            />
+            <input
+              type="text"
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              placeholder="公司名稱（供應商，建議填寫）"
+              style={{
+                background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.18)",
+                color: "#fff", borderRadius: 11, padding: "16px 18px", fontSize: 14,
+                fontFamily: FONT, outline: "none",
+              }}
+            />
+            <button
+              type="button"
+              disabled={!file || submitting}
+              onClick={submit}
+              style={{
+                marginTop: 4,
+                background: !file || submitting ? "rgba(255,255,255,.1)" : "#c9a36a",
+                color: !file || submitting ? "#9aa78d" : "#1a1410",
+                border: "none", borderRadius: 11,
+                padding: "17px 22px", fontSize: 15, fontWeight: 800,
+                cursor: !file || submitting ? "not-allowed" : "pointer",
+                letterSpacing: ".04em",
+                boxShadow: !file || submitting ? "none" : "0 6px 18px rgba(201,163,106,.35)",
+                transition: "background .15s",
+              }}
+            >
+              {submitting ? "分析中… 請稍候" : "送出，免費分析 →"}
+            </button>
+            <div style={{ fontSize: 11, color: "#9aa78d", textAlign: "center", marginTop: 6, lineHeight: 1.6 }}>
+              🔒 上傳即代表同意僅供本次採購分析使用　·　不轉售、不外流
+            </div>
+          </div>
+        </div>
+
+        {allowClose && (
+          <div style={{ textAlign: "center", marginTop: 24 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                background: "transparent", border: "none",
+                color: "#9aa78d", fontSize: 11, cursor: "pointer",
+                letterSpacing: ".06em",
+              }}
+            >
+              或先看上次的分析結果
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
