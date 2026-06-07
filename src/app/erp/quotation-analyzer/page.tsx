@@ -472,21 +472,53 @@ export default function QuotationAnalyzerPage() {
             供應商給的價我們不直接收 — 先 OCR、找 BOM、抓商品價、跑 Should-Cost，再決定接不接。
           </p>
           <div style={{ marginTop: 10 }}>
-            <a
-              href="/downloads/quotation-analyzer-standalone.zip"
-              download
+            <button
+              type="button"
+              onClick={async () => {
+                const token = typeof window === "undefined" ? "" : window.prompt(
+                  "管理員下載驗證\n\n請輸入 ADMIN_DOWNLOAD_TOKEN（僅系統管理員持有）：",
+                  "",
+                );
+                if (!token) return;
+                try {
+                  const res = await fetch(
+                    "/api/admin/downloads/quotation-analyzer-standalone",
+                    { headers: { Authorization: `Bearer ${token}` } },
+                  );
+                  if (res.status === 401) {
+                    setToast("❌ 驗證失敗：非管理員不可下載");
+                    return;
+                  }
+                  if (!res.ok) {
+                    setToast(`❌ 下載失敗（${res.status}）`);
+                    return;
+                  }
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "quotation-analyzer-standalone.zip";
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                  URL.revokeObjectURL(url);
+                  setToast("✓ standalone 程式碼下載完成");
+                } catch (err) {
+                  setToast("❌ 下載發生錯誤：" + (err instanceof Error ? err.message : String(err)));
+                }
+              }}
               style={{
                 display: "inline-flex", alignItems: "center", gap: 6,
                 padding: "6px 12px", borderRadius: 6,
                 fontFamily: FONT_MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.04em",
                 background: BR.greenSoft, color: BR.greenInk,
-                border: `1px solid ${BR.greenLine}`, textDecoration: "none",
+                border: `1px solid ${BR.greenLine}`, cursor: "pointer",
               }}
             >
-              ⬇ 下載 standalone 程式碼（含上傳→分析→PDF 報告）
-            </a>
+              🔒 下載 standalone 程式碼（僅限管理員）
+            </button>
             <span style={{ marginLeft: 8, fontSize: 11, color: BR.inkFaint }}>
-              ZIP · Next.js 16 + React 19 · npm install 即可獨立執行
+              需 ADMIN_DOWNLOAD_TOKEN · 非管理員一律拒絕
             </span>
           </div>
         </header>
