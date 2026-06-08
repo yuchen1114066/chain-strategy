@@ -98,6 +98,9 @@ export default function LeadTimeValidationPage() {
     : { tone: BR.greenDeep, label: "✓ 合理 · 可接受" };
 
   const [activeTab, setActiveTab] = useState<"pipeline" | "score" | "arch">("pipeline");
+  const [chatQuery, setChatQuery] = useState("");
+  const [chatAnswer, setChatAnswer] = useState<ChatAnswer | null>(null);
+  const [chatThinking, setChatThinking] = useState(false);
 
   return (
     <div
@@ -133,6 +136,19 @@ export default function LeadTimeValidationPage() {
             <b style={{ color: BR.purple }}> AI Supply Chain OS 直接以系統回覆。</b>
           </p>
         </header>
+
+        {/* AI 對話框 — 業務輸入問題，AI 給最佳解答 */}
+        <AIChatBox
+          query={chatQuery}
+          setQuery={setChatQuery}
+          answer={chatAnswer}
+          setAnswer={setChatAnswer}
+          thinking={chatThinking}
+          setThinking={setChatThinking}
+          target={TARGET}
+          ai={ai}
+          excessDays={excessDays}
+        />
 
         {/* 原始信件 + 痛點 vs 世界級做法（前情提要） */}
         <div className="grid lg:grid-cols-[1fr,1fr] gap-4">
@@ -707,6 +723,289 @@ function StepHeader({ badge, title, en, desc, tone = BR.green }: {
       <span style={{ flex: 1 }} />
       <span style={{ fontSize: 12, color: BR.inkSoft }}>{desc}</span>
     </div>
+  );
+}
+
+// ============================================================
+// AI 對話框 — 依問題類型給不同最佳解答
+// ============================================================
+
+type ChatAnswer = {
+  intent: string;
+  tone: "green" | "amber" | "red" | "purple" | "blue";
+  headline: string;
+  bullets: { k: string; v: string }[];
+  conclusion: string;
+  confidence: number;
+};
+
+const PRESET_QUESTIONS = [
+  "10 週交期合不合理？",
+  "可以更早交貨嗎？",
+  "要不要換供應商？",
+  "風險在哪裡？",
+  "未來怎麼避免再發生？",
+];
+
+function answerEngine(q: string, ctx: {
+  partNo: string;
+  vendorClaimDays: number;
+  aiLow: number; aiHigh: number; midpoint: number;
+  excessDays: number;
+}): ChatAnswer {
+  const s = q.toLowerCase();
+  const has = (...keys: string[]) => keys.some((k) => s.includes(k.toLowerCase()));
+
+  // Intent 1: 交期合理性
+  if (has("合不合理", "合理", "10 週", "10週", "10周", "幾週", "幾天", "幾天", "幾日", "多久")) {
+    return {
+      intent: "交期合理性",
+      tone: "amber",
+      headline: `廠商報 ${ctx.vendorClaimDays} 天 vs AI 推估合理區間 ${ctx.aiLow}–${ctx.aiHigh} 天 — 偏長 ${ctx.excessDays} 天`,
+      bullets: [
+        { k: "關鍵路徑", v: "電源板 42 天 + 末段組裝 5 天 = 47 天" },
+        { k: "可並行段", v: "PCB / 連接器 / 風扇可與電源板同時製造" },
+        { k: "廠商虛報段", v: `溢出 ${ctx.excessDays} 天，多在「原料準備」段` },
+        { k: "建議交期", v: `${ctx.aiLow}–${ctx.aiHigh} 天（中位 ${ctx.midpoint}）` },
+      ],
+      conclusion: `回覆業務：交期偏長，建議要求廠商重新評估到 ${ctx.aiHigh} 天內。`,
+      confidence: 92,
+    };
+  }
+
+  // Intent 2: 更早交貨 / 加速
+  if (has("更早", "加速", "更快", "縮短", "提前", "趕")) {
+    return {
+      intent: "縮短交期",
+      tone: "green",
+      headline: `透過 3 招可從 ${ctx.vendorClaimDays} 天縮短到約 ${ctx.aiLow} 天（省 ${ctx.vendorClaimDays - ctx.aiLow} 天）`,
+      bullets: [
+        { k: "招 1 · 並行作業", v: "PCB + 連接器 + 電源板 同時備料（省 14 天）" },
+        { k: "招 2 · 安全庫存", v: "USB-C / IC 拉高安全庫存，避免缺貨潮（省 7 天）" },
+        { k: "招 3 · 改空運", v: "海運 14 天 → 空運 3 天（省 11 天，成本 +5%）" },
+        { k: "代價評估", v: "招 1+2 免加成本；招 3 需加 5% 物流費" },
+      ],
+      conclusion: `可行：建議優先採用「並行作業 + 安全庫存」，可達到 ${ctx.aiLow} 天且不加成本。`,
+      confidence: 88,
+    };
+  }
+
+  // Intent 3: 換供應商
+  if (has("換供應商", "供應商", "別家", "其他廠商", "備援", "二供")) {
+    return {
+      intent: "供應商評估",
+      tone: "purple",
+      headline: "Hua Cheng (89 分) 與 新竹昌晟 (84 分) 均優於現任 AGI #1 (71 分)",
+      bullets: [
+        { k: "現任 AGI #1", v: "OTD 56% · 不良 1.0% · 平均 70 天 · 總分 71" },
+        { k: "Hua Cheng", v: "OTD 88% · 不良 0.3% · 平均 52 天 · 總分 89 ★ 推薦" },
+        { k: "新竹昌晟", v: "OTD 80% · 不良 0.6% · 平均 55 天 · 總分 84" },
+        { k: "切換成本", v: "需 3 個月驗證 + 首批小量試產（建議雙軌進行）" },
+      ],
+      conclusion: "建議：保留 AGI #1 為現役、Hua Cheng 啟動驗證流程作為主力替代。",
+      confidence: 85,
+    };
+  }
+
+  // Intent 4: 風險
+  if (has("風險", "缺貨", "斷料", "問題", "issue", "風險點")) {
+    return {
+      intent: "風險評估",
+      tone: "red",
+      headline: "3 大風險點：原料波動 / 單一供應商 / 物流瓶頸",
+      bullets: [
+        { k: "原料風險", v: "USB-C / 電源 IC 全球缺貨潮持續，預估再持續 6 個月" },
+        { k: "供應商集中度", v: "AGI #1 承擔 78% 量，無 backup → 出事就全停" },
+        { k: "海運壅塞", v: "上海港高峰季可能再多 7–14 天" },
+        { k: "客戶交期罰款", v: "若超交 10% 以上將觸發 OEM 客戶罰款條款" },
+      ],
+      conclusion: "急迫：本週啟動「二供導入」+ 「USB-C 安全庫存提升」雙路並行。",
+      confidence: 90,
+    };
+  }
+
+  // Intent 5: 未來應對 / SOP
+  if (has("未來", "應對", "避免", "sop", "標準", "預防", "下次")) {
+    return {
+      intent: "未來應對方法",
+      tone: "blue",
+      headline: "建立「Lead Time Validation」流程，業務 email 5 分鐘內自動回覆",
+      bullets: [
+        { k: "前置 1 · BOM 主檔", v: "所有料號的 BOM 與元件交期上鏈到 MDM 主檔" },
+        { k: "前置 2 · 元件 LT 指數", v: "每月更新各元件平均交期（API 抓供應商資料）" },
+        { k: "流程 · AI 自動回信", v: "email 觸發 → OS 拆 BOM → 5 分鐘內回覆業務" },
+        { k: "監控 · 預警通報", v: "AI 偵測交期異常自動 push 給採購、生管、業務" },
+      ],
+      conclusion: "建議：3 個月內導入此 SOP，回覆時間從 3-5 天 → 5 分鐘。",
+      confidence: 87,
+    };
+  }
+
+  // 預設：fallback
+  return {
+    intent: "AI 綜合分析",
+    tone: "green",
+    headline: `針對 ${ctx.partNo} 的綜合判斷`,
+    bullets: [
+      { k: "交期評估", v: `廠商 ${ctx.vendorClaimDays} 天 vs AI 建議 ${ctx.aiLow}–${ctx.aiHigh} 天` },
+      { k: "可優化空間", v: `${ctx.excessDays} 天（並行 + 安全庫存可解）` },
+      { k: "供應商建議", v: "Hua Cheng 評分最高，可啟動驗證" },
+      { k: "風險提醒", v: "USB-C 缺貨潮 + 單一供應商集中度過高" },
+    ],
+    conclusion: "更具體的問題請點上方建議問題，或描述業務情境。",
+    confidence: 80,
+  };
+}
+
+function AIChatBox({
+  query, setQuery, answer, setAnswer, thinking, setThinking, target, ai, excessDays,
+}: {
+  query: string; setQuery: (s: string) => void;
+  answer: ChatAnswer | null; setAnswer: (a: ChatAnswer | null) => void;
+  thinking: boolean; setThinking: (b: boolean) => void;
+  target: { partNo: string; vendorClaimDays: number };
+  ai: { aiLow: number; aiHigh: number; midpoint: number };
+  excessDays: number;
+}) {
+  function submit(q: string) {
+    if (!q.trim()) return;
+    setThinking(true);
+    setAnswer(null);
+    setTimeout(() => {
+      const a = answerEngine(q, {
+        partNo: target.partNo,
+        vendorClaimDays: target.vendorClaimDays,
+        aiLow: ai.aiLow, aiHigh: ai.aiHigh, midpoint: ai.midpoint,
+        excessDays,
+      });
+      setAnswer(a);
+      setThinking(false);
+    }, 600);
+  }
+
+  const toneMap: Record<ChatAnswer["tone"], { bg: string; border: string; head: string; text: string }> = {
+    green:  { bg: BR.greenSoft, border: BR.greenLine, head: BR.greenInk, text: BR.greenDeep },
+    amber:  { bg: BR.amberSoft, border: "#f3e1b8",    head: BR.amber,    text: BR.amber },
+    red:    { bg: BR.redSoft,   border: "#f5c2c0",    head: BR.red,      text: BR.red },
+    purple: { bg: "#fdf4ff",    border: "#f5d0fe",    head: BR.purple,   text: BR.purple },
+    blue:   { bg: "#eff6fc",    border: "#cfe0ee",    head: BR.blue,     text: BR.blue },
+  };
+  const T = answer ? toneMap[answer.tone] : toneMap.green;
+
+  return (
+    <Card>
+      <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+        <span style={{
+          fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
+          color: "#fff", background: BR.purple, padding: "4px 9px", borderRadius: 5,
+        }}>
+          AI · ASK ANYTHING
+        </span>
+        <span style={{ fontFamily: FONT_HEAD, fontSize: 16, fontWeight: 700 }}>
+          💬 直接問 AI — 不同問題給不同最佳解答
+        </span>
+        <span style={{ flex: 1 }} />
+        <span style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint }}>
+          5 種預設情境 · 業務／生管／採購／工管／高層通用
+        </span>
+      </div>
+
+      {/* 輸入框 */}
+      <div className="flex gap-2 mb-3">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") submit(query); }}
+          placeholder={`針對 ${target.partNo}，問 AI 任何問題（如：10 週合理嗎？能更快嗎？要換供應商嗎？）`}
+          style={{
+            flex: 1, padding: "11px 14px", fontSize: 13, fontFamily: FONT,
+            border: `1.5px solid ${BR.borderHi}`, borderRadius: 10,
+            background: "#fff", color: BR.ink, outline: "none",
+          }}
+        />
+        <button
+          onClick={() => submit(query)}
+          disabled={thinking || !query.trim()}
+          style={{
+            padding: "11px 22px", fontSize: 13, fontWeight: 700, fontFamily: FONT,
+            color: "#fff", background: thinking || !query.trim() ? BR.inkFaint : BR.greenInk,
+            border: "none", borderRadius: 10, cursor: thinking || !query.trim() ? "not-allowed" : "pointer",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {thinking ? "AI 思考中…" : "問 AI →"}
+        </button>
+      </div>
+
+      {/* 建議問題（chip 列） */}
+      <div className="flex flex-wrap gap-2 mb-3">
+        {PRESET_QUESTIONS.map((q) => (
+          <button
+            key={q}
+            onClick={() => { setQuery(q); submit(q); }}
+            disabled={thinking}
+            style={{
+              padding: "6px 12px", fontSize: 11.5, fontFamily: FONT, fontWeight: 600,
+              color: BR.greenDeep, background: BR.greenSoft, border: `1px solid ${BR.greenLine}`,
+              borderRadius: 99, cursor: thinking ? "not-allowed" : "pointer",
+            }}
+          >
+            {q}
+          </button>
+        ))}
+      </div>
+
+      {/* AI 回答 */}
+      {thinking && (
+        <div className="rounded-[10px] p-4" style={{
+          background: "#fbfcfa", border: `1px dashed ${BR.borderHi}`, color: BR.inkSoft, fontSize: 12,
+        }}>
+          <span style={{ fontFamily: FONT_MONO }}>● ● ● </span>
+          AI 正在拆 BOM、查元件、推交期、比對供應商評分中…
+        </div>
+      )}
+
+      {answer && !thinking && (
+        <div className="rounded-[12px] p-4" style={{ background: T.bg, border: `1px solid ${T.border}` }}>
+          <div className="flex items-baseline gap-2 mb-2 flex-wrap">
+            <span style={{
+              fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
+              color: "#fff", background: T.head, padding: "3px 9px", borderRadius: 5,
+            }}>
+              {answer.intent}
+            </span>
+            <span style={{ fontFamily: FONT_MONO, fontSize: 10, color: T.text }}>
+              AI Confidence {answer.confidence}%
+            </span>
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: T.head, marginBottom: 10, lineHeight: 1.5 }}>
+            {answer.headline}
+          </div>
+          <div className="space-y-2 mb-3">
+            {answer.bullets.map((b) => (
+              <div key={b.k} className="flex items-baseline gap-3" style={{ fontSize: 12, lineHeight: 1.55 }}>
+                <span style={{
+                  fontFamily: FONT_MONO, fontSize: 10.5, fontWeight: 700, color: T.text,
+                  minWidth: 110, letterSpacing: "0.03em",
+                }}>
+                  {b.k}
+                </span>
+                <span style={{ color: BR.ink, flex: 1 }}>{b.v}</span>
+              </div>
+            ))}
+          </div>
+          <div className="pt-2 mt-2 border-t" style={{ borderColor: T.border }}>
+            <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: T.text, letterSpacing: "0.06em", marginBottom: 4 }}>
+              建議行動
+            </div>
+            <div style={{ fontSize: 12.5, color: BR.ink, fontWeight: 600, lineHeight: 1.55 }}>
+              {answer.conclusion}
+            </div>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 
