@@ -206,6 +206,7 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
   const [showMenu, setShowMenu] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const scannerRef = useRef<import("html5-qrcode").Html5Qrcode | null>(null);
+  const mountedRef = useRef(true);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -226,46 +227,40 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
     setQuery("");
   }
 
-  const stopScanner = useCallback(async () => {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  async function stopScanner() {
     if (scannerRef.current) {
       try {
-        const state = scannerRef.current.getState();
-        if (state === 2) {
-          await scannerRef.current.stop();
-        }
+        const s = scannerRef.current;
+        const state = s.getState();
+        if (state === 2) await s.stop();
       } catch { /* ignore */ }
       try { scannerRef.current.clear(); } catch { /* ignore */ }
       scannerRef.current = null;
     }
     setScanning(false);
-  }, []);
-
-  const pendingScanRef = useRef(false);
-
-  function startScan() {
-    setScanError("");
-    pendingScanRef.current = true;
-    setScanning(true);
   }
 
-  useEffect(() => {
-    if (!scanning || !pendingScanRef.current) return;
-    pendingScanRef.current = false;
-
-    let cancelled = false;
-
+  const qrReaderRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
     (async () => {
-      await new Promise((r) => requestAnimationFrame(r));
-      if (cancelled) return;
       try {
         const { Html5Qrcode } = await import("html5-qrcode");
-        if (cancelled) return;
-        const scanner = new Html5Qrcode("qr-reader");
+        if (!mountedRef.current) return;
+        const scanner = new Html5Qrcode(node.id);
         scannerRef.current = scanner;
 
         await scanner.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+          {
+            fps: 10,
+            qrbox: { width: 220, height: 220 },
+            aspectRatio: 1,
+          },
           (decodedText) => {
             const text = decodedText.trim().toUpperCase();
             const found = parts.find(
@@ -283,22 +278,24 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
           () => {},
         );
       } catch (err) {
-        if (cancelled) return;
+        if (!mountedRef.current) return;
+        const msg = err instanceof Error ? err.message : String(err);
         setScanError(
-          err instanceof Error && err.message.includes("Permission")
+          msg.includes("NotAllowed") || msg.includes("Permission")
             ? "相機權限被拒絕，請在瀏覽器設定中允許相機存取"
-            : "無法啟動相機，請確認裝置有相機並已授予權限"
+            : msg.includes("NotFound") || msg.includes("Requested device not found")
+            ? "找不到相機裝置"
+            : `無法啟動相機：${msg}`
         );
         setScanning(false);
       }
     })();
+  }, []);
 
-    return () => { cancelled = true; };
-  }, [scanning, stopScanner]);
-
-  useEffect(() => {
-    return () => { stopScanner(); };
-  }, [stopScanner]);
+  function startScan() {
+    setScanError("");
+    setScanning(true);
+  }
 
   return (
     <div style={{
@@ -424,29 +421,34 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
         {scanning && (
           <div style={{
             position: "fixed", inset: 0, zIndex: 100,
-            background: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column",
+            background: "#000", display: "flex", flexDirection: "column",
           }}>
             <div style={{
-              padding: "12px 16px", display: "flex", justifyContent: "space-between",
-              alignItems: "center", color: "#fff",
+              padding: "14px 16px", display: "flex", justifyContent: "space-between",
+              alignItems: "center", color: "#fff", background: "rgba(0,0,0,0.8)",
+              zIndex: 10,
             }}>
-              <div style={{ fontSize: 15, fontWeight: 700 }}>掃描 QR Code / 條碼</div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>掃描 QR Code / 條碼</div>
+                <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>對準零件標籤即可辨識</div>
+              </div>
               <button
                 onClick={stopScanner}
                 style={{
-                  background: "rgba(255,255,255,0.15)", border: "none", color: "#fff",
-                  padding: "8px 16px", borderRadius: 8, fontSize: 14, fontWeight: 600,
+                  background: "rgba(255,255,255,0.2)", border: "none", color: "#fff",
+                  padding: "10px 20px", borderRadius: 10, fontSize: 14, fontWeight: 700,
                   cursor: "pointer", fontFamily: "inherit",
                 }}
               >
                 ✕ 關閉
               </button>
             </div>
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div id="qr-reader" style={{ width: "100%", maxWidth: 400 }} />
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+              <div ref={qrReaderRef} id="qr-reader-box" style={{ width: "100%", maxWidth: 400 }} />
             </div>
             <div style={{
-              padding: "16px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: 12,
+              padding: "16px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: 12,
+              background: "rgba(0,0,0,0.8)",
             }}>
               將 QR Code 或條碼對準框框內即可自動辨識
             </div>
