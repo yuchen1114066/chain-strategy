@@ -420,7 +420,13 @@ export default function QuotationAnalyzerPage() {
       {/* 入口 Intake Modal — 送出後進入下方分析頁；關閉鍵回上一頁 */}
       {showIntake && (
         <IntakeModal
-          onSubmit={(file) => ingestFile(file, fmtOfFile(file), { closeIntakeOnSuccess: true })}
+          onSubmit={(files) => {
+            files.forEach((file, idx) =>
+              ingestFile(file, fmtOfFile(file), {
+                closeIntakeOnSuccess: idx === files.length - 1,
+              })
+            );
+          }}
           onClose={() => {
             // 關閉鍵 = 結束對話框，回到上一頁（若無歷史則僅關閉 modal）
             if (typeof window !== "undefined" && window.history.length > 1) {
@@ -3405,32 +3411,58 @@ function fmtOfFile(file: File): string {
 function IntakeModal({
   onSubmit, onClose,
 }: {
-  onSubmit: (file: File) => void;
+  onSubmit: (files: File[]) => void;
   onClose: () => void;
 }) {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const ACCEPT = ".pdf,.xlsx,.xls,.csv,image/*";
   const MAX_MB = 20;
+  const MAX_FILES = 10;
 
-  const handleFiles = (files: FileList | null) => {
-    const f = files?.[0];
-    if (!f) return;
-    if (f.size > MAX_MB * 1024 * 1024) {
-      alert(`檔案太大（上限 ${MAX_MB} MB）`);
-      return;
+  const handleFiles = (incoming: FileList | null) => {
+    if (!incoming || incoming.length === 0) return;
+    const accepted: File[] = [];
+    const rejected: string[] = [];
+    for (const f of Array.from(incoming)) {
+      if (f.size > MAX_MB * 1024 * 1024) {
+        rejected.push(`${f.name}（超過 ${MAX_MB} MB）`);
+        continue;
+      }
+      accepted.push(f);
     }
-    setFile(f);
+    setFiles((prev) => {
+      const merged = [...prev];
+      for (const f of accepted) {
+        if (merged.length >= MAX_FILES) {
+          rejected.push(`${f.name}（已達 ${MAX_FILES} 個檔案上限）`);
+          continue;
+        }
+        if (!merged.some((m) => m.name === f.name && m.size === f.size)) {
+          merged.push(f);
+        }
+      }
+      return merged;
+    });
+    if (rejected.length > 0) {
+      alert(`部分檔案無法加入：\n${rejected.join("\n")}`);
+    }
+  };
+
+  const removeFile = (idx: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const submit = () => {
-    if (!file) return;
+    if (files.length === 0) return;
     setSubmitting(true);
     // 稍微 delay 一下讓使用者看到「分析中」的回饋
-    setTimeout(() => onSubmit(file), 200);
+    setTimeout(() => onSubmit(files), 200);
   };
+
+  const totalSize = files.reduce((sum, f) => sum + f.size, 0);
 
   return (
     <div
@@ -3504,10 +3536,10 @@ function IntakeModal({
             }}
           >
             <input
-              id="intake-file" type="file" accept={ACCEPT} hidden
-              onChange={(e) => handleFiles(e.target.files)}
+              id="intake-file" type="file" accept={ACCEPT} hidden multiple
+              onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }}
             />
-            {!file ? (
+            {files.length === 0 ? (
               <>
                 <div style={{
                   width: 56, height: 56, borderRadius: 12,
@@ -3521,32 +3553,68 @@ function IntakeModal({
                   把報價單拖進來，或<u style={{ color: BR.green }}>點此選擇檔案</u>
                 </div>
                 <div style={{ fontFamily: FONT_MONO, fontSize: 10.5, color: "#9aa78d", marginTop: 14, letterSpacing: ".1em" }}>
-                  PDF · EXCEL · CSV · 圖片　│　單檔上限 {MAX_MB}MB
+                  PDF · EXCEL · CSV · 圖片　│　單檔上限 {MAX_MB}MB · 最多 {MAX_FILES} 個附件
                 </div>
               </>
             ) : (
-              <>
-                <div style={{ fontSize: 32, marginBottom: 10 }}>
-                  {fmtOfFile(file) === "PDF" ? "📄" : fmtOfFile(file) === "Excel" ? "📊" : fmtOfFile(file) === "JPG" ? "📷" : "📁"}
+              <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  marginBottom: 4,
+                }}>
+                  <div style={{
+                    fontFamily: FONT_MONO, fontSize: 11, color: BR.green,
+                    letterSpacing: ".1em", fontWeight: 700,
+                  }}>
+                    已選 {files.length} 個附件 · {(totalSize / 1024).toFixed(0)} KB
+                  </div>
+                  <span style={{
+                    fontSize: 11, color: "#9aa78d",
+                    textDecoration: "underline",
+                  }}>
+                    ＋ 繼續加入
+                  </span>
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", textAlign: "center", wordBreak: "break-all" }}>
-                  {file.name}
-                </div>
-                <div style={{ fontFamily: FONT_MONO, fontSize: 10.5, color: "#9aa78d", marginTop: 8 }}>
-                  {fmtOfFile(file)} · {(file.size / 1024).toFixed(0)} KB
-                </div>
-                <button
-                  type="button"
-                  onClick={(e) => { e.preventDefault(); setFile(null); }}
-                  style={{
-                    marginTop: 14, background: "transparent", border: "1px solid rgba(255,255,255,.2)",
-                    color: "#cdd6c2", padding: "6px 12px", borderRadius: 7,
-                    fontSize: 11, cursor: "pointer",
-                  }}
-                >
-                  ✕ 重新選擇
-                </button>
-              </>
+                {files.map((f, idx) => (
+                  <div
+                    key={`${f.name}-${idx}`}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "10px 12px", borderRadius: 9,
+                      background: "rgba(255,255,255,.06)",
+                      border: "1px solid rgba(118,185,0,.2)",
+                    }}
+                  >
+                    <span style={{ fontSize: 20 }}>
+                      {fmtOfFile(f) === "PDF" ? "📄" : fmtOfFile(f) === "Excel" ? "📊" : fmtOfFile(f) === "JPG" ? "📷" : "📁"}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 12, fontWeight: 700, color: "#fff",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>
+                        {f.name}
+                      </div>
+                      <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: "#9aa78d", marginTop: 2 }}>
+                        {fmtOfFile(f)} · {(f.size / 1024).toFixed(0)} KB
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeFile(idx); }}
+                      style={{
+                        background: "transparent", border: "1px solid rgba(255,255,255,.2)",
+                        color: "#cdd6c2", width: 26, height: 26, borderRadius: 6,
+                        fontSize: 13, cursor: "pointer", lineHeight: 1, padding: 0,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}
+                      aria-label={`移除 ${f.name}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
           </label>
 
@@ -3554,20 +3622,24 @@ function IntakeModal({
           <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 12 }}>
             <button
               type="button"
-              disabled={!file || submitting}
+              disabled={files.length === 0 || submitting}
               onClick={submit}
               style={{
-                background: !file || submitting ? "rgba(255,255,255,.1)" : "#c9a36a",
-                color: !file || submitting ? "#9aa78d" : "#1a1410",
+                background: files.length === 0 || submitting ? "rgba(255,255,255,.1)" : "#c9a36a",
+                color: files.length === 0 || submitting ? "#9aa78d" : "#1a1410",
                 border: "none", borderRadius: 11,
                 padding: "20px 22px", fontSize: 16, fontWeight: 800,
-                cursor: !file || submitting ? "not-allowed" : "pointer",
+                cursor: files.length === 0 || submitting ? "not-allowed" : "pointer",
                 letterSpacing: ".04em",
-                boxShadow: !file || submitting ? "none" : "0 6px 18px rgba(201,163,106,.35)",
+                boxShadow: files.length === 0 || submitting ? "none" : "0 6px 18px rgba(201,163,106,.35)",
                 transition: "background .15s",
               }}
             >
-              {submitting ? "分析中… 請稍候" : "送出分析 →"}
+              {submitting
+                ? "分析中… 請稍候"
+                : files.length > 1
+                ? `送出 ${files.length} 個附件分析 →`
+                : "送出分析 →"}
             </button>
             <button
               type="button"
