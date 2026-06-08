@@ -31,11 +31,10 @@ for (const slip of initialSlips) {
 }
 
 const WAREHOUSE_STAFF = [
-  { id: "WH001", name: "王建明", role: "倉管組長" },
-  { id: "WH002", name: "林志偉", role: "倉管員" },
-  { id: "WH003", name: "陳美玲", role: "倉管員" },
-  { id: "WH004", name: "張家豪", role: "收貨員" },
-  { id: "WH005", name: "李淑芬", role: "盤點員" },
+  { id: "242", name: "賴允正", role: "倉管員" },
+  { id: "233", name: "林郁展", role: "倉管員" },
+  { id: "243", name: "姜湘淇", role: "倉管員" },
+  { id: "235", name: "范成義", role: "倉管員" },
 ];
 const STORAGE_KEY = "gascc.wh.login";
 
@@ -122,7 +121,7 @@ function LoginScreen({ onLogin }: { onLogin: (s: typeof WAREHOUSE_STAFF[0]) => v
             value={empId}
             onChange={(e) => { setEmpId(e.target.value); setError(""); }}
             onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-            placeholder="例：WH001 或 王建明"
+            placeholder="例：242 或 賴允正"
             style={{
               width: "100%", padding: "14px 16px", fontSize: 16, borderRadius: 12,
               border: `1.5px solid ${error ? BR.red : BR.borderHi}`, background: "#fff",
