@@ -189,13 +189,12 @@ export default function QuotationAnalyzerPage() {
   // 使用者上傳的報價單會自動加進 allRows（demo OCR 模擬）
   const [uploadedRows, setUploadedRows] = useState<OcrRow[]>([]);
   // 入口 intake modal — 預設打開，使用者上傳完才看見全頁分析
-  const [showIntake, setShowIntake] = useState(true);
   // 廠商報價歷史資料夾 — 是否展開
   const [historyOpen, setHistoryOpen] = useState(false);
 
   // 共用：把檔案吃進來 → 呼叫 Claude Vision OCR → 加進 uploadedRows → 自動選中
   // 入口 intake modal 和頁面中的 STEP 1 上傳卡共用同一條路徑
-  const ingestFile = async (file: File, fmt: string, opts?: { closeIntakeOnSuccess?: boolean }) => {
+  const ingestFile = async (file: File, fmt: string) => {
     const sizeKB = (file.size / 1024).toFixed(0);
     showToast(`📂 ${fmt} 上傳中：${file.name}（${sizeKB} KB）· Claude Vision 解析中…`);
     const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
@@ -293,7 +292,6 @@ export default function QuotationAnalyzerPage() {
       setSelectedIdx(next.length - rowsToAdd.length);
       return next;
     });
-    if (opts?.closeIntakeOnSuccess) setShowIntake(false);
 
     if (aiError) {
       showToast(`⚠ ${aiError}`);
@@ -471,45 +469,6 @@ export default function QuotationAnalyzerPage() {
         }}>
           {toast}
         </div>
-      )}
-
-      {/* 入口 Intake Modal — 送出後進入下方分析頁；關閉鍵回上一頁 */}
-      {showIntake && (
-        <IntakeModal
-          onSubmit={(files) => {
-            files.forEach((file, idx) =>
-              ingestFile(file, fmtOfFile(file), {
-                closeIntakeOnSuccess: idx === files.length - 1,
-              })
-            );
-          }}
-          onClose={() => {
-            // 關閉鍵 = 結束對話框，回到上一頁（若無歷史則僅關閉 modal）
-            if (typeof window !== "undefined" && window.history.length > 1) {
-              window.history.back();
-            } else {
-              setShowIntake(false);
-            }
-          }}
-        />
-      )}
-
-      {/* 浮動「新查詢」按鈕 — 隨時可重新打開 intake modal */}
-      {!showIntake && (
-        <button
-          type="button"
-          onClick={() => setShowIntake(true)}
-          style={{
-            position: "fixed", bottom: 80, right: 20, zIndex: 90,
-            background: BR.greenInk, color: "#fff",
-            border: `1px solid ${BR.green}`,
-            padding: "10px 16px", borderRadius: 999,
-            fontSize: 12, fontWeight: 700, letterSpacing: ".08em",
-            boxShadow: "0 8px 20px rgba(12,18,8,.18)", cursor: "pointer",
-          }}
-        >
-          📥 新報價分析
-        </button>
       )}
 
       <div className="max-w-[1440px] mx-auto px-9 py-7 space-y-6">
@@ -3502,262 +3461,6 @@ function AiStatusBadge() {
   );
 }
 
-function IntakeModal({
-  onSubmit, onClose,
-}: {
-  onSubmit: (files: File[]) => void;
-  onClose: () => void;
-}) {
-  const [files, setFiles] = useState<File[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
-  const ACCEPT = ".pdf,.xlsx,.xls,.csv,image/*";
-  const MAX_MB = 20;
-  const MAX_FILES = 10;
-
-  const handleFiles = (incoming: FileList | null) => {
-    if (!incoming || incoming.length === 0) return;
-    const accepted: File[] = [];
-    const rejected: string[] = [];
-    for (const f of Array.from(incoming)) {
-      if (f.size > MAX_MB * 1024 * 1024) {
-        rejected.push(`${f.name}（超過 ${MAX_MB} MB）`);
-        continue;
-      }
-      accepted.push(f);
-    }
-    setFiles((prev) => {
-      const merged = [...prev];
-      for (const f of accepted) {
-        if (merged.length >= MAX_FILES) {
-          rejected.push(`${f.name}（已達 ${MAX_FILES} 個檔案上限）`);
-          continue;
-        }
-        if (!merged.some((m) => m.name === f.name && m.size === f.size)) {
-          merged.push(f);
-        }
-      }
-      return merged;
-    });
-    if (rejected.length > 0) {
-      alert(`部分檔案無法加入：\n${rejected.join("\n")}`);
-    }
-  };
-
-  const removeFile = (idx: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const submit = () => {
-    if (files.length === 0) return;
-    setSubmitting(true);
-    // 稍微 delay 一下讓使用者看到「分析中」的回饋
-    setTimeout(() => onSubmit(files), 200);
-  };
-
-  const totalSize = files.reduce((sum, f) => sum + f.size, 0);
-
-  return (
-    <div
-      style={{
-        position: "fixed", inset: 0, zIndex: 100,
-        background: "rgba(12,18,8,.55)", backdropFilter: "blur(4px)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 24,
-      }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div
-        style={{
-          background: BR.greenInk, color: "#fff",
-          borderRadius: 18, maxWidth: 1050, width: "100%", maxHeight: "90vh",
-          overflow: "auto", boxShadow: "0 30px 60px rgba(0,0,0,.4)",
-          border: `1px solid ${BR.green}`,
-          position: "relative",
-          padding: "44px 48px 36px",
-          fontFamily: FONT,
-        }}
-      >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="關閉"
-          style={{
-            position: "absolute", top: 16, right: 18, zIndex: 1,
-            background: "transparent", border: "none", color: "#9aa78d",
-            fontSize: 22, cursor: "pointer", lineHeight: 1,
-          }}
-        >×</button>
-
-        <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <div style={{
-            fontFamily: FONT_MONO, fontSize: 11, fontWeight: 700,
-            color: BR.green, letterSpacing: ".4em", marginBottom: 14,
-          }}>
-            FREE QUOTE ANALYSIS
-          </div>
-          <h2 style={{
-            fontFamily: FONT_HEAD, fontSize: 34, fontWeight: 800,
-            color: "#fff", letterSpacing: ".02em", lineHeight: 1.2, margin: 0,
-          }}>
-            上傳報價單，5 分鐘拿回初步診斷
-          </h2>
-          <p style={{
-            color: "#cdd6c2", fontSize: 14, marginTop: 14, lineHeight: 1.6,
-            maxWidth: 640, marginLeft: "auto", marginRight: "auto",
-          }}>
-            支援 PDF、Excel、CSV 與報價單照片。Claude Vision 自動讀出廠商、料號、單價與手寫漲幅標註，
-            <b style={{ color: "#fff" }}>檔案僅供本次分析使用，不對外揭露。</b>
-          </p>
-          <AiStatusBadge />
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 22 }}>
-          {/* 左：dropzone */}
-          <label
-            htmlFor="intake-file"
-            onDragEnter={(e) => { e.preventDefault(); setIsDragging(true); }}
-            onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
-            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-            onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFiles(e.dataTransfer.files); }}
-            style={{
-              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-              padding: "44px 30px", borderRadius: 14, cursor: "pointer",
-              background: isDragging ? "rgba(118,185,0,.18)" : "rgba(255,255,255,.04)",
-              border: `2px dashed ${isDragging ? BR.green : "rgba(118,185,0,.45)"}`,
-              transition: "background .15s, border-color .15s",
-              minHeight: 240,
-            }}
-          >
-            <input
-              id="intake-file" type="file" accept={ACCEPT} hidden multiple
-              onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }}
-            />
-            {files.length === 0 ? (
-              <>
-                <div style={{
-                  width: 56, height: 56, borderRadius: 12,
-                  background: "rgba(255,255,255,.08)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  border: `1px solid ${BR.green}`, marginBottom: 18,
-                }}>
-                  <span style={{ fontSize: 22, color: BR.green }}>⬆</span>
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>
-                  把報價單拖進來，或<u style={{ color: BR.green }}>點此選擇檔案</u>
-                </div>
-                <div style={{ fontFamily: FONT_MONO, fontSize: 10.5, color: "#9aa78d", marginTop: 14, letterSpacing: ".1em" }}>
-                  PDF · EXCEL · CSV · 圖片　│　單檔上限 {MAX_MB}MB · 最多 {MAX_FILES} 個附件
-                </div>
-              </>
-            ) : (
-              <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                  marginBottom: 4,
-                }}>
-                  <div style={{
-                    fontFamily: FONT_MONO, fontSize: 11, color: BR.green,
-                    letterSpacing: ".1em", fontWeight: 700,
-                  }}>
-                    已選 {files.length} 個附件 · {(totalSize / 1024).toFixed(0)} KB
-                  </div>
-                  <span style={{
-                    fontSize: 11, color: "#9aa78d",
-                    textDecoration: "underline",
-                  }}>
-                    ＋ 繼續加入
-                  </span>
-                </div>
-                {files.map((f, idx) => (
-                  <div
-                    key={`${f.name}-${idx}`}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 10,
-                      padding: "10px 12px", borderRadius: 9,
-                      background: "rgba(255,255,255,.06)",
-                      border: "1px solid rgba(118,185,0,.2)",
-                    }}
-                  >
-                    <span style={{ fontSize: 20 }}>
-                      {fmtOfFile(f) === "PDF" ? "📄" : fmtOfFile(f) === "Excel" ? "📊" : fmtOfFile(f) === "JPG" ? "📷" : "📁"}
-                    </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{
-                        fontSize: 12, fontWeight: 700, color: "#fff",
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      }}>
-                        {f.name}
-                      </div>
-                      <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: "#9aa78d", marginTop: 2 }}>
-                        {fmtOfFile(f)} · {(f.size / 1024).toFixed(0)} KB
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeFile(idx); }}
-                      style={{
-                        background: "transparent", border: "1px solid rgba(255,255,255,.2)",
-                        color: "#cdd6c2", width: 26, height: 26, borderRadius: 6,
-                        fontSize: 13, cursor: "pointer", lineHeight: 1, padding: 0,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                      }}
-                      aria-label={`移除 ${f.name}`}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </label>
-
-          {/* 右：送出 + 關閉 */}
-          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 12 }}>
-            <button
-              type="button"
-              disabled={files.length === 0 || submitting}
-              onClick={submit}
-              style={{
-                background: files.length === 0 || submitting ? "rgba(255,255,255,.1)" : "#c9a36a",
-                color: files.length === 0 || submitting ? "#9aa78d" : "#1a1410",
-                border: "none", borderRadius: 11,
-                padding: "20px 22px", fontSize: 16, fontWeight: 800,
-                cursor: files.length === 0 || submitting ? "not-allowed" : "pointer",
-                letterSpacing: ".04em",
-                boxShadow: files.length === 0 || submitting ? "none" : "0 6px 18px rgba(201,163,106,.35)",
-                transition: "background .15s",
-              }}
-            >
-              {submitting
-                ? "分析中… 請稍候"
-                : files.length > 1
-                ? `送出 ${files.length} 個附件分析 →`
-                : "送出分析 →"}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                background: "transparent",
-                color: "#cdd6c2",
-                border: "1px solid rgba(255,255,255,.18)",
-                borderRadius: 11,
-                padding: "16px 22px", fontSize: 14, fontWeight: 600,
-                cursor: "pointer",
-                letterSpacing: ".04em",
-              }}
-            >
-              關閉
-            </button>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  );
-}
 
 // ============================================================
 // Purchase History Card — 沒有替代廠商資料時，改顯本料 / 本廠商歷史購入
