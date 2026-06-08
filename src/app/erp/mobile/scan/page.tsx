@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { parts, suppliers, bom, models } from "@/lib/erp/seed";
 import { initialSlips } from "@/lib/erp/warehouse";
 
@@ -202,8 +202,11 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
   const [query, setQuery] = useState("");
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState("");
   const [showMenu, setShowMenu] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const scannerRef = useRef<import("html5-qrcode").Html5Qrcode | null>(null);
+  const mountedRef = useRef(true);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -224,14 +227,74 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
     setQuery("");
   }
 
-  function simulateScan() {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  async function stopScanner() {
+    if (scannerRef.current) {
+      try {
+        const s = scannerRef.current;
+        const state = s.getState();
+        if (state === 2) await s.stop();
+      } catch { /* ignore */ }
+      try { scannerRef.current.clear(); } catch { /* ignore */ }
+      scannerRef.current = null;
+    }
+    setScanning(false);
+  }
+
+  const qrReaderRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    (async () => {
+      try {
+        const { Html5Qrcode } = await import("html5-qrcode");
+        if (!mountedRef.current) return;
+        const scanner = new Html5Qrcode(node.id);
+        scannerRef.current = scanner;
+
+        await scanner.start(
+          { facingMode: "environment" },
+          {
+            fps: 10,
+            qrbox: { width: 220, height: 220 },
+            aspectRatio: 1,
+          },
+          (decodedText) => {
+            const text = decodedText.trim().toUpperCase();
+            const found = parts.find(
+              (p) => p.code.toUpperCase() === text || text.includes(p.code.toUpperCase())
+            );
+            if (found) {
+              setSelectedCode(found.code);
+              setQuery("");
+            } else {
+              setQuery(decodedText.trim());
+              setSelectedCode(null);
+            }
+            stopScanner();
+          },
+          () => {},
+        );
+      } catch (err) {
+        if (!mountedRef.current) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        setScanError(
+          msg.includes("NotAllowed") || msg.includes("Permission")
+            ? "相機權限被拒絕，請在瀏覽器設定中允許相機存取"
+            : msg.includes("NotFound") || msg.includes("Requested device not found")
+            ? "找不到相機裝置"
+            : `無法啟動相機：${msg}`
+        );
+        setScanning(false);
+      }
+    })();
+  }, []);
+
+  function startScan() {
+    setScanError("");
     setScanning(true);
-    setTimeout(() => {
-      const sample = parts[Math.floor(Math.random() * Math.min(30, parts.length))];
-      setSelectedCode(sample.code);
-      setQuery("");
-      setScanning(false);
-    }, 800);
   }
 
   return (
@@ -340,7 +403,7 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
             )}
           </div>
           <button
-            onClick={simulateScan}
+            onClick={startScan}
             disabled={scanning}
             style={{
               padding: "12px 16px", borderRadius: 12, border: "none",
@@ -353,6 +416,62 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
             {scanning ? "…" : "📷"}
           </button>
         </div>
+
+        {/* QR Scanner Overlay */}
+        {scanning && (
+          <div style={{
+            position: "fixed", inset: 0, zIndex: 100,
+            background: "#000", display: "flex", flexDirection: "column",
+          }}>
+            <div style={{
+              padding: "14px 16px", display: "flex", justifyContent: "space-between",
+              alignItems: "center", color: "#fff", background: "rgba(0,0,0,0.8)",
+              zIndex: 10,
+            }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>掃描 QR Code / 條碼</div>
+                <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>對準零件標籤即可辨識</div>
+              </div>
+              <button
+                onClick={stopScanner}
+                style={{
+                  background: "rgba(255,255,255,0.2)", border: "none", color: "#fff",
+                  padding: "10px 20px", borderRadius: 10, fontSize: 14, fontWeight: 700,
+                  cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                ✕ 關閉
+              </button>
+            </div>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+              <div ref={qrReaderRef} id="qr-reader-box" style={{ width: "100%", maxWidth: 400 }} />
+            </div>
+            <div style={{
+              padding: "16px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: 12,
+              background: "rgba(0,0,0,0.8)",
+            }}>
+              將 QR Code 或條碼對準框框內即可自動辨識
+            </div>
+          </div>
+        )}
+
+        {/* Scanner Error */}
+        {scanError && (
+          <div style={{
+            padding: "10px 14px", borderRadius: 10, marginBottom: 12,
+            background: BR.redSoft, border: `1px solid #f5c2c0`,
+            fontSize: 12, color: BR.red, display: "flex", alignItems: "center", gap: 8,
+          }}>
+            <span>⚠️</span>
+            <span style={{ flex: 1 }}>{scanError}</span>
+            <button
+              onClick={() => setScanError("")}
+              style={{ background: "none", border: "none", color: BR.red, fontSize: 16, cursor: "pointer" }}
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {/* Search Results */}
         {query && !selectedCode && filtered.length > 0 && (
