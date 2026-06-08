@@ -209,15 +209,33 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
   const mountedRef = useRef(true);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return parts.filter(
+    const raw = query.trim().toLowerCase();
+    if (!raw) return [];
+
+    // 整段直接比對（有命中就優先回傳）
+    const exact = parts.filter(
       (p) =>
-        p.code.toLowerCase().includes(q) ||
-        p.name.toLowerCase().includes(q) ||
-        (p.spec ?? "").toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q)
-    ).slice(0, 20);
+        p.code.toLowerCase().includes(raw) ||
+        p.name.toLowerCase().includes(raw) ||
+        (p.spec ?? "").toLowerCase().includes(raw) ||
+        p.category.toLowerCase().includes(raw)
+    );
+    if (exact.length > 0) return exact.slice(0, 20);
+
+    // 整段比對不到 → 拆解關鍵字（空格分隔），每個 part 至少要命中一個關鍵字
+    const tokens = raw.split(/\s+/).filter((t) => t.length >= 2);
+    if (tokens.length === 0) return [];
+
+    const scored = parts
+      .map((p) => {
+        const haystack = `${p.code} ${p.name} ${p.spec ?? ""} ${p.category}`.toLowerCase();
+        const hits = tokens.filter((t) => haystack.includes(t)).length;
+        return { p, hits };
+      })
+      .filter((x) => x.hits > 0)
+      .sort((a, b) => b.hits - a.hits);
+
+    return scored.slice(0, 20).map((x) => x.p);
   }, [query]);
 
   const selected = selectedCode ? parts.find((p) => p.code === selectedCode) : null;
@@ -375,13 +393,20 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
 
       <div style={{ padding: "12px 14px" }}>
         {/* Search + Scan */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
           <div style={{ flex: 1, position: "relative" }}>
             <input
               ref={inputRef}
               type="text"
               value={query}
               onChange={(e) => { setQuery(e.target.value); setSelectedCode(null); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  if (filtered.length === 1) handleSelect(filtered[0].code);
+                  else if (filtered.length > 1) handleSelect(filtered[0].code);
+                  inputRef.current?.blur();
+                }
+              }}
               placeholder="搜尋料號 / 品名 / 規格…"
               style={{
                 width: "100%", padding: "12px 14px", fontSize: 15, borderRadius: 12,
@@ -416,6 +441,42 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
             {scanning ? "…" : "📷"}
           </button>
         </div>
+
+        {/* 確認查詢按鈕 */}
+        {query && !selectedCode && (
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <button
+              onClick={() => {
+                if (filtered.length > 0) handleSelect(filtered[0].code);
+                inputRef.current?.blur();
+              }}
+              disabled={filtered.length === 0}
+              style={{
+                flex: 1, padding: "12px", borderRadius: 10, border: "none",
+                background: filtered.length === 0 ? BR.inkFaint : BR.green,
+                color: "#fff", fontSize: 14, fontWeight: 700,
+                cursor: filtered.length === 0 ? "not-allowed" : "pointer",
+                fontFamily: "inherit",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              }}
+            >
+              {filtered.length === 0
+                ? "🔍 找不到符合的料件"
+                : `🔍 查詢「${filtered[0].code}」${filtered.length > 1 ? ` 等 ${filtered.length} 筆` : ""}`}
+            </button>
+            <button
+              onClick={() => { setQuery(""); setSelectedCode(null); inputRef.current?.focus(); }}
+              style={{
+                padding: "12px 16px", borderRadius: 10,
+                background: "#fff", border: `1.5px solid ${BR.borderHi}`,
+                color: BR.inkSoft, fontSize: 14, fontWeight: 700,
+                cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              清除
+            </button>
+          </div>
+        )}
 
         {/* QR Scanner Overlay */}
         {scanning && (
