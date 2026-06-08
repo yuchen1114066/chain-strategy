@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 // ============================================================
@@ -193,59 +193,115 @@ export default function QuotationAnalyzerPage() {
   // 廠商報價歷史資料夾 — 是否展開
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  // 共用：把檔案吃進來 → 跑 OCR mock → 加進 uploadedRows → 自動選中
+  // 共用：把檔案吃進來 → 呼叫 Claude Vision OCR → 加進 uploadedRows → 自動選中
   // 入口 intake modal 和頁面中的 STEP 1 上傳卡共用同一條路徑
-  const ingestFile = (file: File, fmt: string, opts?: { closeIntakeOnSuccess?: boolean }) => {
+  const ingestFile = async (file: File, fmt: string, opts?: { closeIntakeOnSuccess?: boolean }) => {
     const sizeKB = (file.size / 1024).toFixed(0);
-    showToast(`📂 ${fmt} 上傳中：${file.name}（${sizeKB} KB）· AI OCR 處理中…`);
+    showToast(`📂 ${fmt} 上傳中：${file.name}（${sizeKB} KB）· Claude Vision 解析中…`);
     const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
 
-    const base = file.name.replace(/\.[^.]+$/, "");
-    const cleaned = base
-      .replace(/^(?:螢幕擷取(?:畫面)?|螢幕截圖|截圖|截屏|Screen\s?Shot|Screenshot|IMG|Image|Photo|Scan)[\s_\-]*\d*[\s_\-]*[\d\-:.]*\s*/i, "")
-      .trim();
-    const knownSuppliers = /(企能|企龍|茂晟|重邑|鼎能|力豐|新竹\s?EFG|聯昌|建準|友達|台積|鴻海)/;
-    const supMatch  = base.match(knownSuppliers) ?? cleaned.match(/[一-龥]{2,4}/);
-    const partMatch = base.match(/[A-Z][A-Z0-9]{3,}[-]?[A-Z0-9]*/);
-    // 若使用者在 modal 內手填公司名，優先使用
-    const newSupplier = supMatch?.[0] || "未識別供應商";
-    const needsSupplierFix = newSupplier === "未識別供應商";
-    const newPartNo   = partMatch?.[0] ?? `OCR-${Date.now().toString().slice(-6)}`;
     const today = new Date();
     const yymmdd = `${today.getFullYear().toString().slice(-2)}${(today.getMonth() + 1).toString().padStart(2, "0")}${today.getDate().toString().padStart(2, "0")}`;
-    const newQuoteNo = `QTE-${yymmdd}-${Date.now().toString().slice(-3)}`;
 
-    const oldP = +(6 + Math.random() * 4).toFixed(2);
-    const hike = +(0.05 + Math.random() * 0.2).toFixed(3);
-    const newP = +(oldP * (1 + hike)).toFixed(2);
+    // --- 呼叫 Claude Vision OCR API ---
+    let aiRows: OcrRow[] | null = null;
+    let aiError: string | null = null;
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/ai/quotation-ocr", { method: "POST", body: formData });
+      const json = await res.json();
 
-    const newRow: OcrRow = {
-      quoteNo: newQuoteNo,
-      supplier: newSupplier,
-      partNo: newPartNo,
-      oldPrice: oldP,
-      newPrice: newP,
-      reasonText: "自上傳檔案 OCR · 等待 STEP 2–4 分析",
-      uploadedAt: Date.now(),
-      previewUrl,
-      fileName: file.name,
-      fmt,
-    };
-
-    setTimeout(() => {
-      setUploadedRows((arr: OcrRow[]) => {
-        const next = [...arr, newRow];
-        const newIdx = next.length - 1;
-        setSelectedIdx(newIdx);
-        return next;
-      });
-      if (opts?.closeIntakeOnSuccess) setShowIntake(false);
-      if (needsSupplierFix) {
-        showToast(`✓ AI OCR 完成 · ${newQuoteNo} 已加入清單 — 公司名未自動識別，請於表格內點輸入框補登後即可分析`);
+      if (json.ok && json.data) {
+        type AiLine = {
+          partNo: string; description?: string | null;
+          unitPrice: number; oldPrice?: number | null; markupPercent?: number | null;
+          remark?: string | null;
+        };
+        const d = json.data as {
+          supplier: string; quoteNo?: string | null; quoteDate?: string | null;
+          currency?: string | null; leadTimeText?: string | null;
+          lines: AiLine[];
+        };
+        const supplier = d.supplier || "未識別供應商";
+        const baseQuoteNo = d.quoteNo || `QTE-${yymmdd}-${Date.now().toString().slice(-3)}`;
+        aiRows = (d.lines ?? []).map((line, idx) => {
+          const newP = +line.unitPrice;
+          const oldP = line.oldPrice != null ? +line.oldPrice : newP;
+          return {
+            quoteNo: d.lines.length > 1 ? `${baseQuoteNo}-${idx + 1}` : baseQuoteNo,
+            supplier,
+            partNo: line.partNo,
+            oldPrice: oldP,
+            newPrice: newP,
+            reasonText: [
+              line.description ?? null,
+              line.markupPercent != null ? `手寫漲幅 ${line.markupPercent}%` : null,
+              d.leadTimeText ? `L/T ${d.leadTimeText}` : null,
+            ].filter(Boolean).join(" · ") || "Claude Vision 抽取",
+            uploadedAt: Date.now() + idx,
+            previewUrl: idx === 0 ? previewUrl : undefined,
+            fileName: file.name,
+            fmt,
+          };
+        });
+        if (aiRows.length === 0) {
+          aiError = "AI 沒有抽到任何料件";
+          aiRows = null;
+        }
+      } else if (json.demoMode) {
+        aiError = "尚未設定 ANTHROPIC_API_KEY · 回退到示範模式（檔名解析）";
       } else {
-        showToast(`✓ AI OCR 完成 · ${newQuoteNo}（${newSupplier}）已加入清單 — 下方所有分析已自動切換到此筆`);
+        aiError = json.error || "AI OCR 失敗";
       }
-    }, 900);
+    } catch (err) {
+      aiError = err instanceof Error ? err.message : String(err);
+    }
+
+    // --- 失敗時的回退（保留原本 demo 行為，免得使用者卡住）---
+    if (!aiRows) {
+      const base = file.name.replace(/\.[^.]+$/, "");
+      const cleaned = base
+        .replace(/^(?:螢幕擷取(?:畫面)?|螢幕截圖|截圖|截屏|Screen\s?Shot|Screenshot|IMG|Image|Photo|Scan)[\s_\-]*\d*[\s_\-]*[\d\-:.]*\s*/i, "")
+        .trim();
+      const knownSuppliers = /(企能|企龍|茂晟|重邑|鼎能|力豐|新竹\s?EFG|聯昌|建準|友達|台積|鴻海)/;
+      const supMatch = base.match(knownSuppliers) ?? cleaned.match(/[一-龥]{2,4}/);
+      const partMatch = base.match(/[A-Z][A-Z0-9]{3,}[-]?[A-Z0-9]*/);
+      const newSupplier = supMatch?.[0] || "未識別供應商（DEMO）";
+      const newPartNo = partMatch?.[0] ?? `OCR-${Date.now().toString().slice(-6)}`;
+      const newQuoteNo = `QTE-${yymmdd}-${Date.now().toString().slice(-3)}`;
+      const oldP = +(6 + Math.random() * 4).toFixed(2);
+      const hike = +(0.05 + Math.random() * 0.2).toFixed(3);
+      const newP = +(oldP * (1 + hike)).toFixed(2);
+      aiRows = [{
+        quoteNo: newQuoteNo,
+        supplier: newSupplier,
+        partNo: newPartNo,
+        oldPrice: oldP,
+        newPrice: newP,
+        reasonText: aiError ? `⚠ ${aiError}（示範資料）` : "示範資料",
+        uploadedAt: Date.now(),
+        previewUrl,
+        fileName: file.name,
+        fmt,
+      }];
+    }
+
+    const rowsToAdd = aiRows;
+    setUploadedRows((arr) => {
+      const next = [...arr, ...rowsToAdd];
+      setSelectedIdx(next.length - rowsToAdd.length);
+      return next;
+    });
+    if (opts?.closeIntakeOnSuccess) setShowIntake(false);
+
+    if (aiError) {
+      showToast(`⚠ ${aiError}`);
+    } else if (rowsToAdd.length > 1) {
+      showToast(`✓ Claude Vision 完成 · ${rowsToAdd[0].supplier} · 抽到 ${rowsToAdd.length} 個料件`);
+    } else {
+      showToast(`✓ Claude Vision 完成 · ${rowsToAdd[0].supplier} · ${rowsToAdd[0].partNo}`);
+    }
   };
   // 使用者上傳後直接「換掉」demo 種子，避免頁面殘留無關報價單
   const allRows: OcrRow[] = uploadedRows.length > 0 ? uploadedRows : OCR_ROWS;
@@ -3408,6 +3464,44 @@ function fmtOfFile(file: File): string {
   return "檔案";
 }
 
+function AiStatusBadge() {
+  const [status, setStatus] = useState<"loading" | "enabled" | "demo">("loading");
+  useEffect(() => {
+    fetch("/api/ai/quotation-ocr")
+      .then((r) => r.json())
+      .then((j) => setStatus(j.enabled ? "enabled" : "demo"))
+      .catch(() => setStatus("demo"));
+  }, []);
+
+  if (status === "loading") return null;
+
+  if (status === "enabled") {
+    return (
+      <div style={{
+        display: "inline-flex", alignItems: "center", gap: 8,
+        marginTop: 16, padding: "6px 14px", borderRadius: 99,
+        background: "rgba(118,185,0,.15)", border: `1px solid ${BR.green}`,
+        fontSize: 11, fontWeight: 700, color: BR.green, fontFamily: FONT_MONO,
+      }}>
+        <span style={{ width: 6, height: 6, borderRadius: 99, background: BR.green }} />
+        CLAUDE VISION · 真實 OCR 已啟用
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      display: "inline-flex", alignItems: "center", gap: 8,
+      marginTop: 16, padding: "6px 14px", borderRadius: 99,
+      background: "rgba(212,53,28,.15)", border: "1px solid #d4351c",
+      fontSize: 11, fontWeight: 700, color: "#ff8a7a", fontFamily: FONT_MONO,
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: 99, background: "#d4351c" }} />
+      DEMO 模式 · 尚未設定 ANTHROPIC_API_KEY
+    </div>
+  );
+}
+
 function IntakeModal({
   onSubmit, onClose,
 }: {
@@ -3513,9 +3607,10 @@ function IntakeModal({
             color: "#cdd6c2", fontSize: 14, marginTop: 14, lineHeight: 1.6,
             maxWidth: 640, marginLeft: "auto", marginRight: "auto",
           }}>
-            支援 PDF、Excel、CSV 與報價單照片。AI 自動拆解成本結構，
-            標出不合理漲幅與議價空間。<b style={{ color: "#fff" }}>檔案僅供本次分析使用，不對外揭露。</b>
+            支援 PDF、Excel、CSV 與報價單照片。Claude Vision 自動讀出廠商、料號、單價與手寫漲幅標註，
+            <b style={{ color: "#fff" }}>檔案僅供本次分析使用，不對外揭露。</b>
           </p>
+          <AiStatusBadge />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 22 }}>
