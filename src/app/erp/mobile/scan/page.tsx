@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef } from "react";
+import Link from "next/link";
 import { parts, suppliers, bom, models } from "@/lib/erp/seed";
 import { initialSlips } from "@/lib/erp/warehouse";
 
@@ -75,8 +76,32 @@ export default function MobileScanPage() {
         background: BR.greenInk, color: "#fff", padding: "12px 16px",
         position: "sticky", top: 0, zIndex: 50,
       }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {selectedCode ? (
+            <button
+              onClick={() => setSelectedCode(null)}
+              style={{
+                background: "rgba(255,255,255,0.12)", border: "none", color: "#fff",
+                padding: "8px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
+                fontFamily: "inherit",
+              }}
+            >
+              ← 返回搜尋
+            </button>
+          ) : (
+            <Link
+              href="/erp"
+              style={{
+                background: "rgba(255,255,255,0.12)", color: "#fff",
+                padding: "8px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                textDecoration: "none", display: "flex", alignItems: "center", gap: 4,
+              }}
+            >
+              ← 主選單
+            </Link>
+          )}
+          <div style={{ flex: 1 }}>
             <div style={{ fontSize: 10, opacity: 0.7, letterSpacing: "0.1em", fontFamily: "'Sora', sans-serif" }}>
               CHI HUA · WAREHOUSE
             </div>
@@ -84,7 +109,7 @@ export default function MobileScanPage() {
           </div>
           <div style={{
             fontSize: 9, background: BR.green, padding: "3px 8px", borderRadius: 99,
-            fontWeight: 700, letterSpacing: "0.06em",
+            fontWeight: 700, letterSpacing: "0.06em", whiteSpace: "nowrap",
           }}>
             {parts.length} 料件
           </div>
@@ -179,7 +204,22 @@ export default function MobileScanPage() {
         )}
 
         {/* Parts Card — 零件卡 */}
-        {selected && <PartCard code={selected.code} />}
+        {selected && (
+          <>
+            <PartCard code={selected.code} />
+            <button
+              onClick={() => setSelectedCode(null)}
+              style={{
+                width: "100%", marginTop: 12, padding: "14px",
+                background: "#fff", border: `1.5px solid ${BR.borderHi}`,
+                borderRadius: 12, fontSize: 14, fontWeight: 700, color: BR.greenInk,
+                cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              ← 返回搜尋其他料件
+            </button>
+          </>
+        )}
 
         {/* Empty State */}
         {!query && !selectedCode && (
