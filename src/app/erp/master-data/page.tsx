@@ -615,6 +615,23 @@ function ErpDirectConnectPanel() {
     | { kind: "fail"; error: string; hint?: string; step?: string; durationMs?: number }
   >({ kind: "idle" });
 
+  // 判斷這頁是不是從「能看到 ERP 內網」的伺服器載入的。
+  // 規則：localhost / 私有 IP 段 (10.* / 192.168.* / 172.16-31.*) → 可能能連
+  //       其他（chistrategy.com / Vercel / 任何公網域名）→ 一定 timeout
+  // 用 useEffect 在 mount 後判斷，避免 SSR / hydration mismatch
+  const [hostMode, setHostMode] = useState<"unknown" | "internal" | "external">("unknown");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const h = window.location.hostname;
+    const isInternal =
+      h === "localhost" ||
+      h === "127.0.0.1" ||
+      /^10\./.test(h) ||
+      /^192\.168\./.test(h) ||
+      /^172\.(1[6-9]|2[0-9]|3[01])\./.test(h);
+    setHostMode(isInternal ? "internal" : "external");
+  }, []);
+
   const onTest = async () => {
     setState({ kind: "testing" });
     try {
@@ -683,6 +700,25 @@ function ErpDirectConnectPanel() {
             <Field label="密碼" value={form.password} onChange={(v) => setForm({ ...form, password: v })} placeholder="" type="password" wide />
           </div>
 
+          {/* 部署位置警告 — 從公網按下去一定 timeout */}
+          {hostMode === "external" && (
+            <div className="rounded-[8px] p-2.5" style={{
+              background: BR.amberSoft, border: `1.5px solid ${BR.amber}`,
+              fontSize: 12, color: BR.amber, lineHeight: 1.55,
+            }}>
+              <div style={{ fontWeight: 700, marginBottom: 2 }}>
+                ⚠ 從目前這個網址按下去一定會 timeout
+              </div>
+              <div style={{ color: BR.ink, fontSize: 11.5 }}>
+                這頁載入自 <b style={{ fontFamily: FONT_MONO }}>
+                {typeof window !== "undefined" ? window.location.hostname : "外部網域"}
+                </b>（公網），看不到你公司內網的 <b style={{ fontFamily: FONT_MONO }}>192.168.16.201</b>。
+                <br />
+                要真的連通，需要把這個 app 部署到你公司內網（建議部署到 BI 主機），或在公司桌機跑 <b style={{ fontFamily: FONT_MONO }}>localhost:3000</b>。
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-3 flex-wrap">
             <button
               onClick={onTest}
@@ -696,10 +732,45 @@ function ErpDirectConnectPanel() {
             >
               {state.kind === "testing" ? "測試中…" : "▶ 測試連線"}
             </button>
+            {(!form.user || !form.password) && (
+              <span style={{ fontSize: 11, color: BR.red, fontFamily: FONT_MONO }}>
+                ← 帳號 + 密碼都填完才會亮起來
+              </span>
+            )}
+            <span className="flex-1" />
             <span style={{ fontSize: 11, color: BR.inkFaint, fontFamily: FONT_MONO }}>
               ⓘ 密碼僅用於這次測試 · 不儲存 · 不寫任何資料到 ERP
             </span>
           </div>
+
+          {/* 「怎麼看是不是連線成功」說明 */}
+          <details className="rounded-[8px]" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
+            <summary className="cursor-pointer px-3 py-2" style={{
+              fontFamily: FONT_MONO, fontSize: 11.5, color: BR.greenDeep, fontWeight: 700,
+            }}>
+              ❓ 我怎麼看是否已連線？
+            </summary>
+            <div className="px-3 pb-3" style={{ fontSize: 12, color: BR.inkSoft, lineHeight: 1.65 }}>
+              按下「測試連線」會 POST 給後端 API，後端用你輸入的帳密試著連 MSSQL。結果有三種：
+              <ul className="mt-2 space-y-1.5 pl-4" style={{ listStyle: "disc" }}>
+                <li>
+                  <b style={{ color: BR.green }}>✓ 綠色框：連線成功</b> — 會顯示 SQL Server 版本 + 三張核心表（INVMB / BOMMB / PURTH）筆數。代表帳號可以讀，可以進下一步（直連同步）。
+                </li>
+                <li>
+                  <b style={{ color: BR.red }}>✗ 紅色框：連線失敗</b> — 會顯示卡在哪步（connect / version / counts）+ 判讀提示。常見：
+                  <div className="mt-1 ml-2 grid gap-1" style={{ fontFamily: FONT_MONO, fontSize: 11 }}>
+                    <span><b>connect 步驟 timeout</b> → IP / 防火牆 / VPN 問題（最常見）</span>
+                    <span><b>connect 步驟 ECONNREFUSED</b> → MSSQL 沒開 TCP/IP（鼎新預設關閉，要 IT 開）</span>
+                    <span><b>connect 步驟 Login failed</b> → 帳密錯</span>
+                    <span><b>counts 步驟 Invalid object name</b> → 接到了但表不存在 / 帳號沒 SELECT 權限</span>
+                  </div>
+                </li>
+                <li>
+                  <b style={{ color: BR.inkFaint }}>都沒框出現</b> — 表示按鈕還灰著（帳密沒填完）或網路出問題（按下去 1 秒內沒反應）。
+                </li>
+              </ul>
+            </div>
+          </details>
 
           {/* 結果 */}
           {state.kind === "ok" && (
