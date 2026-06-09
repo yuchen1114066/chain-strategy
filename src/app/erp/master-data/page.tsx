@@ -165,6 +165,9 @@ export default function MasterDataPage() {
           showToast("✓ 已清空所有主檔");
         }} />
 
+        {/* 進階：直連 ERP 測試 */}
+        <ErpDirectConnectPanel />
+
         <footer className="flex items-center gap-4 pt-4" style={{
           fontFamily: FONT_MONO, fontSize: 10.5, color: BR.inkFaint,
         }}>
@@ -588,6 +591,197 @@ function PreviewPanel({
 }
 
 // ============================================================
+<<<<<<< HEAD
+// ERP 直連測試面板（進階 · 給 IT / 鼎新顧問用）
+//
+// 場景：CSV 上傳是日常用，但理想終態是把這個 web app 部署到客戶內網的
+// BI 主機，直接連 192.168.16.201 上的 eproerp 資料庫。
+// 這個面板給 IT / 鼎新顧問做 5 分鐘可達性驗證 — 不寫資料、只 SELECT 三個 COUNT。
+//
+// 預設值來自 ConductorC.INI（客戶端設定檔）解出的真實連線資訊。
+// ============================================================
+function ErpDirectConnectPanel() {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    server: "192.168.16.201",
+    port: "1433",
+    database: "eproerp",
+    user: "",
+    password: "",
+  });
+  const [state, setState] = useState<
+    | { kind: "idle" }
+    | { kind: "testing" }
+    | { kind: "ok"; versionShort: string; counts: { items: number; bomParents: number; purchases: number }; durationMs: number }
+    | { kind: "fail"; error: string; hint?: string; step?: string; durationMs?: number }
+  >({ kind: "idle" });
+
+  const onTest = async () => {
+    setState({ kind: "testing" });
+    try {
+      const res = await fetch("/api/erp/test-connection", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          port: form.port ? Number(form.port) : 1433,
+        }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setState({ kind: "ok", versionShort: json.versionShort, counts: json.counts, durationMs: json.durationMs });
+      } else {
+        setState({ kind: "fail", error: json.error ?? "未知錯誤", hint: json.hint, step: json.step, durationMs: json.durationMs });
+      }
+    } catch (err) {
+      setState({ kind: "fail", error: err instanceof Error ? err.message : "fetch 失敗", hint: "前端到自己伺服器的 fetch 都通不過 → 檢查網路 / Next.js 伺服器" });
+    }
+  };
+
+  return (
+    <div className="rounded-[14px]" style={{
+      background: BR.card, border: `1px solid ${BR.border}`, padding: "16px 20px",
+    }}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-3 w-full text-left"
+        style={{ background: "transparent", border: "none", cursor: "pointer" }}
+      >
+        <span style={{ fontSize: 22, lineHeight: 1 }}>{open ? "▾" : "▸"}</span>
+        <div className="flex-1">
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <span style={{ fontFamily: FONT_MONO, fontSize: 10.5, fontWeight: 700, color: BR.greenDeep, letterSpacing: "0.08em" }}>
+              進階 · ADVANCED
+            </span>
+            <h2 style={{ fontFamily: FONT_HEAD, fontSize: 17, fontWeight: 800, color: BR.ink, margin: 0 }}>
+              ERP 直連測試（給 IT / 鼎新顧問）
+            </h2>
+          </div>
+          <p style={{ fontSize: 12, color: BR.inkSoft, marginTop: 2, lineHeight: 1.5 }}>
+            如果這個 web app 部署在公司內網（例如 BI 主機），可以直接連到 ERP MSSQL，免去 CSV 匯出。
+            這頁只測「連線通不通」，不寫任何資料。
+          </p>
+        </div>
+      </button>
+
+      {open && (
+        <div className="mt-4 space-y-3">
+          {/* 預設值出處說明 */}
+          <div className="p-2.5 rounded-[6px]" style={{
+            background: BR.greenSoft, border: `1px solid ${BR.greenLine}`,
+            fontFamily: FONT_MONO, fontSize: 11, color: BR.greenInk, lineHeight: 1.55,
+          }}>
+            💡 預設值來自 <b>ConductorC.INI</b>（鼎新 client 設定檔）+ <b>BOR213 截圖</b>（DB 名稱）。
+            如果跟你公司 IT 實際配置不同，請改下方欄位再測試。
+          </div>
+
+          {/* 表單 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="MSSQL 主機 IP" value={form.server} onChange={(v) => setForm({ ...form, server: v })} placeholder="192.168.16.201" />
+            <Field label="Port" value={form.port} onChange={(v) => setForm({ ...form, port: v })} placeholder="1433" />
+            <Field label="資料庫名" value={form.database} onChange={(v) => setForm({ ...form, database: v })} placeholder="eproerp" />
+            <Field label="使用者帳號（建議唯讀帳號）" value={form.user} onChange={(v) => setForm({ ...form, user: v })} placeholder="chistrategy_readonly" />
+            <Field label="密碼" value={form.password} onChange={(v) => setForm({ ...form, password: v })} placeholder="" type="password" wide />
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={onTest}
+              disabled={state.kind === "testing" || !form.user || !form.password}
+              className="px-4 py-2 rounded-[8px] font-bold"
+              style={{
+                background: BR.green, color: "#fff", fontSize: 13,
+                opacity: (state.kind === "testing" || !form.user || !form.password) ? 0.4 : 1,
+                cursor: state.kind === "testing" ? "wait" : "pointer",
+              }}
+            >
+              {state.kind === "testing" ? "測試中…" : "▶ 測試連線"}
+            </button>
+            <span style={{ fontSize: 11, color: BR.inkFaint, fontFamily: FONT_MONO }}>
+              ⓘ 密碼僅用於這次測試 · 不儲存 · 不寫任何資料到 ERP
+            </span>
+          </div>
+
+          {/* 結果 */}
+          {state.kind === "ok" && (
+            <div className="rounded-[8px] p-3" style={{
+              background: BR.greenSoft, border: `1px solid ${BR.green}`,
+              fontSize: 12.5, color: BR.greenInk, lineHeight: 1.6,
+            }}>
+              <div style={{ fontWeight: 800, marginBottom: 4 }}>✓ 連線成功（{state.durationMs} ms）</div>
+              <div style={{ fontFamily: FONT_MONO, fontSize: 11 }}>{state.versionShort}</div>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <CountCell label="INVMB 料件" v={state.counts.items} />
+                <CountCell label="BOMMB BOM 母件" v={state.counts.bomParents} />
+                <CountCell label="PURTH 採購單頭" v={state.counts.purchases} />
+              </div>
+              <div className="mt-2" style={{ fontSize: 11.5 }}>
+                ✦ 三張核心表都查到了，路線 A（直連 DB）可走。下一步：把 CSV 上傳改成 DB 同步任務（PR-X 計劃中）。
+              </div>
+            </div>
+          )}
+
+          {state.kind === "fail" && (
+            <div className="rounded-[8px] p-3" style={{
+              background: BR.redSoft, border: `1px solid ${BR.red}`,
+              fontSize: 12.5, color: BR.red, lineHeight: 1.6,
+            }}>
+              <div style={{ fontWeight: 800, marginBottom: 4 }}>
+                ✗ 連線失敗{state.step ? `（卡在「${state.step}」步驟）` : ""}
+                {state.durationMs ? ` · ${state.durationMs} ms` : ""}
+              </div>
+              {state.hint && (
+                <div className="rounded-[6px] p-2 mt-1" style={{ background: "#fff", color: BR.ink, fontSize: 12 }}>
+                  💡 {state.hint}
+                </div>
+              )}
+              <div className="mt-2" style={{ fontFamily: FONT_MONO, fontSize: 10.5, color: BR.inkSoft, wordBreak: "break-all" }}>
+                {state.error}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, placeholder, type = "text", wide = false }: {
+  label: string; value: string; onChange: (v: string) => void;
+  placeholder?: string; type?: string; wide?: boolean;
+}) {
+  return (
+    <label className={wide ? "block md:col-span-2" : "block"}>
+      <div style={{ fontSize: 11, color: BR.inkSoft, marginBottom: 4, fontFamily: FONT_MONO }}>{label}</div>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-[6px] px-2 py-1.5"
+        style={{
+          fontFamily: FONT_MONO, fontSize: 12,
+          border: `1px solid ${BR.border}`, background: "#fff", color: BR.ink,
+        }}
+      />
+    </label>
+  );
+}
+
+function CountCell({ label, v }: { label: string; v: number }) {
+  return (
+    <div className="rounded-[6px] p-2" style={{ background: "#fff", border: `1px solid ${BR.greenLine}` }}>
+      <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint }}>{label}</div>
+      <div style={{ fontFamily: FONT_MONO, fontSize: 18, fontWeight: 700, color: BR.greenDeep }}>
+        {v.toLocaleString()}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+=======
+>>>>>>> origin/main
 // 清空全部（含確認）
 // ============================================================
 function DangerZone({ onClear }: { onClear: () => void }) {
