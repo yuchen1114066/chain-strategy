@@ -3765,7 +3765,12 @@ function UploadedRowAnalysisPlaceholder({ selected }: { selected: OcrRow }) {
       <div className="mt-3 p-3 rounded-[8px]" style={{ background: BR.greenSoft, border: `1px solid ${BR.greenLine}`, fontSize: 12, color: BR.greenInk, lineHeight: 1.6 }}>
         💡 <b>目前可用功能</b>：
         STEP 1 報價 OCR · 多廠商批次上傳 · 自動歷史歸檔 · 年度評鑑分數 · CSV 匯出 · 原始檔儲存（IndexedDB）。
-        想要完整 STEP 2~5 真實分析請聯絡開發團隊安排 ERP 串接（料件主檔 / 採購歷史 / 核可供應商清單）。
+      </div>
+      <div className="mt-2 p-3 rounded-[8px] flex items-center gap-3 flex-wrap" style={{ background: "#fff", border: `2px solid ${BR.green}`, fontSize: 13, color: BR.ink, lineHeight: 1.6 }}>
+        <span>✨ <b>想啟用 STEP 2-5 真實分析？</b>從鼎新匯出料件/BOM/採購歷史 3 張 Excel 上傳即可（不用 IT 介入）</span>
+        <Link href="/erp/master-data" className="px-3 py-1.5 rounded-[6px] font-bold" style={{ background: BR.green, color: "#fff", fontSize: 12 }}>
+          → 上傳 ERP 主檔
+        </Link>
       </div>
     </div>
   );
