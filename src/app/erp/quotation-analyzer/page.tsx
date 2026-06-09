@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { saveQuotationFile, getQuotationFile, deleteQuotationFile } from "@/lib/quotation-file-store";
 
 // ============================================================
 // L3 PROCUREMENT · AI Quotation Analyzer
@@ -217,19 +218,40 @@ export default function QuotationAnalyzerPage() {
   // 廠商報價歷史資料夾 — 是否展開
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  // 載入 / 持久化歷史報價資料（localStorage · 年底評鑑與大數據備查）
+  // 載入歷史報價（localStorage 存 metadata；IndexedDB 存原始檔 blob）
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("chain-strategy:quotation-history");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) setHistoryRows(parsed);
-      }
-    } catch {}
+    (async () => {
+      try {
+        const stored = localStorage.getItem("chain-strategy:quotation-history");
+        if (!stored) return;
+        const parsed: OcrRow[] = JSON.parse(stored);
+        if (!Array.isArray(parsed)) return;
+
+        // 從 IndexedDB 還原原始檔，產生新的 blob URL 掛回去
+        const uniqueKeys = Array.from(
+          new Set(parsed.map((r) => r.uploadedAt).filter((x): x is number => x != null)),
+        );
+        const blobEntries = await Promise.all(
+          uniqueKeys.map(async (key) => {
+            const blob = await getQuotationFile(key);
+            return blob ? ([key, URL.createObjectURL(blob)] as const) : null;
+          }),
+        );
+        const urlMap = new Map(blobEntries.filter((x): x is readonly [number, string] => x !== null));
+
+        setHistoryRows(
+          parsed.map((r) =>
+            r.uploadedAt != null && urlMap.has(r.uploadedAt)
+              ? { ...r, previewUrl: urlMap.get(r.uploadedAt) }
+              : r,
+          ),
+        );
+      } catch {}
+    })();
   }, []);
   useEffect(() => {
     try {
-      // 不存 previewUrl（blob URL 重整就失效）
+      // localStorage 不存 previewUrl（blob URL 是 session 級別）
       const serializable = historyRows.map(({ previewUrl: _drop, ...rest }) => rest);
       localStorage.setItem("chain-strategy:quotation-history", JSON.stringify(serializable));
     } catch {}
@@ -264,10 +286,13 @@ export default function QuotationAnalyzerPage() {
         const supplier = cleanAiStr(d.supplier) ?? "未識別供應商";
         const baseQuoteNo = cleanAiStr(d.quoteNo) ?? `QTE-${yymmdd}-${Date.now().toString().slice(-3)}`;
         const quoteDate = cleanAiStr(d.quoteDate) ?? undefined;
-        const currency = cleanAiStr(d.currency) ?? undefined;
+        // 沒寫幣別 → 預設台幣（多數本地供應商不會特別標 NTD/TWD）
+        const currency = cleanAiStr(d.currency) ?? "TWD";
         const leadTime = cleanAiStr(d.leadTimeText);
         const payTerms = cleanAiStr(d.paymentTerms);
 
+        // 同一份檔案的所有 line 共用一個 timestamp = IndexedDB 的 key
+        const fileTimestamp = Date.now();
         aiRows = (d.lines ?? []).map((line, idx) => {
           const partNoStr = cleanAiStr(line.partNo);
           const descStr = cleanAiStr(line.description);
@@ -291,8 +316,8 @@ export default function QuotationAnalyzerPage() {
               leadTime ? `L/T ${leadTime}` : null,
               payTerms,
             ].filter(Boolean).join(" · ") || "Gemini 抽取",
-            uploadedAt: Date.now() + idx,
-            previewUrl: idx === 0 ? previewUrl : undefined,
+            uploadedAt: fileTimestamp,
+            previewUrl,
             fileName: file.name,
             fmt,
             firstQuote,
@@ -305,6 +330,8 @@ export default function QuotationAnalyzerPage() {
             markupPercent: markup ?? undefined,
           } satisfies OcrRow;
         });
+        // 把原始檔存進 IndexedDB（用 fileTimestamp 當 key），重整後也能調出原圖
+        void saveQuotationFile(fileTimestamp, file);
         if (aiRows.length === 0) {
           aiError = "AI 沒有抽到任何料件";
           aiRows = null;
@@ -824,9 +851,13 @@ export default function QuotationAnalyzerPage() {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      if (confirm(`確定要清空歷史資料夾的 ${historyRows.length} 張歷史報價嗎？（不影響目前查詢中的 ${uploadedRows.length} 張）`)) {
+                                      if (confirm(`確定要清空歷史資料夾的 ${historyRows.length} 張歷史報價嗎？（不影響目前查詢中的 ${uploadedRows.length} 張；原始檔也一併刪除）`)) {
+                                        // 保留 uploadedRows（in-progress）的 IDB 檔案
+                                        const keepKeys = new Set(uploadedRows.map((r) => r.uploadedAt).filter((x): x is number => x != null));
+                                        const toDeleteKeys = Array.from(new Set(historyRows.map((r) => r.uploadedAt).filter((x): x is number => x != null && !keepKeys.has(x))));
+                                        Promise.all(toDeleteKeys.map((k) => deleteQuotationFile(k))).catch(() => {});
                                         setHistoryRows([]);
-                                        showToast("✓ 已清空歷史報價資料夾");
+                                        showToast(`✓ 已清空歷史報價資料夾 · 同步刪除 ${toDeleteKeys.length} 份原始檔`);
                                       }
                                     }}
                                     style={{
