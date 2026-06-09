@@ -1117,6 +1117,15 @@ export default function QuotationAnalyzerPage() {
           </div>
         </Card>
 
+        {/* STEP 2-5 + ENHANCE + L0 Board Card 都用寫死的 demo profile 推導。
+            上傳的真實報價單沒有 ERP 主檔可比 → 顯示誠實的「需 ERP 整合」提示，
+            避免「鼎能精密」這類寫死字串誤導 CEO。
+            Demo 種子（OCR_ROWS）uploadedAt 都是 undefined → 走原本展示路徑。 */}
+        {SELECTED.uploadedAt ? (
+          <UploadedRowAnalysisPlaceholder selected={SELECTED} />
+        ) : (
+        <>
+
         {/* Step 2 · 找料號 → BOM / CBS / Commodity Mapping */}
         <div data-step="2">
           <StepHeader badge="STEP 2" title="AI 自動尋找料號" en="Auto-match to ERP · BOM / CBS / Commodity Mapping" desc="從 ERP 找到該料號，拉出 BOM 結構與商品 mapping" />
@@ -1581,6 +1590,9 @@ export default function QuotationAnalyzerPage() {
             ))}
           </div>
         </Card>
+
+        </>
+        )}
 
         <footer className="flex items-center gap-5 flex-wrap pt-4" style={{
           fontFamily: FONT_MONO, fontSize: 10.5, color: BR.inkFaint,
@@ -3693,6 +3705,70 @@ function fmtOfFile(file: File): string {
   if (["xlsx", "xls", "csv"].includes(ext)) return "Excel";
   if (["jpg", "jpeg", "png", "gif", "webp", "heic"].includes(ext)) return "JPG";
   return "檔案";
+}
+
+// 上傳的真實報價單只有 STEP 1 OCR 是真資料；
+// STEP 2~5 和 L0 Board Card 都需要 ERP 主檔（料件 / BOM / 替代廠商 / 年用量）才能算。
+// 沒接 ERP 時誠實顯示這個 placeholder，避免「鼎能精密」這類 demo 字串誤導 CEO。
+function UploadedRowAnalysisPlaceholder({ selected }: { selected: OcrRow }) {
+  const items: Array<{ step: string; what: string; needs: string }> = [
+    { step: "STEP 2", what: "BOM 比對 / 料號自動 mapping", needs: "ERP 料件主檔 + BOM 結構表" },
+    { step: "STEP 3", what: "市場原物料波動抓取", needs: "LME / 指數訂閱 + 料件 → 商品 mapping" },
+    { step: "STEP 4", what: "Should-Cost 合理上限推導", needs: "BOM × 商品波動 + 工資 / 製費權重" },
+    { step: "ENHANCE 1", what: "供應商歷年漲價曲線", needs: "ERP 採購單歷史（近 3-6 年）" },
+    { step: "ENHANCE 2", what: "替代供應商推薦", needs: "核可供應商主檔 + 風險評分 + 報價歷史" },
+    { step: "ENHANCE 3", what: "AI 議價信稿草擬", needs: "STEP 4 結果（要先有 Should-Cost）" },
+    { step: "OUTPUT", what: "L0 董事長一頁決策卡 + Annual Impact", needs: "上述全部 + 年使用量 / 毛利率" },
+  ];
+  return (
+    <div className="rounded-[14px] p-5" style={{
+      background: "#fbfcfa", border: `2px dashed ${BR.amber}`,
+    }}>
+      <div className="flex items-baseline gap-3 mb-2 flex-wrap">
+        <span style={{
+          fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700,
+          color: "#fff", background: BR.amber,
+          padding: "3px 10px", borderRadius: 4, letterSpacing: "0.08em",
+        }}>
+          ⚠ STEP 2~5 需 ERP 整合
+        </span>
+        <h3 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 800, color: BR.ink, margin: 0 }}>
+          STEP 1 OCR 已完成 · 後續分析需連接 ERP 主檔
+        </h3>
+      </div>
+      <p style={{ fontSize: 13, color: BR.inkSoft, lineHeight: 1.65, marginBottom: 14 }}>
+        您上傳的 <b style={{ color: BR.ink }}>{selected.supplier} · {selected.partNo}</b> 報價單，
+        AI 已把廠商、料號、單價、手寫漲幅等資料正確抽出（請看上方 🔍 AI 抽取對照面板驗證）。
+        但要產生<b style={{ color: BR.ink }}>「合理性判定 / 替代供應商推薦 / 年化毛利衝擊 / 議價信稿」</b>等下游分析，
+        必須先連接您公司的 ERP 拿到真實的料件主檔、BOM 結構、供應商清單、採購歷史 — 才不會給出寫死的示範資料誤導決策。
+      </p>
+      <div className="rounded-[10px] overflow-hidden" style={{ border: `1px solid ${BR.border}` }}>
+        <div className="grid grid-cols-[110px_1fr_1.4fr] text-xs" style={{
+          background: BR.greenInk, color: "#fff",
+          fontFamily: FONT_MONO, fontWeight: 700, letterSpacing: "0.06em",
+        }}>
+          <div className="p-2">階段</div>
+          <div className="p-2">會產出什麼</div>
+          <div className="p-2">需要的 ERP 資料</div>
+        </div>
+        {items.map((row, i) => (
+          <div key={row.step} className="grid grid-cols-[110px_1fr_1.4fr] text-xs" style={{
+            background: i % 2 === 0 ? "#fff" : "#fbfcfa",
+            borderTop: `1px solid ${BR.border}`,
+          }}>
+            <div className="p-2" style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.greenDeep }}>{row.step}</div>
+            <div className="p-2" style={{ color: BR.ink }}>{row.what}</div>
+            <div className="p-2" style={{ color: BR.inkSoft }}>{row.needs}</div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 p-3 rounded-[8px]" style={{ background: BR.greenSoft, border: `1px solid ${BR.greenLine}`, fontSize: 12, color: BR.greenInk, lineHeight: 1.6 }}>
+        💡 <b>目前可用功能</b>：
+        STEP 1 報價 OCR · 多廠商批次上傳 · 自動歷史歸檔 · 年度評鑑分數 · CSV 匯出 · 原始檔儲存（IndexedDB）。
+        想要完整 STEP 2~5 真實分析請聯絡開發團隊安排 ERP 串接（料件主檔 / 採購歷史 / 核可供應商清單）。
+      </div>
+    </div>
+  );
 }
 
 function AiStatusBadge() {
