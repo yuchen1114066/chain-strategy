@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { saveQuotationFile, getQuotationFile, deleteQuotationFile } from "@/lib/quotation-file-store";
+import { findItemByPartNo, findBomByParent, findPurchasesByPart } from "@/lib/erp/master-data-store";
 
 // ============================================================
 // L3 PROCUREMENT · AI Quotation Analyzer
@@ -1125,7 +1126,7 @@ export default function QuotationAnalyzerPage() {
             避免「鼎能精密」這類寫死字串誤導 CEO。
             Demo 種子（OCR_ROWS）uploadedAt 都是 undefined → 走原本展示路徑。 */}
         {SELECTED.uploadedAt ? (
-          <UploadedRowAnalysisPlaceholder selected={SELECTED} />
+          <UploadedRowAnalysis selected={SELECTED} />
         ) : (
         <>
 
@@ -3868,7 +3869,384 @@ function fmtOfFile(file: File): string {
 // 上傳的真實報價單只有 STEP 1 OCR 是真資料；
 // STEP 2~5 和 L0 Board Card 都需要 ERP 主檔（料件 / BOM / 替代廠商 / 年用量）才能算。
 // 沒接 ERP 時誠實顯示這個 placeholder，避免「鼎能精密」這類 demo 字串誤導 CEO。
-function UploadedRowAnalysisPlaceholder({ selected }: { selected: OcrRow }) {
+// ============================================================
+// 上傳列的真實分析 — PR-3B
+//
+// 流程：
+//   1. 收到上傳的 OcrRow（含 partNo）
+//   2. 去 IndexedDB（master-data-store）查料件主檔
+//   3. 沒查到 → fallback 到舊版 placeholder（誠實顯示缺資料）
+//   4. 查到 → 拉 BOM children + 採購歷史，跑出真實 STEP 2-3
+//
+// 為什麼這層拆出來？
+//   舊 placeholder 只能說「需要 ERP 整合」— 那是 PR-1 前的狀態。
+//   PR-1 上傳後，這台瀏覽器已經有真實的 698 筆料件 / 610 筆 BOM /
+//   20693 筆採購紀錄，每次選列就該真的查、真的算。
+// ============================================================
+function UploadedRowAnalysis({ selected }: { selected: OcrRow }) {
+  type LoadState =
+    | { kind: "loading" }
+    | { kind: "no-match" }
+    | { kind: "matched"; item: MasterItem; bom: MasterBom[]; purchases: MasterPurchase[]; childItems: Map<string, MasterItem> };
+
+  const [state, setState] = useState<LoadState>({ kind: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    setState({ kind: "loading" });
+    (async () => {
+      const item = await findItemByPartNo(selected.partNo);
+      if (cancelled) return;
+      if (!item) {
+        setState({ kind: "no-match" });
+        return;
+      }
+      const [bom, purchases] = await Promise.all([
+        findBomByParent(selected.partNo),
+        findPurchasesByPart(selected.partNo),
+      ]);
+      if (cancelled) return;
+
+      // 一次撈所有子料的品名（避免逐筆 N+1 查詢）
+      const childItems = new Map<string, MasterItem>();
+      const uniqueChildren = Array.from(new Set(bom.map((b) => b.childPartNo)));
+      const childResults = await Promise.all(uniqueChildren.map((p) => findItemByPartNo(p)));
+      uniqueChildren.forEach((p, i) => {
+        const it = childResults[i];
+        if (it) childItems.set(p, it);
+      });
+      if (cancelled) return;
+
+      setState({ kind: "matched", item, bom, purchases, childItems });
+    })();
+    return () => { cancelled = true; };
+  }, [selected.partNo]);
+
+  if (state.kind === "loading") {
+    return (
+      <div className="rounded-[14px] p-5 text-center" style={{
+        background: "#fbfcfa", border: `2px dashed ${BR.border}`,
+        fontFamily: FONT_MONO, fontSize: 12, color: BR.inkSoft,
+      }}>
+        從 ERP 主檔查 {selected.partNo} ...
+      </div>
+    );
+  }
+
+  if (state.kind === "no-match") {
+    return <UploadedRowAnalysisPlaceholder selected={selected} noMatchInErp />;
+  }
+
+  return <RealErpAnalysis selected={selected} item={state.item} bom={state.bom} purchases={state.purchases} childItems={state.childItems} />;
+}
+
+// 命名衝突避免：master-data-store 的 type 別名
+type MasterItem = import("@/lib/erp/master-data-store").ItemMaster;
+type MasterBom = import("@/lib/erp/master-data-store").BomEntry;
+type MasterPurchase = import("@/lib/erp/master-data-store").PurchaseRecord;
+
+function RealErpAnalysis({
+  selected, item, bom, purchases, childItems,
+}: {
+  selected: OcrRow; item: MasterItem; bom: MasterBom[];
+  purchases: MasterPurchase[]; childItems: Map<string, MasterItem>;
+}) {
+  // 採購歷史分析 — 同料號近一年 / 全部
+  const now = Date.now();
+  const oneYearAgo = now - 365 * 24 * 60 * 60 * 1000;
+  const recentPurchases = purchases.filter((p) => {
+    if (!p.date) return false;
+    const t = new Date(p.date).getTime();
+    return Number.isFinite(t) && t >= oneYearAgo;
+  });
+  const allPrices = purchases.map((p) => p.unitPrice).filter((p) => p > 0);
+  const recentPrices = recentPurchases.map((p) => p.unitPrice).filter((p) => p > 0);
+
+  const histAvg = recentPrices.length > 0
+    ? recentPrices.reduce((s, p) => s + p, 0) / recentPrices.length
+    : (allPrices.length > 0 ? allPrices.reduce((s, p) => s + p, 0) / allPrices.length : 0);
+  const histMin = allPrices.length > 0 ? Math.min(...allPrices) : 0;
+  const histMax = allPrices.length > 0 ? Math.max(...allPrices) : 0;
+
+  // 供應商分布（這個料號歷年買過誰）
+  const supplierStats = new Map<string, { count: number; latestPrice: number; latestDate: string; avgPrice: number }>();
+  for (const p of purchases) {
+    const s = supplierStats.get(p.supplier) ?? { count: 0, latestPrice: 0, latestDate: "", avgPrice: 0 };
+    s.count += 1;
+    if (!s.latestDate || p.date > s.latestDate) {
+      s.latestDate = p.date;
+      s.latestPrice = p.unitPrice;
+    }
+    s.avgPrice = ((s.avgPrice * (s.count - 1)) + p.unitPrice) / s.count;
+    supplierStats.set(p.supplier, s);
+  }
+  const topSuppliers = Array.from(supplierStats.entries())
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 5);
+
+  // 議價空間 — 新報價 vs 歷史均價
+  const newPrice = selected.newPrice;
+  const vsAvgPct = histAvg > 0 ? ((newPrice - histAvg) / histAvg) * 100 : 0;
+  const vsMinPct = histMin > 0 ? ((newPrice - histMin) / histMin) * 100 : 0;
+
+  // 漲價判定 → tone
+  const verdict = (() => {
+    if (purchases.length === 0) return { tone: BR.inkFaint, label: "首次採購", note: "ERP 沒有歷史紀錄 — 此為新料號" };
+    if (vsAvgPct > 15) return { tone: BR.red, label: "嚴重高於歷史均價", note: `新報價比近 12 月均價高 ${vsAvgPct.toFixed(1)}% — 強烈建議議價或換廠` };
+    if (vsAvgPct > 5) return { tone: BR.amber, label: "高於歷史均價", note: `新報價比均價高 ${vsAvgPct.toFixed(1)}% — 可議價 ${(vsAvgPct - 2).toFixed(0)}% 拉回合理範圍` };
+    if (vsAvgPct < -5) return { tone: BR.green, label: "低於歷史均價", note: `新報價比均價低 ${Math.abs(vsAvgPct).toFixed(1)}% — 接受` };
+    return { tone: BR.greenDeep, label: "與歷史均價接近", note: "在歷史正常區間內，可接受" };
+  })();
+
+  return (
+    <>
+      {/* STEP 2 · 真實 BOM + 料件主檔 */}
+      <div data-step="2">
+        <StepHeader
+          badge="STEP 2"
+          title="ERP 主檔比對"
+          en="Real ERP item + BOM lookup"
+          desc="從你上傳的 698 筆料件 / 610 筆 BOM 查到此料號"
+        />
+      </div>
+      <Card>
+        <div className="grid lg:grid-cols-[300px,1fr] gap-5">
+          {/* 左欄：料件主檔資訊 */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span style={{
+                fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700,
+                color: "#fff", background: BR.green,
+                padding: "2px 8px", borderRadius: 4, letterSpacing: "0.06em",
+              }}>
+                ✦ ERP 真實資料
+              </span>
+            </div>
+            <div className="rounded-[10px] p-3 mb-3" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
+              <div style={{ fontSize: 10, color: BR.inkFaint }}>料號</div>
+              <div style={{ fontFamily: FONT_MONO, fontSize: 18, fontWeight: 800, color: BR.greenDeep, wordBreak: "break-all" }}>
+                {item.partNo}
+              </div>
+              <div style={{ fontSize: 13, color: BR.ink, marginTop: 4, fontWeight: 600 }}>
+                {item.name || "（無品名）"}
+              </div>
+              {item.spec && (
+                <div style={{ fontSize: 11, color: BR.inkSoft, marginTop: 2 }}>
+                  {item.spec}
+                </div>
+              )}
+              <div className="mt-2 grid grid-cols-2 gap-2" style={{ fontSize: 11 }}>
+                <div>
+                  <span style={{ color: BR.inkFaint }}>分類：</span>
+                  <span style={{ color: BR.ink }}>{item.category || "—"}</span>
+                </div>
+                <div>
+                  <span style={{ color: BR.inkFaint }}>單位：</span>
+                  <span style={{ color: BR.ink }}>{item.unit || "—"}</span>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-[10px] p-3" style={{ background: BR.greenSoft, border: `1px solid ${BR.greenLine}`, fontSize: 11, color: BR.greenInk, lineHeight: 1.55 }}>
+              <div style={{ fontFamily: FONT_MONO, fontWeight: 700, fontSize: 10, marginBottom: 3 }}>BOM 查詢</div>
+              <div>
+                找到 <b>{bom.length}</b> 個子料{" "}
+                {bom.length > 0 && <>· 階層深度 {Math.max(...bom.map((b) => b.level ?? 1))}</>}
+              </div>
+              <div className="mt-1.5">
+                <span style={{ fontFamily: FONT_MONO, fontWeight: 700, fontSize: 10 }}>採購歷史</span>
+                <div>
+                  共 <b>{purchases.length}</b> 筆 · 近 12 月 <b>{recentPurchases.length}</b> 筆
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 右欄：BOM children */}
+          <div>
+            <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 8 }}>
+              {item.partNo} 的子料結構（依用量遞減 · 取前 12 個）
+            </div>
+            {bom.length === 0 ? (
+              <div className="rounded-[10px] p-4 text-center" style={{ background: "#fbfcfa", border: `1px dashed ${BR.borderHi}`, fontSize: 12, color: BR.inkSoft }}>
+                ERP 沒有此料號的 BOM 結構（可能是外購完成品 / 標準件）
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {bom.slice().sort((a, b) => b.qty - a.qty).slice(0, 12).map((b, i) => {
+                  const child = childItems.get(b.childPartNo);
+                  return (
+                    <div key={i} className="grid grid-cols-[110px_1fr_80px_44px] gap-2 items-center rounded-[8px] px-3 py-2" style={{
+                      background: "#fff", border: `1px solid ${BR.border}`,
+                    }}>
+                      <span style={{ fontFamily: FONT_MONO, fontSize: 11.5, fontWeight: 700, color: BR.greenDeep }}>
+                        {b.childPartNo}
+                      </span>
+                      <div style={{ fontSize: 11.5, color: BR.ink, lineHeight: 1.3 }}>
+                        {child?.name || <span style={{ color: BR.inkFaint }}>—</span>}
+                        {child?.spec && (
+                          <span style={{ color: BR.inkSoft, fontSize: 10.5, marginLeft: 4 }}>· {child.spec}</span>
+                        )}
+                      </div>
+                      <span style={{ fontFamily: FONT_MONO, fontSize: 11.5, fontWeight: 700, color: BR.ink, textAlign: "right" }}>
+                        {b.qty.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                      </span>
+                      <span style={{ fontSize: 10.5, color: BR.inkFaint, textAlign: "right" }}>
+                        {b.unit || child?.unit || "—"}
+                      </span>
+                    </div>
+                  );
+                })}
+                {bom.length > 12 && (
+                  <div className="text-center" style={{ fontSize: 11, color: BR.inkFaint, fontFamily: FONT_MONO, paddingTop: 4 }}>
+                    ⋯ 還有 {bom.length - 12} 個子料未顯示
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      {/* STEP 3 · 真實採購歷史 */}
+      <div data-step="3">
+        <StepHeader
+          badge="STEP 3"
+          title="採購歷史 + 議價空間"
+          en="Real purchase history · negotiation room"
+          desc="從你上傳的 20,693 筆採購紀錄推導合理價"
+          tone={verdict.tone}
+        />
+      </div>
+      <Card>
+        {purchases.length === 0 ? (
+          <div className="rounded-[10px] p-5 text-center" style={{ background: "#fbfcfa", border: `1px dashed ${BR.borderHi}`, fontSize: 13, color: BR.inkSoft }}>
+            ERP 沒有此料號的採購紀錄 — 可能是新料或近年未採購
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* AI 判定 */}
+            <div className="rounded-[10px] p-3.5" style={{
+              background: verdict.tone === BR.red ? BR.redSoft : verdict.tone === BR.amber ? BR.amberSoft : BR.greenSoft,
+              border: `1.5px solid ${verdict.tone}`,
+            }}>
+              <div className="flex items-baseline gap-3 flex-wrap mb-1">
+                <span style={{
+                  fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700,
+                  color: "#fff", background: verdict.tone,
+                  padding: "3px 8px", borderRadius: 4, letterSpacing: "0.06em",
+                }}>
+                  AI 判定
+                </span>
+                <span style={{ fontFamily: FONT_HEAD, fontSize: 16, fontWeight: 800, color: verdict.tone }}>
+                  {verdict.label}
+                </span>
+                <span className="flex-1" />
+                <span style={{ fontFamily: FONT_MONO, fontSize: 12, color: BR.ink }}>
+                  新報價 <b style={{ color: verdict.tone, fontSize: 15 }}>{newPrice.toFixed(2)}</b>
+                </span>
+              </div>
+              <div style={{ fontSize: 12.5, color: BR.ink, lineHeight: 1.55 }}>
+                {verdict.note}
+              </div>
+            </div>
+
+            {/* 統計卡 */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <StatBox label="近 12 月均價" value={histAvg > 0 ? histAvg.toFixed(2) : "—"} sub={`${recentPurchases.length} 筆`} tone={BR.greenDeep} />
+              <StatBox label="歷史最低" value={histMin > 0 ? histMin.toFixed(2) : "—"} sub={vsMinPct > 0 ? `+${vsMinPct.toFixed(1)}% vs 新報價` : "—"} tone={BR.green} />
+              <StatBox label="歷史最高" value={histMax > 0 ? histMax.toFixed(2) : "—"} sub="—" tone={BR.amber} />
+              <StatBox label="vs 均價" value={vsAvgPct > 0 ? `+${vsAvgPct.toFixed(1)}%` : `${vsAvgPct.toFixed(1)}%`} sub="新報價對歷史" tone={verdict.tone} />
+            </div>
+
+            {/* 供應商分布 */}
+            {topSuppliers.length > 1 && (
+              <div className="rounded-[10px] overflow-hidden" style={{ border: `1px solid ${BR.border}` }}>
+                <div style={{
+                  background: BR.greenInk, color: "#fff",
+                  padding: "6px 12px", fontFamily: FONT_MONO,
+                  fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em",
+                }}>
+                  ※ 此料號的歷年供應商 · 替代候選清單
+                </div>
+                <div>
+                  {topSuppliers.map((s, i) => {
+                    const [name, stats] = s;
+                    const cmp = stats.latestPrice > 0 ? ((stats.latestPrice - newPrice) / newPrice) * 100 : 0;
+                    const isBetter = cmp < -2;
+                    return (
+                      <div key={name} className="grid grid-cols-[40px_1.5fr_1fr_1fr_1fr_100px] items-center gap-2 px-3 py-2" style={{
+                        borderTop: i === 0 ? "none" : `1px solid ${BR.border}`,
+                        background: name === selected.supplier ? "#fffaf0" : "#fff",
+                      }}>
+                        <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: BR.inkFaint }}>
+                          #{i + 1}
+                        </span>
+                        <span style={{ fontSize: 12.5, color: BR.ink, fontWeight: name === selected.supplier ? 700 : 500 }}>
+                          {name}{name === selected.supplier && <span style={{ color: BR.amber, marginLeft: 4 }}>· 本次報價廠</span>}
+                        </span>
+                        <span style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: BR.inkSoft }}>
+                          {stats.count} 次採購
+                        </span>
+                        <span style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: BR.ink }}>
+                          均價 {stats.avgPrice.toFixed(2)}
+                        </span>
+                        <span style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: BR.ink }}>
+                          上次 {stats.latestPrice.toFixed(2)}
+                          <span style={{ color: BR.inkFaint, fontSize: 10, marginLeft: 3 }}>({stats.latestDate.slice(0, 10) || "—"})</span>
+                        </span>
+                        <span style={{
+                          fontFamily: FONT_MONO, fontSize: 11.5, fontWeight: 700, textAlign: "right",
+                          color: isBetter ? BR.green : cmp > 5 ? BR.red : BR.inkSoft,
+                        }}>
+                          {stats.latestPrice > 0
+                            ? (cmp > 0 ? `+${cmp.toFixed(1)}%` : `${cmp.toFixed(1)}%`)
+                            : "—"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="text-right" style={{
+              fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint,
+            }}>
+              資料來源：你本機 IndexedDB · PR-1 上傳之採購歷史
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* STEP 4-5 還沒接 — 維持透明 placeholder */}
+      <div className="rounded-[12px] p-3 flex items-center gap-3 flex-wrap" style={{
+        background: "#fbfcfa", border: `1px dashed ${BR.border}`,
+        fontSize: 12, color: BR.inkSoft, lineHeight: 1.5,
+      }}>
+        <span style={{ fontFamily: FONT_MONO, fontSize: 10.5, color: BR.inkFaint, letterSpacing: "0.06em" }}>
+          STEP 4-5 預留：
+        </span>
+        <span>
+          Should-Cost 推導（BOM × LME / 指數）· 議價信稿草擬 · L0 一頁決策卡 — 規劃中
+        </span>
+      </div>
+    </>
+  );
+}
+
+function StatBox({ label, value, sub, tone }: { label: string; value: string; sub: string; tone: string }) {
+  return (
+    <div className="rounded-[8px] p-2.5" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
+      <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint, letterSpacing: "0.04em" }}>{label}</div>
+      <div style={{ fontFamily: FONT_MONO, fontSize: 17, fontWeight: 700, color: tone, marginTop: 2, lineHeight: 1.1 }}>
+        {value}
+      </div>
+      <div style={{ fontSize: 10.5, color: BR.inkFaint, marginTop: 2 }}>{sub}</div>
+    </div>
+  );
+}
+
+function UploadedRowAnalysisPlaceholder({ selected, noMatchInErp }: { selected: OcrRow; noMatchInErp?: boolean }) {
   const items: Array<{ step: string; what: string; needs: string }> = [
     { step: "STEP 2", what: "BOM 比對 / 料號自動 mapping", needs: "ERP 料件主檔 + BOM 結構表" },
     { step: "STEP 3", what: "市場原物料波動抓取", needs: "LME / 指數訂閱 + 料件 → 商品 mapping" },
@@ -3885,20 +4263,34 @@ function UploadedRowAnalysisPlaceholder({ selected }: { selected: OcrRow }) {
       <div className="flex items-baseline gap-3 mb-2 flex-wrap">
         <span style={{
           fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700,
-          color: "#fff", background: BR.amber,
+          color: "#fff", background: noMatchInErp ? BR.red : BR.amber,
           padding: "3px 10px", borderRadius: 4, letterSpacing: "0.08em",
         }}>
-          ⚠ STEP 2~5 需 ERP 整合
+          {noMatchInErp ? "✗ ERP 中沒有此料號" : "⚠ STEP 2~5 需 ERP 整合"}
         </span>
         <h3 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 800, color: BR.ink, margin: 0 }}>
-          STEP 1 OCR 已完成 · 後續分析需連接 ERP 主檔
+          {noMatchInErp
+            ? `${selected.partNo} — 在你上傳的料件主檔中找不到`
+            : "STEP 1 OCR 已完成 · 後續分析需連接 ERP 主檔"}
         </h3>
       </div>
       <p style={{ fontSize: 13, color: BR.inkSoft, lineHeight: 1.65, marginBottom: 14 }}>
-        您上傳的 <b style={{ color: BR.ink }}>{selected.supplier} · {selected.partNo}</b> 報價單，
-        AI 已把廠商、料號、單價、手寫漲幅等資料正確抽出（請看上方 🔍 AI 抽取對照面板驗證）。
-        但要產生<b style={{ color: BR.ink }}>「合理性判定 / 替代供應商推薦 / 年化毛利衝擊 / 議價信稿」</b>等下游分析，
-        必須先連接您公司的 ERP 拿到真實的料件主檔、BOM 結構、供應商清單、採購歷史 — 才不會給出寫死的示範資料誤導決策。
+        {noMatchInErp ? (
+          <>
+            供應商 <b style={{ color: BR.ink }}>{selected.supplier}</b> 開的料號 <b style={{ color: BR.ink }}>{selected.partNo}</b>，
+            在你已上傳的 ERP 料件主檔（IndexedDB）裡找不到對應。常見原因：
+            <br />① 供應商用自己的料號（你方料號不同）→ 需要在 ERP 建廠商料號對照
+            <br />② 這是新料、ERP 還沒建檔 → 採購建檔後重新上傳料件主檔
+            <br />③ 上傳時欄位 mapping 沒對好 → 回 <Link href="/erp/master-data" style={{ color: BR.greenDeep, textDecoration: "underline" }}>master-data 重上傳</Link>
+          </>
+        ) : (
+          <>
+            您上傳的 <b style={{ color: BR.ink }}>{selected.supplier} · {selected.partNo}</b> 報價單，
+            AI 已把廠商、料號、單價、手寫漲幅等資料正確抽出（請看上方 🔍 AI 抽取對照面板驗證）。
+            但要產生<b style={{ color: BR.ink }}>「合理性判定 / 替代供應商推薦 / 年化毛利衝擊 / 議價信稿」</b>等下游分析，
+            必須先連接您公司的 ERP 拿到真實的料件主檔、BOM 結構、供應商清單、採購歷史 — 才不會給出寫死的示範資料誤導決策。
+          </>
+        )}
       </p>
       <div className="rounded-[10px] overflow-hidden" style={{ border: `1px solid ${BR.border}` }}>
         <div className="grid grid-cols-[110px_1fr_1.4fr] text-xs" style={{
