@@ -112,6 +112,61 @@ export const saveBom = (rows: BomEntry[]) => replaceStore(STORE_BOM, rows);
 export const savePurchases = (rows: PurchaseRecord[]) => replaceStore(STORE_PURCHASES, rows);
 
 // ============================================================
+// 寫入（增量式 — 報表 OCR 用，每次只匯入一份報表，merge 到既有資料）
+// ============================================================
+
+// 料件：用 partNo 當 key 自然 upsert（IDB 的 put 會覆寫同 key）
+export async function upsertItems(rows: ItemMaster[]): Promise<{ inserted: number }> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_ITEMS, STORE_META], "readwrite");
+    const store = tx.objectStore(STORE_ITEMS);
+    for (const row of rows) store.put(row);
+    tx.objectStore(STORE_META).put(new Date().toISOString(), `${STORE_ITEMS}_updatedAt`);
+    tx.oncomplete = () => { db.close(); resolve({ inserted: rows.length }); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+// BOM：先刪掉同一個父件的舊資料、再寫新的（避免單一父件 BOM 累積髒）
+export async function replaceBomForParent(parentPartNo: string, rows: BomEntry[]): Promise<{ removed: number; inserted: number }> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_BOM, STORE_META], "readwrite");
+    const store = tx.objectStore(STORE_BOM);
+    const idx = store.index("parent");
+    let removed = 0;
+    const req = idx.openCursor(IDBKeyRange.only(parentPartNo));
+    req.onsuccess = (e) => {
+      const cur = (e.target as IDBRequest<IDBCursorWithValue | null>).result;
+      if (cur) {
+        cur.delete();
+        removed++;
+        cur.continue();
+      } else {
+        for (const r of rows) store.put(r);
+        tx.objectStore(STORE_META).put(new Date().toISOString(), `${STORE_BOM}_updatedAt`);
+      }
+    };
+    tx.oncomplete = () => { db.close(); resolve({ removed, inserted: rows.length }); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+// 採購：純 append（每筆採購單都是獨立事件，不該被「同料號」覆寫）
+export async function appendPurchases(rows: PurchaseRecord[]): Promise<{ inserted: number }> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_PURCHASES, STORE_META], "readwrite");
+    const store = tx.objectStore(STORE_PURCHASES);
+    for (const row of rows) store.put(row);
+    tx.objectStore(STORE_META).put(new Date().toISOString(), `${STORE_PURCHASES}_updatedAt`);
+    tx.oncomplete = () => { db.close(); resolve({ inserted: rows.length }); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+// ============================================================
 // 讀取
 // ============================================================
 async function readAll<T>(storeName: string): Promise<T[]> {

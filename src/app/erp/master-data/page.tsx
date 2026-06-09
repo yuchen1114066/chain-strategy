@@ -7,6 +7,9 @@ import {
   saveItems,
   saveBom,
   savePurchases,
+  upsertItems,
+  replaceBomForParent,
+  appendPurchases,
   clearAll,
   type MasterDataMeta,
 } from "@/lib/erp/master-data-store";
@@ -131,6 +134,14 @@ export default function MasterDataPage() {
 
         {/* 目前狀態 */}
         <StatusOverview meta={meta} />
+
+        {/* 鼎新報表 OCR — PR-4 */}
+        <ReportOcrSection
+          onSaved={async (msg) => {
+            await refreshMeta();
+            showToast(msg);
+          }}
+        />
 
         {/* 三個上傳區塊 */}
         <UploadSection
@@ -588,6 +599,486 @@ function PreviewPanel({
       </div>
     </div>
   );
+}
+
+// ============================================================
+// 鼎新報表 OCR — PR-4
+//
+// CSV 上傳搞定一般情境，但客戶手上的資料常常不是 CSV：
+//   - BOM 是影印機掃描的 PDF（像 FB61H003_bom.pdf）
+//   - BOR213 是螢幕截圖嵌在 Word
+//   - 採購單可能是 PDF 印出再簽核掃描
+//   - 採購員在外面手機拍鼎新畫面回傳
+//
+// 這個區塊把這些「不乾淨」的格式接住：
+//   檔案 → Gemini Vision → 自動辨識報表類型 → 抽 rows → 預覽 → 寫進對應 store
+// ============================================================
+type ReportType = "bom" | "items" | "purchases" | "unknown";
+
+type ReportRow = {
+  partNo?: string | null; name?: string | null; spec?: string | null;
+  qty?: number | null; unit?: string | null;
+  level?: number | null; isAlternative?: boolean | null;
+  category?: string | null;
+  poNo?: string | null; supplier?: string | null;
+  unitPrice?: number | null; currency?: string | null; date?: string | null;
+};
+
+type ReportOcrResult = {
+  reportType: ReportType;
+  reportLabel?: string | null;
+  parentPartNo?: string | null;
+  parentName?: string | null;
+  printDate?: string | null;
+  rows: ReportRow[];
+};
+
+const REPORT_TYPE_LABELS: Record<ReportType, { icon: string; title: string; tone: string }> = {
+  bom: { icon: "🔗", title: "BOM 結構", tone: "#3a6ea5" },
+  items: { icon: "📦", title: "料件主檔", tone: "#76b900" },
+  purchases: { icon: "💰", title: "採購歷史", tone: "#b8860b" },
+  unknown: { icon: "❓", title: "未辨識", tone: "#9aa291" },
+};
+
+function ReportOcrSection({ onSaved }: { onSaved: (msg: string) => void | Promise<void> }) {
+  const [state, setState] = useState<
+    | { kind: "empty" }
+    | { kind: "uploading"; fileName: string }
+    | { kind: "ready"; fileName: string; result: ReportOcrResult }
+    | { kind: "saving" }
+    | { kind: "error"; message: string }
+  >({ kind: "empty" });
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleFile = async (file: File) => {
+    if (file.size > 15 * 1024 * 1024) {
+      setState({ kind: "error", message: "檔案太大（>15MB）。建議降低 PDF 解析度或分頁上傳" });
+      return;
+    }
+    setState({ kind: "uploading", fileName: file.name });
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/erp/report-import", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!json.ok) {
+        setState({ kind: "error", message: json.error || json.message || "OCR 失敗" });
+        return;
+      }
+      setState({ kind: "ready", fileName: file.name, result: json.data as ReportOcrResult });
+    } catch (err) {
+      setState({ kind: "error", message: err instanceof Error ? err.message : "上傳失敗" });
+    }
+  };
+
+  const onConfirm = async () => {
+    if (state.kind !== "ready") return;
+    setState({ kind: "saving" });
+    try {
+      const r = state.result;
+      let msg = "";
+      if (r.reportType === "bom") {
+        const parent = r.parentPartNo;
+        if (!parent) {
+          setState({ kind: "error", message: "AI 沒抓到父件品號 — 請手動到 BOM 上傳區放 CSV" });
+          return;
+        }
+        const bomEntries = r.rows
+          .filter((row) => row.partNo)
+          .map((row) => ({
+            parentPartNo: parent,
+            childPartNo: String(row.partNo),
+            qty: Number(row.qty) > 0 ? Number(row.qty) : 1,
+            unit: row.unit || undefined,
+            level: row.level != null ? Number(row.level) : undefined,
+          }));
+        const result = await replaceBomForParent(parent, bomEntries);
+        msg = `✓ ${parent}: 寫入 ${result.inserted} 筆 BOM 子料（替換舊有 ${result.removed} 筆）`;
+      } else if (r.reportType === "items") {
+        const items = r.rows
+          .filter((row) => row.partNo)
+          .map((row) => ({
+            partNo: String(row.partNo),
+            name: row.name || "",
+            spec: row.spec || undefined,
+            category: row.category || undefined,
+            unit: row.unit || undefined,
+          }));
+        const result = await upsertItems(items);
+        msg = `✓ 新增/更新 ${result.inserted} 筆料件主檔（依料號 upsert）`;
+      } else if (r.reportType === "purchases") {
+        const purchases = r.rows
+          .filter((row) => row.partNo && row.supplier && Number(row.unitPrice) > 0)
+          .map((row) => ({
+            poNo: row.poNo || "",
+            partNo: String(row.partNo),
+            supplier: String(row.supplier),
+            unitPrice: Number(row.unitPrice),
+            currency: row.currency || "TWD",
+            qty: Number(row.qty) || 0,
+            date: normalizeDate(row.date || ""),
+          }));
+        const result = await appendPurchases(purchases);
+        msg = `✓ 新增 ${result.inserted} 筆採購紀錄（不刪除既有資料）`;
+      } else {
+        setState({ kind: "error", message: "AI 無法辨識報表類型 — 請改用下方 CSV 上傳區" });
+        return;
+      }
+      setState({ kind: "empty" });
+      await onSaved(msg);
+    } catch (err) {
+      setState({ kind: "error", message: err instanceof Error ? err.message : "儲存失敗" });
+    }
+  };
+
+  return (
+    <div className="rounded-[14px]" style={{
+      background: BR.card,
+      border: `2px solid ${BR.green}`,
+      boxShadow: "0 1px 2px rgba(12,18,8,.03), 0 4px 16px rgba(12,18,8,.04)",
+      padding: "20px 22px",
+    }}>
+      <div className="flex items-start gap-4 mb-3">
+        <div style={{ fontSize: 32, lineHeight: 1 }}>📄</div>
+        <div className="flex-1">
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <span style={{
+              fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700,
+              color: "#fff", background: BR.green,
+              padding: "2px 8px", borderRadius: 4, letterSpacing: "0.08em",
+            }}>
+              NEW · AI OCR
+            </span>
+            <h2 style={{ fontFamily: FONT_HEAD, fontSize: 18, fontWeight: 800, color: BR.ink, margin: 0 }}>
+              鼎新報表 OCR · 一鍵辨識
+            </h2>
+          </div>
+          <p style={{ fontSize: 12.5, color: BR.inkSoft, lineHeight: 1.55, marginTop: 4 }}>
+            把鼎新印出來的報表丟進來（PDF 掃描、Word 截圖、手機翻拍都行）。
+            AI 會自動判斷是 BOM / 料件主檔 / 採購歷史，抽出結構化資料、預覽、確認後寫進對應的 IndexedDB。
+          </p>
+          <div className="mt-2 p-2 rounded-[6px]" style={{
+            background: BR.greenSoft, border: `1px solid ${BR.greenLine}`,
+            fontFamily: FONT_MONO, fontSize: 11, color: BR.greenInk, lineHeight: 1.5,
+          }}>
+            💡 適合的場景：① BOM 多階正展 BOM210（影印機掃描）② 鼎新畫面截圖 ③ 採購單 PDF ④ 採購員手機拍鼎新畫面
+          </div>
+        </div>
+      </div>
+
+      {state.kind === "empty" || state.kind === "error" ? (
+        <div>
+          <label
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              const f = e.dataTransfer.files[0];
+              if (f) handleFile(f);
+            }}
+            className="block cursor-pointer rounded-[10px] text-center"
+            style={{
+              border: `2px dashed ${dragOver ? BR.green : BR.borderHi}`,
+              background: dragOver ? BR.greenSoft : "#fbfcfa",
+              padding: "28px 20px",
+            }}
+          >
+            <input
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg,.webp"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleFile(f);
+                e.target.value = "";
+              }}
+              className="hidden"
+            />
+            <div style={{ fontSize: 13, color: BR.ink, fontWeight: 600 }}>
+              拖檔到這裡，或<span style={{ color: BR.greenDeep, textDecoration: "underline" }}>點選檔案</span>
+            </div>
+            <div style={{ fontSize: 11, color: BR.inkFaint, marginTop: 4, fontFamily: FONT_MONO }}>
+              支援 .pdf · .png · .jpg · .webp（≤ 15MB）
+            </div>
+          </label>
+          {state.kind === "error" && (
+            <div className="mt-2 p-2 rounded-[6px]" style={{
+              background: BR.redSoft, border: `1px solid ${BR.red}`,
+              fontSize: 12, color: BR.red,
+            }}>
+              ⚠ {state.message}
+            </div>
+          )}
+        </div>
+      ) : state.kind === "uploading" ? (
+        <div className="rounded-[10px] p-5 text-center" style={{
+          background: "#fbfcfa", border: `1px solid ${BR.border}`,
+          fontSize: 13, color: BR.inkSoft,
+        }}>
+          Gemini Vision 解析中：{state.fileName} …<br />
+          <span style={{ fontSize: 11, fontFamily: FONT_MONO, color: BR.inkFaint }}>
+            掃描檔通常 5-20 秒（看頁數）
+          </span>
+        </div>
+      ) : state.kind === "saving" ? (
+        <div className="rounded-[10px] p-5 text-center" style={{
+          background: BR.greenSoft, border: `1px solid ${BR.green}`,
+          fontSize: 13, color: BR.greenInk,
+        }}>
+          寫入 IndexedDB 中…
+        </div>
+      ) : (
+        <ReportOcrPreview
+          fileName={state.fileName}
+          result={state.result}
+          onConfirm={onConfirm}
+          onCancel={() => setState({ kind: "empty" })}
+        />
+      )}
+    </div>
+  );
+}
+
+function ReportOcrPreview({ fileName, result, onConfirm, onCancel }: {
+  fileName: string; result: ReportOcrResult;
+  onConfirm: () => void; onCancel: () => void;
+}) {
+  const type = REPORT_TYPE_LABELS[result.reportType];
+  const validRows = result.rows.filter((r) => r.partNo);
+  const previewRows = validRows.slice(0, 8);
+
+  return (
+    <div className="space-y-3">
+      {/* 辨識結果 */}
+      <div className="flex items-center gap-3 flex-wrap rounded-[10px] p-3" style={{
+        background: result.reportType === "unknown" ? BR.amberSoft : BR.greenSoft,
+        border: `1.5px solid ${result.reportType === "unknown" ? BR.amber : BR.green}`,
+      }}>
+        <span style={{ fontSize: 28 }}>{type.icon}</span>
+        <div className="flex-1">
+          <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", color: BR.inkFaint }}>
+            AI 判定報表類型
+          </div>
+          <div style={{ fontFamily: FONT_HEAD, fontSize: 17, fontWeight: 800, color: type.tone }}>
+            {type.title}
+            <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: BR.inkSoft, marginLeft: 8, fontWeight: 500 }}>
+              {result.reportLabel || ""}
+            </span>
+          </div>
+        </div>
+        <div className="text-right" style={{ fontSize: 11, color: BR.inkSoft, fontFamily: FONT_MONO }}>
+          📎 {fileName}<br />
+          抽出 <b style={{ color: BR.ink }}>{validRows.length}</b> 筆有效列
+          {result.rows.length !== validRows.length && (
+            <span>（{result.rows.length - validRows.length} 筆無 partNo 已跳過）</span>
+          )}
+        </div>
+      </div>
+
+      {/* BOM 顯示父件 */}
+      {result.reportType === "bom" && (
+        <div className="rounded-[8px] p-3 flex items-center gap-3 flex-wrap" style={{
+          background: "#fff", border: `1px solid ${BR.border}`,
+        }}>
+          <span style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.06em" }}>
+            父件
+          </span>
+          {result.parentPartNo ? (
+            <>
+              <span style={{ fontFamily: FONT_MONO, fontSize: 15, fontWeight: 800, color: BR.blue }}>
+                {result.parentPartNo}
+              </span>
+              {result.parentName && (
+                <span style={{ fontSize: 13, color: BR.ink }}>{result.parentName}</span>
+              )}
+            </>
+          ) : (
+            <span style={{ fontSize: 12, color: BR.red }}>
+              ⚠ AI 沒抓到父件品號 — 請改用下方 CSV 路徑（BOM 一定要知道父件才能存）
+            </span>
+          )}
+          {result.printDate && (
+            <>
+              <span className="flex-1" />
+              <span style={{ fontSize: 11, color: BR.inkFaint, fontFamily: FONT_MONO }}>
+                報表日期 {result.printDate}
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* unknown 提示 */}
+      {result.reportType === "unknown" && (
+        <div className="rounded-[8px] p-3" style={{
+          background: BR.amberSoft, border: `1px solid ${BR.amber}`,
+          fontSize: 12.5, color: BR.amber, lineHeight: 1.55,
+        }}>
+          ⚠ AI 看不出這是哪種鼎新報表。如果你確定它是 BOM / 料件 / 採購其中一種，
+          可以截圖更清楚再丟一次，或改用下方 CSV 上傳路徑。
+        </div>
+      )}
+
+      {/* 預覽前 8 筆 */}
+      {previewRows.length > 0 && (
+        <div className="rounded-[8px] overflow-hidden" style={{ border: `1px solid ${BR.border}` }}>
+          <div style={{
+            background: BR.greenInk, color: "#fff", padding: "6px 10px",
+            fontFamily: FONT_MONO, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em",
+          }}>
+            預覽前 8 筆 {validRows.length > 8 && `（共 ${validRows.length} 筆）`}
+          </div>
+          <PreviewTable type={result.reportType} rows={previewRows} />
+        </div>
+      )}
+
+      {/* 動作列 */}
+      <div className="flex items-center gap-3 pt-1">
+        <button
+          onClick={onConfirm}
+          disabled={validRows.length === 0 || (result.reportType === "bom" && !result.parentPartNo) || result.reportType === "unknown"}
+          className="px-4 py-2 rounded-[8px] font-bold"
+          style={{
+            background: BR.green, color: "#fff", fontSize: 13,
+            opacity: (validRows.length === 0 || (result.reportType === "bom" && !result.parentPartNo) || result.reportType === "unknown") ? 0.4 : 1,
+            cursor: "pointer",
+          }}
+        >
+          ✓ 寫入 {validRows.length.toLocaleString()} 筆到「{type.title}」
+        </button>
+        <button
+          onClick={onCancel}
+          className="px-4 py-2 rounded-[8px]"
+          style={{
+            background: "transparent", color: BR.inkSoft,
+            border: `1px solid ${BR.border}`, fontSize: 13,
+          }}
+        >
+          取消
+        </button>
+        <span className="flex-1" />
+        <span style={{ fontSize: 11, color: BR.inkFaint, fontFamily: FONT_MONO }}>
+          {result.reportType === "bom" && "BOM：替換同父件舊資料"}
+          {result.reportType === "items" && "料件：依料號 upsert"}
+          {result.reportType === "purchases" && "採購：純新增不覆寫"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function PreviewTable({ type, rows }: { type: ReportType; rows: ReportRow[] }) {
+  if (type === "bom") {
+    return (
+      <PreviewGrid headers={["階", "子料號", "品名", "規格", "用量", "單位", "替代"]}>
+        {rows.map((r, i) => (
+          <PreviewRowCells key={i} cells={[
+            r.level != null ? String(r.level) : "—",
+            r.partNo ?? "—",
+            r.name ?? "",
+            r.spec ?? "",
+            r.qty != null ? String(r.qty) : "",
+            r.unit ?? "",
+            r.isAlternative ? "Y" : "",
+          ]} />
+        ))}
+      </PreviewGrid>
+    );
+  }
+  if (type === "items") {
+    return (
+      <PreviewGrid headers={["料號", "品名", "規格", "分類", "單位"]}>
+        {rows.map((r, i) => (
+          <PreviewRowCells key={i} cells={[
+            r.partNo ?? "—",
+            r.name ?? "",
+            r.spec ?? "",
+            r.category ?? "",
+            r.unit ?? "",
+          ]} />
+        ))}
+      </PreviewGrid>
+    );
+  }
+  if (type === "purchases") {
+    return (
+      <PreviewGrid headers={["單號", "料號", "供應商", "單價", "幣", "數量", "日期"]}>
+        {rows.map((r, i) => (
+          <PreviewRowCells key={i} cells={[
+            r.poNo ?? "",
+            r.partNo ?? "—",
+            r.supplier ?? "",
+            r.unitPrice != null ? String(r.unitPrice) : "",
+            r.currency ?? "",
+            r.qty != null ? String(r.qty) : "",
+            r.date ?? "",
+          ]} />
+        ))}
+      </PreviewGrid>
+    );
+  }
+  return (
+    <PreviewGrid headers={["欄位 1", "欄位 2", "欄位 3"]}>
+      {rows.map((r, i) => (
+        <PreviewRowCells key={i} cells={[
+          r.partNo ?? "",
+          r.name ?? r.supplier ?? "",
+          r.spec ?? "",
+        ]} />
+      ))}
+    </PreviewGrid>
+  );
+}
+
+function PreviewGrid({ headers, children }: { headers: string[]; children: React.ReactNode }) {
+  return (
+    <div className="overflow-x-auto">
+      <table style={{ width: "100%", fontFamily: FONT_MONO, fontSize: 11, borderCollapse: "collapse" }}>
+        <thead style={{ background: "#f6f8f2" }}>
+          <tr>
+            {headers.map((h) => (
+              <th key={h} style={{
+                padding: "6px 10px", textAlign: "left",
+                color: BR.ink, fontWeight: 700,
+                borderBottom: `1px solid ${BR.border}`,
+              }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+      </table>
+    </div>
+  );
+}
+
+function PreviewRowCells({ cells }: { cells: string[] }) {
+  return (
+    <tr>
+      {cells.map((c, i) => (
+        <td key={i} style={{
+          padding: "5px 10px", color: BR.inkSoft,
+          borderBottom: `1px solid ${BR.border}`,
+          whiteSpace: "nowrap",
+          maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis",
+        }}>
+          {c}
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+// 民國年 / YYYYMMDD / YYYY/MM/DD 統一轉成 ISO YYYY-MM-DD
+function normalizeDate(s: string): string {
+  if (!s) return "";
+  const t = s.trim();
+  const m1 = t.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (m1) return `${m1[1]}-${m1[2].padStart(2, "0")}-${m1[3].padStart(2, "0")}`;
+  const m2 = t.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (m2) return `${m2[1]}-${m2[2]}-${m2[3]}`;
+  const m3 = t.match(/^(\d{3})(\d{2})(\d{2})$/);
+  if (m3) return `${parseInt(m3[1], 10) + 1911}-${m3[2]}-${m3[3]}`;
+  return t;
 }
 
 // ============================================================
