@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 
 // ============================================================
@@ -181,7 +181,30 @@ type OcrRow = {
   previewUrl?: string;             // JPG/PNG 預覽圖（object URL）
   fileName?: string;
   fmt?: string;
+  // 以下為 AI 抽取的原始資料，供驗證面板對照原始文件
+  firstQuote?: boolean;            // 沒有手寫舊價時，標記為首次報價（不顯示假漲幅）
+  description?: string;            // 品名 + 規格（例如「無鉛錫棒 Sn-Cu0.7」）
+  quoteDate?: string;              // 報價日期（原樣保留）
+  currency?: string;               // 幣別
+  quantity?: number;               // 數量
+  unit?: string;                   // 單位
+  remark?: string;                 // 備註欄
+  markupPercent?: number;          // 手寫漲幅 %（無則 undefined）
 };
+
+// 把 AI 偶爾回傳的 "null" / "undefined" / "n/a" / 全空白字串視為「沒有」
+function cleanAiStr(v: unknown): string | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+  if (/^(null|undefined|n\/a|none|無|無資料)$/i.test(s)) return null;
+  return s;
+}
+function cleanAiNum(v: unknown): number | null {
+  if (v == null) return null;
+  const n = typeof v === "number" ? v : Number(String(v).replace(/[,\s$]/g, ""));
+  return Number.isFinite(n) ? n : null;
+}
 
 export default function QuotationAnalyzerPage() {
   const [activeSub, setActiveSub] = useState("ocr");
@@ -232,44 +255,62 @@ export default function QuotationAnalyzerPage() {
       const json = await res.json();
 
       if (json.ok && json.data) {
-        type AiLine = {
-          partNo: string; description?: string | null;
-          unitPrice: number; oldPrice?: number | null; markupPercent?: number | null;
-          remark?: string | null;
-        };
+        type AiLine = Record<string, unknown>;
         const d = json.data as {
-          supplier: string; quoteNo?: string | null; quoteDate?: string | null;
-          currency?: string | null; leadTimeText?: string | null;
-          lines: AiLine[];
+          supplier?: unknown; quoteNo?: unknown; quoteDate?: unknown;
+          currency?: unknown; leadTimeText?: unknown; paymentTerms?: unknown;
+          lines?: AiLine[];
         };
-        const supplier = d.supplier || "未識別供應商";
-        const baseQuoteNo = d.quoteNo || `QTE-${yymmdd}-${Date.now().toString().slice(-3)}`;
+        const supplier = cleanAiStr(d.supplier) ?? "未識別供應商";
+        const baseQuoteNo = cleanAiStr(d.quoteNo) ?? `QTE-${yymmdd}-${Date.now().toString().slice(-3)}`;
+        const quoteDate = cleanAiStr(d.quoteDate) ?? undefined;
+        const currency = cleanAiStr(d.currency) ?? undefined;
+        const leadTime = cleanAiStr(d.leadTimeText);
+        const payTerms = cleanAiStr(d.paymentTerms);
+
         aiRows = (d.lines ?? []).map((line, idx) => {
-          const newP = +line.unitPrice;
-          const oldP = line.oldPrice != null ? +line.oldPrice : newP;
+          const partNoStr = cleanAiStr(line.partNo);
+          const descStr = cleanAiStr(line.description);
+          // 散裝/原物料常常沒料號 → 用「品名 規格」作識別碼，比 (料號未識別) 有用
+          const partNo = partNoStr ?? (descStr ? descStr.replace(/\s+/g, " ").slice(0, 40) : "（料號未識別）");
+          const newP = cleanAiNum(line.unitPrice) ?? 0;
+          const oldRaw = cleanAiNum(line.oldPrice);
+          const markup = cleanAiNum(line.markupPercent);
+          // 沒有手寫舊價 → 標記首次報價（介面顯示「首次報價」而非 +0%）
+          const firstQuote = oldRaw == null;
+          const oldP = oldRaw ?? newP;
           return {
-            quoteNo: d.lines.length > 1 ? `${baseQuoteNo}-${idx + 1}` : baseQuoteNo,
+            quoteNo: (d.lines?.length ?? 0) > 1 ? `${baseQuoteNo}-${idx + 1}` : baseQuoteNo,
             supplier,
-            partNo: line.partNo,
+            partNo,
             oldPrice: oldP,
             newPrice: newP,
             reasonText: [
-              line.description ?? null,
-              line.markupPercent != null ? `手寫漲幅 ${line.markupPercent}%` : null,
-              d.leadTimeText ? `L/T ${d.leadTimeText}` : null,
+              descStr,
+              markup != null ? `手寫漲幅 ${markup}%` : null,
+              leadTime ? `L/T ${leadTime}` : null,
+              payTerms,
             ].filter(Boolean).join(" · ") || "Gemini 抽取",
             uploadedAt: Date.now() + idx,
             previewUrl: idx === 0 ? previewUrl : undefined,
             fileName: file.name,
             fmt,
-          };
+            firstQuote,
+            description: descStr ?? undefined,
+            quoteDate,
+            currency,
+            quantity: cleanAiNum(line.quantity) ?? undefined,
+            unit: cleanAiStr(line.unit) ?? undefined,
+            remark: cleanAiStr(line.remark) ?? undefined,
+            markupPercent: markup ?? undefined,
+          } satisfies OcrRow;
         });
         if (aiRows.length === 0) {
           aiError = "AI 沒有抽到任何料件";
           aiRows = null;
         }
       } else if (json.demoMode) {
-        aiError = "尚未設定 ANTHROPIC_API_KEY · 回退到示範模式（檔名解析）";
+        aiError = "尚未設定 GEMINI_API_KEY · 回退到示範模式（檔名解析）";
       } else {
         aiError = json.error || "AI OCR 失敗";
       }
@@ -306,11 +347,7 @@ export default function QuotationAnalyzerPage() {
       }];
     }
 
-    // partNo 防呆：AI 偶爾會回傳 null/空字串，給一個 placeholder 避免介面顯示「null」
-    const rowsToAdd: OcrRow[] = aiRows.map((r) => ({
-      ...r,
-      partNo: r.partNo && r.partNo.trim() ? r.partNo : "（料號未識別）",
-    }));
+    const rowsToAdd: OcrRow[] = aiRows;
     const newSupplier = rowsToAdd[0].supplier;
 
     // 換廠商規則：若目前 uploadedRows 跟新上傳是不同供應商，前一家整批歸檔
@@ -933,10 +970,14 @@ export default function QuotationAnalyzerPage() {
                           <td style={{ padding: "10px 8px", fontFamily: FONT_MONO, fontWeight: 700, color: selected ? BR.greenDeep : BR.ink, verticalAlign: "top" }}>
                             {r.partNo}
                           </td>
-                          <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: FONT_MONO, color: BR.inkSoft, verticalAlign: "top" }}>{r.oldPrice.toFixed(2)}</td>
-                          <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, verticalAlign: "top" }}>↗ {r.newPrice.toFixed(2)}</td>
-                          <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 800, color: BR.red, verticalAlign: "top" }}>
-                            +{pct.toFixed(1)}%
+                          <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: FONT_MONO, color: BR.inkSoft, verticalAlign: "top" }}>
+                            {r.firstQuote ? <span style={{ color: BR.inkFaint }}>—</span> : r.oldPrice.toFixed(2)}
+                          </td>
+                          <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 700, verticalAlign: "top" }}>
+                            {r.currency ? `${r.currency} ` : ""}{r.newPrice.toFixed(2)}
+                          </td>
+                          <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: FONT_MONO, fontWeight: 800, color: r.firstQuote ? BR.inkFaint : BR.red, verticalAlign: "top" }}>
+                            {r.firstQuote ? <span style={{ fontSize: 10 }}>首次報價</span> : `+${pct.toFixed(1)}%`}
                           </td>
                           <td style={{ padding: "10px 8px", fontSize: 12, color: BR.inkSoft, verticalAlign: "top" }}>
                             {r.reasonText}
@@ -948,14 +989,80 @@ export default function QuotationAnalyzerPage() {
                   </tbody>
                 </table>
               </div>
+              {/* AI 抽取對照面板 — 已選報價單的原始檔案 + AI 抽出的所有欄位（讓使用者一秒驗證） */}
+              {SELECTED.uploadedAt && (
+                <div className="mt-3 rounded-[10px] overflow-hidden" style={{ border: `1px solid ${BR.greenLine}` }}>
+                  <div className="px-3 py-2 flex items-baseline justify-between" style={{ background: BR.greenInk, color: "#fff" }}>
+                    <span style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em" }}>
+                      🔍 AI 抽取對照 · 請肉眼核對原始檔案
+                    </span>
+                    <span style={{ fontFamily: FONT_MONO, fontSize: 9, color: "#aebba0" }}>
+                      AI 偶有誤判 · 重要欄位請依原始文件為準
+                    </span>
+                  </div>
+                  <div className="grid" style={{ gridTemplateColumns: SELECTED.previewUrl ? "minmax(0, 1fr) minmax(0, 1fr)" : "1fr", background: "#fff" }}>
+                    {/* 左：原始檔案 */}
+                    {SELECTED.previewUrl && (
+                      <div style={{ background: "#0c1208", padding: 8, display: "flex", alignItems: "center", justifyContent: "center", borderRight: `1px solid ${BR.border}` }}>
+                        <a href={SELECTED.previewUrl} target="_blank" rel="noopener noreferrer" title="點擊看原圖">
+                          <img
+                            src={SELECTED.previewUrl}
+                            alt={SELECTED.fileName ?? "原始檔案"}
+                            style={{ maxWidth: "100%", maxHeight: 360, objectFit: "contain", display: "block", cursor: "zoom-in" }}
+                          />
+                        </a>
+                      </div>
+                    )}
+                    {/* 右：AI 抽出的所有欄位 */}
+                    <div className="p-3" style={{ fontSize: 12 }}>
+                      {(() => {
+                        const fields: Array<[string, React.ReactNode]> = [
+                          ["供應商", <b key="s" style={{ color: BR.ink }}>{SELECTED.supplier}</b>],
+                          ["報價單號", <span key="q" style={{ fontFamily: FONT_MONO, color: BR.ink }}>{SELECTED.quoteNo}</span>],
+                          ["報價日期", SELECTED.quoteDate ? <span key="d" style={{ fontFamily: FONT_MONO }}>{SELECTED.quoteDate}</span> : <span key="d" style={{ color: BR.inkFaint }}>—</span>],
+                          ["料號 / 品名", <span key="p" style={{ fontFamily: FONT_MONO, color: BR.ink, fontWeight: 700 }}>{SELECTED.partNo}</span>],
+                          ["品名/規格", SELECTED.description ? <span key="ds">{SELECTED.description}</span> : <span key="ds" style={{ color: BR.inkFaint }}>—</span>],
+                          ["數量 / 單位", (SELECTED.quantity != null || SELECTED.unit)
+                            ? <span key="qu" style={{ fontFamily: FONT_MONO }}>{SELECTED.quantity ?? "—"} {SELECTED.unit ?? ""}</span>
+                            : <span key="qu" style={{ color: BR.inkFaint }}>—</span>],
+                          ["新單價", <span key="np" style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.red }}>{SELECTED.currency ? `${SELECTED.currency} ` : ""}{SELECTED.newPrice.toFixed(2)}</span>],
+                          ["手寫舊價", SELECTED.firstQuote
+                            ? <span key="op" style={{ color: BR.inkFaint }}>未標註（首次報價）</span>
+                            : <span key="op" style={{ fontFamily: FONT_MONO }}>{SELECTED.oldPrice.toFixed(2)}</span>],
+                          ["手寫漲幅", SELECTED.markupPercent != null
+                            ? <span key="mu" style={{ fontFamily: FONT_MONO, fontWeight: 700, color: BR.amber }}>+{SELECTED.markupPercent}%</span>
+                            : <span key="mu" style={{ color: BR.inkFaint }}>未標註</span>],
+                          ["備註", SELECTED.remark ? <span key="rm">{SELECTED.remark}</span> : <span key="rm" style={{ color: BR.inkFaint }}>—</span>],
+                          ["檔名", <span key="f" style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.inkSoft }}>{SELECTED.fileName ?? "—"}</span>],
+                        ];
+                        return (
+                          <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 12px", alignItems: "baseline" }}>
+                            {fields.map(([label, val]) => (
+                              <React.Fragment key={label}>
+                                <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint, whiteSpace: "nowrap" }}>{label}</div>
+                                <div>{val}</div>
+                              </React.Fragment>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                      <div style={{ marginTop: 10, padding: 8, background: "#fbfcfa", border: `1px dashed ${BR.border}`, borderRadius: 6, fontSize: 10.5, color: BR.inkSoft, lineHeight: 1.5 }}>
+                        💡 <b>驗證方式：</b>把左邊原始檔案中的廠商名、料號、單價、日期跟右邊 AI 抽出的對一遍。
+                        若有錯（散裝原物料常常沒料號、AI 會用品名+規格代替）請以原始文件為準。
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* 上傳 + 選擇好之後的 CTA — 解決「上傳後怎麼查詢」 */}
               <div className="mt-3 rounded-[10px] p-3" style={{ background: BR.greenSoft, border: `1px solid ${BR.greenLine}` }}>
                 <div className="flex items-baseline justify-between flex-wrap gap-2 mb-2">
                   <div style={{ fontSize: 12, color: BR.greenInk }}>
                     已選報價單　<b style={{ fontFamily: FONT_MONO, color: BR.greenDeep }}>{SELECTED.quoteNo}</b>　/　<b>{SELECTED.supplier}</b>　/　料號 <b style={{ fontFamily: FONT_MONO }}>{SELECTED.partNo}</b>
                   </div>
-                  <span style={{ fontFamily: FONT_MONO, fontSize: 18, fontWeight: 800, color: BR.red }}>
-                    AI 立即算 +{supplierClaim.toFixed(1)}%
+                  <span style={{ fontFamily: FONT_MONO, fontSize: 18, fontWeight: 800, color: SELECTED.firstQuote ? BR.inkFaint : BR.red }}>
+                    {SELECTED.firstQuote ? "首次報價 · 無歷史比對" : `AI 立即算 +${supplierClaim.toFixed(1)}%`}
                   </span>
                 </div>
                 <button
