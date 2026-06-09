@@ -40,7 +40,8 @@ type TestResponse = {
 };
 
 const ERROR_HINTS: Array<[RegExp, string]> = [
-  [/ETIMEOUT|ETIMEDOUT|getaddrinfo/i, "連線逾時 — 主機 IP 不通。檢查：① IP 是不是內網位址（我們的伺服器看不到 192.168.*）② 防火牆 / VPN ③ MSSQL 是否真的在 1433"],
+  // mssql 套件的 timeout 訊息是「Failed to connect to X in YYYYms」，沒帶 ETIMEOUT 字樣
+  [/ETIMEOUT|ETIMEDOUT|getaddrinfo|Failed to connect to .* in \d+ms/i, "連線逾時 — 主機 IP 不通。檢查：① IP 是不是內網位址（我們的伺服器看不到 192.168.*）② 防火牆 / VPN ③ MSSQL 是否真的在 1433"],
   [/ECONNREFUSED/i, "連線被拒 — IP 通但 port 沒開。檢查：① MSSQL 是否啟用 TCP/IP（鼎新預設關閉）② 1433 是不是改過 ③ Windows 防火牆"],
   [/Login failed/i, "帳號 / 密碼錯誤，或該帳號沒有資料庫存取權"],
   [/Cannot open database/i, "資料庫名稱錯了。鼎新慣用 `eproerp`，請跟 MIS 確認正式機庫名"],
