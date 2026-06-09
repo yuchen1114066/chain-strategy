@@ -192,17 +192,17 @@ export default function QuotationAnalyzerPage() {
   // 廠商報價歷史資料夾 — 是否展開
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  // 共用：把檔案吃進來 → 呼叫 Claude Vision OCR → 加進 uploadedRows → 自動選中
+  // 共用：把檔案吃進來 → 呼叫 Gemini OCR → 加進 uploadedRows → 自動選中
   // 入口 intake modal 和頁面中的 STEP 1 上傳卡共用同一條路徑
   const ingestFile = async (file: File, fmt: string) => {
     const sizeKB = (file.size / 1024).toFixed(0);
-    showToast(`📂 ${fmt} 上傳中：${file.name}（${sizeKB} KB）· Claude Vision 解析中…`);
+    showToast(`📂 ${fmt} 上傳中：${file.name}（${sizeKB} KB）· Gemini 解析中…`);
     const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
 
     const today = new Date();
     const yymmdd = `${today.getFullYear().toString().slice(-2)}${(today.getMonth() + 1).toString().padStart(2, "0")}${today.getDate().toString().padStart(2, "0")}`;
 
-    // --- 呼叫 Claude Vision OCR API ---
+    // --- 呼叫 Gemini OCR API ---
     let aiRows: OcrRow[] | null = null;
     let aiError: string | null = null;
     try {
@@ -237,7 +237,7 @@ export default function QuotationAnalyzerPage() {
               line.description ?? null,
               line.markupPercent != null ? `手寫漲幅 ${line.markupPercent}%` : null,
               d.leadTimeText ? `L/T ${d.leadTimeText}` : null,
-            ].filter(Boolean).join(" · ") || "Claude Vision 抽取",
+            ].filter(Boolean).join(" · ") || "Gemini 抽取",
             uploadedAt: Date.now() + idx,
             previewUrl: idx === 0 ? previewUrl : undefined,
             fileName: file.name,
@@ -296,9 +296,9 @@ export default function QuotationAnalyzerPage() {
     if (aiError) {
       showToast(`⚠ ${aiError}`);
     } else if (rowsToAdd.length > 1) {
-      showToast(`✓ Claude Vision 完成 · ${rowsToAdd[0].supplier} · 抽到 ${rowsToAdd.length} 個料件`);
+      showToast(`✓ Gemini 完成 · ${rowsToAdd[0].supplier} · 抽到 ${rowsToAdd.length} 個料件`);
     } else {
-      showToast(`✓ Claude Vision 完成 · ${rowsToAdd[0].supplier} · ${rowsToAdd[0].partNo}`);
+      showToast(`✓ Gemini 完成 · ${rowsToAdd[0].supplier} · ${rowsToAdd[0].partNo}`);
     }
   };
   // 使用者上傳後直接「換掉」demo 種子，避免頁面殘留無關報價單
@@ -3443,7 +3443,7 @@ function AiStatusBadge() {
         fontSize: 11, fontWeight: 700, color: BR.green, fontFamily: FONT_MONO,
       }}>
         <span style={{ width: 6, height: 6, borderRadius: 99, background: BR.green }} />
-        CLAUDE VISION · 真實 OCR 已啟用
+        GEMINI 2.5 FLASH · 真實 OCR 已啟用
       </div>
     );
   }
@@ -3456,7 +3456,7 @@ function AiStatusBadge() {
       fontSize: 11, fontWeight: 700, color: "#ff8a7a", fontFamily: FONT_MONO,
     }}>
       <span style={{ width: 6, height: 6, borderRadius: 99, background: "#d4351c" }} />
-      DEMO 模式 · 尚未設定 ANTHROPIC_API_KEY
+      DEMO 模式 · 尚未設定 GEMINI_API_KEY
     </div>
   );
 }
