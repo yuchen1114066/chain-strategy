@@ -679,6 +679,9 @@ export default function QuotationAnalyzerPage() {
           </div>
         </Card>
 
+        {/* ──────────────────────────── 本月績效（對標 2022 SOW KPI）──────────────────────── */}
+        <MonthlyKpiBanner historyRows={historyRows} uploadedRows={uploadedRows} />
+
         {/* ──────────────────────────── 4-step pipeline ──────────────────────────── */}
 
         {/* Step 1 · 報價單合理性查詢 */}
@@ -1639,6 +1642,161 @@ function StepHeader({ badge, title, en, desc, tone = BR.green }: {
       <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: BR.inkFaint }}>{en}</span>
       <span style={{ flex: 1 }} />
       <span style={{ fontSize: 12, color: BR.inkSoft }}>{desc}</span>
+    </div>
+  );
+}
+
+// ============================================================
+// 本月績效 KPI Banner — 對標 2022 SOW「產品成本波動掌握」
+//
+// SOW 寫明的 KPI：「每月 70-80 筆負毛利訂單 → 0 筆」。
+// 真實負毛利判斷要 customer order + standard cost，我們還沒接到。
+// 這版只用 STEP 1 OCR 已有的真資料算「先行指標」：
+//   - 本月處理報價：實際單據數
+//   - 供應商漲價件數：newPrice > oldPrice（排除首次報價）
+//   - 潛在負毛利警示：漲幅 > 10% 的件數（這些不議價就會吃掉毛利）
+//   - 預估月度多花：∑(newPrice - oldPrice) × qty
+//   - 已避免負毛利訂單：目前無法計算 → 顯示「—」+ tooltip 標明需要的資料
+// ============================================================
+type MonthlyKpiInput = { historyRows: OcrRow[]; uploadedRows: OcrRow[] };
+
+function MonthlyKpiBanner({ historyRows, uploadedRows }: MonthlyKpiInput) {
+  const now = new Date();
+  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+  // 合併 history + uploaded、依 uploadedAt 過濾本月、排除沒 timestamp 的示範資料
+  const merged = [...historyRows, ...uploadedRows];
+  const monthRows = merged.filter((r) => {
+    if (!r.uploadedAt) return false;
+    const d = new Date(r.uploadedAt);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` === ym;
+  });
+
+  const quoteCount = new Set(monthRows.map((r) => r.quoteNo)).size;
+  const hikeRows = monthRows.filter(
+    (r) => !r.firstQuote && r.oldPrice > 0 && r.newPrice > r.oldPrice,
+  );
+  const riskRows = hikeRows.filter(
+    (r) => (r.newPrice - r.oldPrice) / r.oldPrice > 0.10,
+  );
+
+  // 多廠幣別混雜：只把 TWD（含空白幣別 = 預設台幣）相加，避免 USD/JPY 直接加總亂報
+  const twdHikeRows = hikeRows.filter((r) => !r.currency || /^(twd|nt|ntd)$/i.test(r.currency));
+  const extraSpend = twdHikeRows.reduce(
+    (s, r) => s + (r.newPrice - r.oldPrice) * (r.quantity || 1),
+    0,
+  );
+
+  const cells: Array<{
+    label: string;
+    en: string;
+    value: string;
+    sub?: string;
+    tone: string;
+    tooltip?: string;
+  }> = [
+    {
+      label: "已避免負毛利訂單", en: "Negative-margin avoided",
+      value: "—", sub: "需 ERP 客戶訂單 (COPMB)",
+      tone: BR.inkFaint,
+      tooltip: "要算這個指標必須接到 ERP 客戶訂單 + 標準成本（鼎新 COPMB / CSTMB 表）。目前 STEP 1 只看供應商側，看不到客戶側價格。",
+    },
+    {
+      label: "本月處理報價", en: "Quotes processed",
+      value: quoteCount.toString(), sub: `${monthRows.length} 筆明細`,
+      tone: BR.green,
+    },
+    {
+      label: "偵測供應商漲價", en: "Price hikes detected",
+      value: hikeRows.length.toString(),
+      sub: hikeRows.length > 0
+        ? `平均漲幅 ${(hikeRows.reduce((s, r) => s + (r.newPrice - r.oldPrice) / r.oldPrice, 0) / hikeRows.length * 100).toFixed(1)}%`
+        : "—",
+      tone: BR.amber,
+    },
+    {
+      label: "潛在負毛利警示", en: "At-risk lines (>10% hike)",
+      value: riskRows.length.toString(),
+      sub: "漲幅 >10% · 不議價恐吃毛利",
+      tone: riskRows.length > 0 ? BR.red : BR.inkFaint,
+    },
+    {
+      label: "預估月度多花費", en: "Est. extra spend (TWD)",
+      value: extraSpend > 0 ? `+${Math.round(extraSpend).toLocaleString()}` : "—",
+      sub: "若全數接受漲價",
+      tone: BR.red,
+    },
+  ];
+
+  return (
+    <div className="rounded-[14px] overflow-hidden" style={{
+      background: BR.card, border: `1px solid ${BR.border}`,
+      boxShadow: "0 1px 2px rgba(12,18,8,.03), 0 4px 16px rgba(12,18,8,.04)",
+    }}>
+      {/* 頂條 — 引用 SOW 出處 */}
+      <div className="flex items-baseline gap-3 flex-wrap" style={{
+        background: BR.greenInk, padding: "8px 16px",
+      }}>
+        <span style={{
+          fontFamily: FONT_MONO, fontSize: 10.5, fontWeight: 700, color: "#fff",
+          letterSpacing: "0.12em",
+        }}>
+          本月績效 · {ym}
+        </span>
+        <span style={{ fontFamily: FONT_MONO, fontSize: 10, color: "#cfe0a8" }}>
+          MONTHLY PERFORMANCE
+        </span>
+        <span className="flex-1" />
+        <span style={{ fontSize: 10.5, color: "#cfe0a8", fontFamily: FONT_MONO }}>
+          目標：負毛利訂單 70-80 筆 / 月 → 0 筆 · 出處 2022 SOW「產品成本波動掌握」
+        </span>
+      </div>
+
+      {/* 5 cell KPI row */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5" style={{
+        background: BR.card,
+      }}>
+        {cells.map((c, i) => (
+          <div key={c.label} title={c.tooltip} style={{
+            padding: "16px 18px",
+            borderRight: i < cells.length - 1 ? `1px solid ${BR.border}` : "none",
+            borderBottom: `1px solid ${BR.border}`,
+          }}>
+            <div style={{
+              fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint,
+              letterSpacing: "0.06em", marginBottom: 4,
+            }}>
+              {c.label}
+            </div>
+            <div style={{
+              fontFamily: FONT_MONO, fontSize: 28, fontWeight: 700,
+              color: c.tone, lineHeight: 1.1,
+            }}>
+              {c.value}
+            </div>
+            <div style={{ fontSize: 10.5, color: BR.inkFaint, marginTop: 2, fontFamily: FONT_MONO }}>
+              {c.en}
+            </div>
+            {c.sub && (
+              <div style={{ fontSize: 11, color: BR.inkSoft, marginTop: 3, lineHeight: 1.4 }}>
+                {c.sub}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* 底部說明 — 從哪算來的 / 怎麼把虛線轉實線 */}
+      <div className="flex items-center gap-3 flex-wrap" style={{
+        background: "#fbfcfa", padding: "8px 16px",
+        fontFamily: FONT_MONO, fontSize: 10.5, color: BR.inkSoft, lineHeight: 1.5,
+      }}>
+        <span>📊 數值來源：STEP 1 OCR 已歸檔報價（本機 IndexedDB · 本月 {monthRows.length} 筆）</span>
+        <span className="flex-1" />
+        <Link href="/erp/master-data" style={{ color: BR.greenDeep }}>
+          → 上傳 ERP 主檔可啟用「已避免負毛利訂單」即時計算
+        </Link>
+      </div>
     </div>
   );
 }
