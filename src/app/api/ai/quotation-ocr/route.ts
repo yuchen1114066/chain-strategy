@@ -8,7 +8,7 @@
 //   GEMINI_API_KEY  — 從 https://aistudio.google.com/apikey 取得（Gmail 登入即可，免費 1500 次/天）
 
 import { NextResponse } from "next/server";
-import { GoogleGenerativeAI, SchemaType, type Schema } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType, type Schema, type EnhancedGenerateContentResponse } from "@google/generative-ai";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -133,23 +133,56 @@ export async function POST(req: Request) {
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    systemInstruction: SYSTEM_PROMPT,
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: QUOTATION_SCHEMA,
-      temperature: 0.1,
-    },
-  });
+  // Gemini 2.5 Flash 偶爾過載 (503) → 失敗時自動降版到 2.0 Flash（也免費、穩定、Vision 一樣）
+  const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"] as const;
+  const isRetryable = (err: unknown): boolean => {
+    const msg = err instanceof Error ? err.message : String(err);
+    return /\b(429|500|502|503|504|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand|overloaded)\b/i.test(msg);
+  };
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  let lastErr: unknown = null;
+  let usedModel = "";
+  let response: EnhancedGenerateContentResponse | null = null;
+
+  outer: for (const modelId of MODELS) {
+    const model = genAI.getGenerativeModel({
+      model: modelId,
+      systemInstruction: SYSTEM_PROMPT,
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: QUOTATION_SCHEMA,
+        temperature: 0.1,
+      },
+    });
+    // 每個模型最多重試 2 次（指數退避：1s、2s）
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const result = await model.generateContent([
+          { inlineData: { mimeType: mediaType, data: base64 } },
+          { text: "請從這份報價單抽出結構化資料。" },
+        ]);
+        response = result.response;
+        usedModel = modelId;
+        break outer;
+      } catch (err) {
+        lastErr = err;
+        if (!isRetryable(err)) break; // 不可重試 (4xx) → 直接跳出去試下一個模型
+        if (attempt < 2) await sleep(1000 * Math.pow(2, attempt));
+      }
+    }
+  }
+
+  if (!response) {
+    const msg = lastErr instanceof Error ? lastErr.message : String(lastErr);
+    const friendly = isRetryable(lastErr)
+      ? "Gemini 伺服器目前過載（全球免費用戶搶資源），1-2 分鐘後請再試一次。已自動嘗試 2.5-flash 與 2.0-flash 共 6 次都失敗。"
+      : `Gemini API 錯誤：${msg}`;
+    return NextResponse.json({ ok: false, error: friendly, raw: msg.slice(0, 300) }, { status: 503 });
+  }
 
   try {
-    const result = await model.generateContent([
-      { inlineData: { mimeType: mediaType, data: base64 } },
-      { text: "請從這份報價單抽出結構化資料。" },
-    ]);
-
-    const text = result.response.text();
+    const text = response.text();
     if (!text) {
       return NextResponse.json(
         { ok: false, error: "Gemini 沒有回傳文字內容" },
@@ -167,10 +200,11 @@ export async function POST(req: Request) {
       );
     }
 
-    const usage = result.response.usageMetadata;
+    const usage = response.usageMetadata;
     return NextResponse.json({
       ok: true,
       data: parsed,
+      model: usedModel,
       usage: usage
         ? {
             inputTokens: usage.promptTokenCount,
