@@ -187,10 +187,30 @@ export default function QuotationAnalyzerPage() {
   const [activeSub, setActiveSub] = useState("ocr");
   const [toast, setToast] = useState<string | null>(null);
   // 使用者上傳的報價單會自動加進 allRows（demo OCR 模擬）
+  // 規則：uploadedRows 只放「目前正在分析的那一家供應商」的報價單（可多張）
+  // 一旦上傳到不同供應商，前一家整批會自動歸檔到 historyRows
   const [uploadedRows, setUploadedRows] = useState<OcrRow[]>([]);
-  // 入口 intake modal — 預設打開，使用者上傳完才看見全頁分析
+  const [historyRows, setHistoryRows] = useState<OcrRow[]>([]);
   // 廠商報價歷史資料夾 — 是否展開
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // 載入 / 持久化歷史報價資料（localStorage · 年底評鑑與大數據備查）
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("chain-strategy:quotation-history");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) setHistoryRows(parsed);
+      }
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      // 不存 previewUrl（blob URL 重整就失效）
+      const serializable = historyRows.map(({ previewUrl: _drop, ...rest }) => rest);
+      localStorage.setItem("chain-strategy:quotation-history", JSON.stringify(serializable));
+    } catch {}
+  }, [historyRows]);
 
   // 共用：把檔案吃進來 → 呼叫 Gemini OCR → 加進 uploadedRows → 自動選中
   // 入口 intake modal 和頁面中的 STEP 1 上傳卡共用同一條路徑
@@ -286,19 +306,37 @@ export default function QuotationAnalyzerPage() {
       }];
     }
 
-    const rowsToAdd = aiRows;
+    // partNo 防呆：AI 偶爾會回傳 null/空字串，給一個 placeholder 避免介面顯示「null」
+    const rowsToAdd: OcrRow[] = aiRows.map((r) => ({
+      ...r,
+      partNo: r.partNo && r.partNo.trim() ? r.partNo : "（料號未識別）",
+    }));
+    const newSupplier = rowsToAdd[0].supplier;
+
+    // 換廠商規則：若目前 uploadedRows 跟新上傳是不同供應商，前一家整批歸檔
+    let archivedSupplier: string | null = null;
     setUploadedRows((arr) => {
-      const next = [...arr, ...rowsToAdd];
-      setSelectedIdx(next.length - rowsToAdd.length);
-      return next;
+      const currentSupplier = arr[0]?.supplier;
+      if (currentSupplier && currentSupplier !== newSupplier) {
+        archivedSupplier = currentSupplier;
+        // 把目前 uploadedRows 推進 historyRows（新進的放最前面）
+        setHistoryRows((h) => [...arr, ...h]);
+        setSelectedIdx(0);
+        return rowsToAdd;
+      }
+      // 同一家供應商 → 累積
+      setSelectedIdx(arr.length);
+      return [...arr, ...rowsToAdd];
     });
 
     if (aiError) {
       showToast(`⚠ ${aiError}`);
+    } else if (archivedSupplier) {
+      showToast(`✓ 切換供應商：${archivedSupplier} → ${newSupplier}（前者整批已歸檔至歷史資料夾）`);
     } else if (rowsToAdd.length > 1) {
-      showToast(`✓ Gemini 完成 · ${rowsToAdd[0].supplier} · 抽到 ${rowsToAdd.length} 個料件`);
+      showToast(`✓ Gemini 完成 · ${newSupplier} · 抽到 ${rowsToAdd.length} 個料件`);
     } else {
-      showToast(`✓ Gemini 完成 · ${rowsToAdd[0].supplier} · ${rowsToAdd[0].partNo}`);
+      showToast(`✓ Gemini 完成 · ${newSupplier} · ${rowsToAdd[0].partNo}`);
     }
   };
   // 使用者上傳後直接「換掉」demo 種子，避免頁面殘留無關報價單
@@ -632,23 +670,50 @@ export default function QuotationAnalyzerPage() {
                 </div>
               </div>
 
-              {/* 廠商報價歷史資料夾 · 只列查詢中的供應商，可開啟看年度評核 */}
+              {/* 廠商報價歷史資料夾 · 所有歷史供應商 · 年底評鑑用 */}
               {(() => {
-                // 從當前可見資料推導本供應商的年度評核（不寫死其他廠商）
-                const supRows = allRows.filter((r) => r.supplier === SELECTED.supplier);
-                const count   = supRows.length;
-                const avgHike = count > 0
-                  ? +(supRows.reduce((s, r) => s + ((r.newPrice - r.oldPrice) / r.oldPrice) * 100, 0) / count).toFixed(1)
-                  : 0;
-                // 評核：漲幅越高分數越低（凍漲 = 95；>15% = 65）
-                const score = avgHike <= 0   ? 95
-                            : avgHike <  5   ? 88
-                            : avgHike < 10   ? 78
-                            : avgHike < 15   ? 70
-                                             : 65;
-                const tone  = score >= 90 ? BR.greenDeep
-                            : score >= 75 ? BR.amber
-                                          : BR.red;
+                // 同時計入當前 uploadedRows（in-progress）與已歸檔的 historyRows
+                const allArchive: OcrRow[] = [...uploadedRows, ...historyRows];
+                // 依供應商分組
+                const grouped = new Map<string, OcrRow[]>();
+                for (const r of allArchive) {
+                  const arr = grouped.get(r.supplier) ?? [];
+                  arr.push(r);
+                  grouped.set(r.supplier, arr);
+                }
+                // 依筆數降冪排序（送樣品最多的廠商排前面）
+                const suppliers = Array.from(grouped.entries())
+                  .sort((a, b) => b[1].length - a[1].length);
+
+                const scoreOf = (avgHike: number) =>
+                  avgHike <= 0 ? 95 : avgHike < 5 ? 88 : avgHike < 10 ? 78 : avgHike < 15 ? 70 : 65;
+                const toneOf  = (score: number) =>
+                  score >= 90 ? BR.greenDeep : score >= 75 ? BR.amber : BR.red;
+
+                // 匯出 CSV
+                const exportCSV = () => {
+                  const header = ["供應商", "報價單號", "料號", "舊單價", "新單價", "漲幅%", "原因", "檔名", "上傳時間"];
+                  const rows = allArchive.map((r) => [
+                    r.supplier, r.quoteNo, r.partNo,
+                    r.oldPrice.toFixed(2), r.newPrice.toFixed(2),
+                    (((r.newPrice - r.oldPrice) / r.oldPrice) * 100).toFixed(1),
+                    (r.reasonText ?? "").replace(/[\n\r,]/g, " "),
+                    r.fileName ?? "",
+                    r.uploadedAt ? new Date(r.uploadedAt).toISOString() : "",
+                  ]);
+                  const csv = [header, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+                  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `quotation-history-${new Date().toISOString().slice(0, 10)}.csv`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  setTimeout(() => URL.revokeObjectURL(url), 1000);
+                  showToast(`✓ 已匯出 ${allArchive.length} 筆歷史報價（CSV · UTF-8 BOM）`);
+                };
+
                 return (
                   <div className="mt-3 rounded-[10px]" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
                     <button
@@ -659,27 +724,87 @@ export default function QuotationAnalyzerPage() {
                     >
                       <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.greenDeep, letterSpacing: "0.1em" }}>
                         <span style={{ display: "inline-block", width: 12 }}>{historyOpen ? "▾" : "▸"}</span>
-                        📁 廠商報價歷史資料夾 · <b style={{ color: BR.ink }}>{SELECTED.supplier}</b>
+                        📁 廠商報價歷史資料夾 · <b style={{ color: BR.ink }}>{suppliers.length} 家供應商 / 共 {allArchive.length} 張</b>
                       </div>
-                      <span style={{ fontFamily: FONT_MONO, fontSize: 9, color: BR.inkFaint }}>近 12 月 · 年度評核</span>
+                      <span style={{ fontFamily: FONT_MONO, fontSize: 9, color: BR.inkFaint }}>年度評核 · 大數據備查</span>
                     </button>
                     {historyOpen && (
                       <div className="px-3 pb-3">
-                        <div className="flex items-baseline justify-between mt-1 text-xs">
-                          <span style={{ color: BR.ink, fontWeight: 700, width: 60 }}>{SELECTED.supplier}</span>
-                          <span style={{ fontFamily: FONT_MONO, color: BR.inkSoft, width: 56, textAlign: "right" }}>{count} 件</span>
-                          <span style={{ fontFamily: FONT_MONO, color: avgHike > 10 ? BR.red : avgHike > 0 ? BR.amber : BR.greenDeep, width: 64, textAlign: "right", fontWeight: 700 }}>
-                            {avgHike > 0 ? "+" : ""}{avgHike.toFixed(1)}%
-                          </span>
-                          <span style={{ fontFamily: FONT_MONO, fontWeight: 800, color: tone, width: 40, textAlign: "right" }}>
-                            {score}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: 10, color: BR.inkSoft, marginTop: 6, lineHeight: 1.5 }}>
-                          每筆報價自動歸檔 → 年度供應商評核打分（漲幅次數 / 合理超出 / 凍漲表現）。
-                          本次查詢之供應商 <b style={{ color: BR.ink }}>{SELECTED.supplier}</b> 評核分數 <b style={{ color: tone }}>{score}</b>。
-                          其他供應商不在此查詢範圍。
-                        </div>
+                        {suppliers.length === 0 ? (
+                          <div style={{ fontSize: 11, color: BR.inkSoft, padding: "8px 0" }}>
+                            尚未有任何上傳記錄。上傳第一張報價單後，這裡會自動累積年度評鑑資料。
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-baseline justify-between text-[10px] font-bold border-b pb-1 mb-1" style={{ color: BR.inkFaint, borderColor: BR.border, fontFamily: FONT_MONO }}>
+                              <span style={{ width: "40%" }}>供應商</span>
+                              <span style={{ width: "15%", textAlign: "right" }}>件數</span>
+                              <span style={{ width: "20%", textAlign: "right" }}>平均漲幅</span>
+                              <span style={{ width: "12%", textAlign: "right" }}>評核分</span>
+                              <span style={{ width: "13%", textAlign: "right" }}>最新</span>
+                            </div>
+                            {suppliers.map(([sup, rs]) => {
+                              const count = rs.length;
+                              const avgHike = +(rs.reduce((s, r) => s + ((r.newPrice - r.oldPrice) / r.oldPrice) * 100, 0) / count).toFixed(1);
+                              const score = scoreOf(avgHike);
+                              const tone = toneOf(score);
+                              const latest = rs.reduce((max, r) => Math.max(max, r.uploadedAt ?? 0), 0);
+                              const isActive = uploadedRows[0]?.supplier === sup;
+                              return (
+                                <div key={sup} className="flex items-baseline justify-between text-xs py-1" style={{ borderBottom: `1px solid ${BR.border}40` }}>
+                                  <span style={{ color: BR.ink, fontWeight: isActive ? 800 : 600, width: "40%" }}>
+                                    {isActive && <span style={{ color: BR.green, marginRight: 4 }}>●</span>}
+                                    {sup}
+                                  </span>
+                                  <span style={{ fontFamily: FONT_MONO, color: BR.inkSoft, width: "15%", textAlign: "right" }}>{count} 張</span>
+                                  <span style={{ fontFamily: FONT_MONO, color: avgHike > 10 ? BR.red : avgHike > 0 ? BR.amber : BR.greenDeep, width: "20%", textAlign: "right", fontWeight: 700 }}>
+                                    {avgHike > 0 ? "+" : ""}{avgHike.toFixed(1)}%
+                                  </span>
+                                  <span style={{ fontFamily: FONT_MONO, fontWeight: 800, color: tone, width: "12%", textAlign: "right" }}>{score}</span>
+                                  <span style={{ fontFamily: FONT_MONO, fontSize: 10, color: BR.inkFaint, width: "13%", textAlign: "right" }}>
+                                    {latest ? new Date(latest).toLocaleDateString("zh-TW", { month: "numeric", day: "numeric" }) : "—"}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                            <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
+                              <div style={{ fontSize: 10, color: BR.inkSoft, lineHeight: 1.5, flex: 1, minWidth: 200 }}>
+                                每張報價單自動歸檔 → 切換供應商時前一家整批移入此處 → 年度評核打分（漲幅次數 / 合理超出 / 凍漲表現）。
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={exportCSV}
+                                  style={{
+                                    fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.greenDeep,
+                                    background: "#fff", border: `1px solid ${BR.greenLine}`, borderRadius: 4,
+                                    padding: "4px 10px", letterSpacing: "0.06em", cursor: "pointer",
+                                  }}
+                                >
+                                  📥 匯出 CSV
+                                </button>
+                                {historyRows.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (confirm(`確定要清空歷史資料夾的 ${historyRows.length} 張歷史報價嗎？（不影響目前查詢中的 ${uploadedRows.length} 張）`)) {
+                                        setHistoryRows([]);
+                                        showToast("✓ 已清空歷史報價資料夾");
+                                      }
+                                    }}
+                                    style={{
+                                      fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.red,
+                                      background: "#fff", border: `1px solid ${BR.red}40`, borderRadius: 4,
+                                      padding: "4px 10px", letterSpacing: "0.06em", cursor: "pointer",
+                                    }}
+                                  >
+                                    清空歷史
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -696,18 +821,27 @@ export default function QuotationAnalyzerPage() {
                   {uploadedRows.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => { setUploadedRows([]); setSelectedIdx(0); showToast("✓ 已清空上傳報價，還原 demo 種子"); }}
+                      onClick={() => {
+                        const sup = uploadedRows[0]?.supplier;
+                        // 結束本廠商查詢 → 整批歸檔到歷史資料夾
+                        setHistoryRows((h) => [...uploadedRows, ...h]);
+                        setUploadedRows([]);
+                        setSelectedIdx(0);
+                        showToast(`✓ ${sup} 的 ${uploadedRows.length} 張已歸檔至歷史資料夾 · 還原 demo 種子`);
+                      }}
                       style={{
                         fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700, color: BR.red,
                         background: "#fff", border: `1px solid ${BR.red}40`, borderRadius: 4,
                         padding: "2px 7px", letterSpacing: "0.06em", cursor: "pointer",
                       }}
                     >
-                      ✕ 清空上傳 / 還原 demo
+                      ↵ 結束本廠商查詢（自動歸檔）
                     </button>
                   )}
                   <span style={{ fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700, color: BR.greenDeep, background: BR.greenSoft, padding: "2px 7px", borderRadius: 4, letterSpacing: "0.06em", border: `1px solid ${BR.greenLine}` }}>
-                    查詢中　1 / 1
+                    {uploadedRows.length > 0
+                      ? `${uploadedRows[0].supplier} · ${uploadedRows.length} 張查詢中`
+                      : `查詢中　1 / 1`}
                   </span>
                 </div>
               </div>
@@ -726,7 +860,7 @@ export default function QuotationAnalyzerPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {allRows.map((r, i) => i).filter((i) => i === selectedIdx).map((i) => {
+                    {allRows.map((r, i) => i).filter((i) => uploadedRows.length > 0 ? true : i === selectedIdx).map((i) => {
                       const r = allRows[i];
                       const pct = ((r.newPrice - r.oldPrice) / r.oldPrice) * 100;
                       const selected = true;
