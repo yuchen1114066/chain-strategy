@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { parts, suppliers, bom, models } from "@/lib/erp/seed";
 import { initialSlips } from "@/lib/erp/warehouse";
 
@@ -343,6 +344,17 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
             </div>
             <div style={{ fontSize: 16, fontWeight: 700 }}>倉庫零件查詢</div>
           </div>
+
+          <Link
+            href="/erp/mobile/material-card"
+            style={{
+              background: BR.green, border: "none", color: "#fff",
+              padding: "8px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+              textDecoration: "none", fontFamily: "inherit", whiteSpace: "nowrap",
+            }}
+          >
+            📋 進出卡
+          </Link>
 
           {/* 用戶頭像按鈕 */}
           <div style={{ position: "relative" }}>
