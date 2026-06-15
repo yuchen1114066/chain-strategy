@@ -30,12 +30,12 @@ const FONT_MONO = "'IBM Plex Mono', ui-monospace, Menlo, monospace";
 
 // 子模組（左側 menu / nav strip）
 const SUBMODULES = [
-  { key: "ocr",      icon: "▤", title: "報價 OCR",        en: "Quotation OCR",        active: true  },
-  { key: "should",   icon: "◈", title: "Should Cost",     en: "Should Cost Engine",   active: true  },
-  { key: "validate", icon: "✦", title: "Price Validation",en: "Price Validation",     active: true  },
-  { key: "comm",     icon: "◉", title: "Commodity Engine",en: "Commodity Mapping",    active: true  },
-  { key: "history",  icon: "↻", title: "Supplier History",en: "Supplier History",     active: false },
-  { key: "copilot",  icon: "⚡", title: "Negotiation Copilot", en: "Negotiation Copilot", active: false },
+  { key: "ocr",      icon: "▤", title: "報價單辨識",   en: "Quotation OCR",        active: true  },
+  { key: "should",   icon: "◈", title: "應該成本",     en: "Should Cost Engine",   active: true  },
+  { key: "validate", icon: "✦", title: "價格合理性",   en: "Price Validation",     active: true  },
+  { key: "comm",     icon: "◉", title: "原物料 mapping", en: "Commodity Mapping",  active: true  },
+  { key: "history",  icon: "↻", title: "供應商歷史",   en: "Supplier History",     active: false },
+  { key: "copilot",  icon: "⚡", title: "議價助手",     en: "Negotiation Copilot",  active: false },
 ];
 
 // Step 1 — Mock OCR 抓出來的內容
@@ -591,11 +591,14 @@ export default function QuotationAnalyzerPage() {
           </div>
           <h1 style={{ fontFamily: FONT_HEAD, fontSize: 32, fontWeight: 700, lineHeight: 1.1 }}>
             <span style={{ color: BR.green, marginRight: 8 }}>✦</span>
-            AI Quotation Analyzer
+            AI 報價分析引擎
+            <span style={{ fontFamily: FONT_MONO, fontSize: 14, color: BR.inkFaint, marginLeft: 12, fontWeight: 500 }}>
+              AI Quotation Analyzer
+            </span>
           </h1>
-          <p style={{ fontSize: 14, color: BR.inkSoft, marginTop: 6 }}>
-            <b style={{ color: BR.ink }}>關鍵不是報價</b>，而是 <b style={{ color: BR.purple }}>Cost Breakdown</b>。
-            供應商給的價我們不直接收 — 先 OCR、找 BOM、抓商品價、跑 Should-Cost，再決定接不接。
+          <p style={{ fontSize: 14, color: BR.inkSoft, marginTop: 6, lineHeight: 1.65 }}>
+            <b style={{ color: BR.ink }}>關鍵不是報價</b>，而是 <b style={{ color: BR.purple }}>成本拆解（Cost Breakdown）</b>。
+            供應商開的價我們不直接收 — 先<b>辨識報價單（OCR）</b>、找<b>料件結構（BOM）</b>、抓<b>原物料市價</b>、跑<b>應該成本（Should-Cost）</b>，再決定接不接。
           </p>
           <div style={{ marginTop: 10 }}>
             <button
@@ -1236,7 +1239,7 @@ export default function QuotationAnalyzerPage() {
         </Card>
 
         {/* Step 4 · Should Cost Engine — 3-column (Cost Breakdown / Market Impact / AI Verdict) */}
-        <StepHeader badge="STEP 4" title="Should Cost Engine" en="Compute fair upper limit · 3-column view for CEO" desc="左：成本結構 · 中：市場波動 · 右：AI 判定 — CEO 一眼看出合理 vs 喊價" />
+        <StepHeader badge="STEP 4" title="應該成本推導引擎" en="Should Cost Engine · 3-column view for CEO" desc="左：成本結構 · 中：市場波動 · 右：AI 判定 — CEO 一眼看出合理 vs 喊價" />
         <Card>
           <div className="grid lg:grid-cols-3 gap-4">
             {/* 左 · Cost Breakdown */}
@@ -1440,15 +1443,15 @@ export default function QuotationAnalyzerPage() {
         </Card>
 
         {/* ▶▶▶ 補強 ① · Supplier Price History — 這家供應商歷史漲價軌跡 */}
-        <StepHeader badge="ENHANCE 1" title="Supplier Price History" en="供應商歷史漲價曲線" desc="過去 6 年這家供應商對此料漲了幾次？越來越過分了嗎？" tone={BR.purple} />
+        <StepHeader badge="ENHANCE 1" title="供應商歷年漲價曲線" en="Supplier Price History" desc="過去 6 年這家供應商對此料漲了幾次？越來越過分了嗎？" tone={BR.purple} />
         <SupplierPriceHistoryCard selected={SELECTED} />
 
         {/* ▶▶▶ 補強 ② · Alternative Supplier Recommendation — 該換家了嗎 */}
-        <StepHeader badge="ENHANCE 2" title="Alternative Supplier" en="替代供應商建議" desc="若議價失敗，AI 自動推薦可立即詢價的替代供應商" tone={BR.purple} />
+        <StepHeader badge="ENHANCE 2" title="替代供應商建議" en="Alternative Supplier" desc="若議價失敗，AI 自動推薦可立即詢價的替代供應商" tone={BR.purple} />
         <AlternativeSupplierCard buffered={sc.buffered} selected={SELECTED} />
 
         {/* ▶▶▶ 補強 ③ · Negotiation Copilot — AI 直接草擬議價信 */}
-        <StepHeader badge="ENHANCE 3" title="Negotiation Copilot" en="AI 草擬議價信稿" desc="業務 / 採購不會寫 — AI 都做這些（不只給數字，給文字）" tone={BR.purple} />
+        <StepHeader badge="ENHANCE 3" title="AI 草擬議價信稿" en="Negotiation Copilot" desc="業務 / 採購不會寫 — AI 都做這些（不只給數字，給文字）" tone={BR.purple} />
         <NegotiationCopilotCard
           partNo={SELECTED.partNo}
           supplier={SELECTED.supplier}
@@ -1458,7 +1461,7 @@ export default function QuotationAnalyzerPage() {
         />
 
         {/* 結果 · 供應商不合理 → 議價建議 */}
-        <StepHeader badge="OUTPUT" title="結果 · 議價建議" en="If supplier unreasonable → Negotiation Brief" desc="自動產出可在會議念出的證據包" tone={BR.red} />
+        <StepHeader badge="OUTPUT" title="議價建議書" en="Negotiation Brief — auto-generated evidence package" desc="供應商開價不合理 → 自動產出可在會議念出的證據包" tone={BR.red} />
         <Card style={{ background: BR.greenInk, color: "#fff" }}>
           <div className="grid lg:grid-cols-3 gap-5">
             <div>
