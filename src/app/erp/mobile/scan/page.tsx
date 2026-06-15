@@ -705,24 +705,35 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
                 "9": { label: "9 費用類", color: "#d4351c", bg: "#fdecea" },
                 "S": { label: "S 半成品", color: "#0369a1", bg: "#e0f2fe" },
               };
-              const kindToErp: Record<string, string> = {
-                purchase: "2", self: "3", outsource: "3",
-                feature: "4", dummy: "9", option: "5",
-              };
-              const catToErp: Record<string, string> = {
-                半成品: "S", 原料: "1", 化工: "1", 鐵心: "1", 膠材: "1",
-                包材: "9", 包裝: "9",
-                鋼架: "2", 飛輪: "2", 阻力: "2", 控制板: "2", 顯示器: "2",
-                座墊: "2", 踏板: "2", 皮帶: "2", 電源: "2", 馬達: "2",
-                框架: "2", 扣件: "2", 軸件: "2", 軸承: "2", 磁件: "2",
-                索線: "2", 套件: "2", 彈簧: "2", 絕緣材: "2", 塑件: "2",
-                電線: "2", 傳動: "2", 電氣: "2", 其他: "2",
-              };
+              const ERP_CODES = new Set(["1", "2", "3", "4", "5", "9", "S"]);
+
               function getErpCat(p: MergedPart) {
-                if (p.category && catToErp[p.category]) return catToErp[p.category];
-                if (p.kind && kindToErp[p.kind]) return kindToErp[p.kind];
+                const cat = (p.category ?? "").trim();
+                if (ERP_CODES.has(cat)) return cat;
+                if (cat.startsWith("1") || /原料/.test(cat)) return "1";
+                if (cat.startsWith("2") || /物料/.test(cat)) return "2";
+                if (cat.startsWith("3") || /在製/.test(cat)) return "3";
+                if (cat.startsWith("4") || /製成|成品/.test(cat)) return "4";
+                if (cat.startsWith("5") || /商品/.test(cat)) return "5";
+                if (cat.startsWith("9") || /費用/.test(cat)) return "9";
+                if (cat.toUpperCase() === "S" || /半成品/.test(cat)) return "S";
+
+                const name = (p.name ?? "").trim();
+                const code = (p.code ?? "").trim().toUpperCase();
+                if (/半成品/.test(name)) return "S";
+                if (/包裝|包材|外箱|紙箱|棧板/.test(name)) return "9";
+                if (/治具|治工具|模具|夾具/.test(name)) return "9";
+                if (code.startsWith("SP") || code.startsWith("SPM")) return "9";
+
+                const kind = p.kind ?? "";
+                if (kind === "self" || kind === "outsource") return "3";
+                if (kind === "feature") return "4";
+                if (kind === "dummy") return "9";
+                if (kind === "option") return "5";
+
                 return "2";
               }
+
               const grouped = new Map<string, MergedPart[]>();
               for (const p of parts) {
                 const cat = getErpCat(p);
