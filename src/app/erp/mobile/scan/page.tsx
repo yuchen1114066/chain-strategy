@@ -645,6 +645,10 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
                     }}>
                       庫存 {p.stockOnHand} {p.unit}
                     </div>
+                    {(() => {
+                      const oq = digitalPOs.filter((po) => po.partId === p.id && !["draft", "received", "closed", "rejected"].includes(po.status)).reduce((s, po) => s + po.qty, 0);
+                      return oq > 0 ? <div style={{ fontSize: 10, fontWeight: 700, marginTop: 1, color: "#7c3aed" }}>在途 {oq} {p.unit}</div> : null;
+                    })()}
                   </button>
                 ))}
               </div>
@@ -676,6 +680,10 @@ function PartCard({ code }: { code: string }) {
   const low = p.stockOnHand < p.safetyStock;
   const pct = p.safetyStock > 0 ? Math.round((p.stockOnHand / p.safetyStock) * 100) : 999;
   const location = LOCATION_MAP[p.code] ?? "—";
+
+  const onOrderQty = digitalPOs
+    .filter((po) => po.partId === p.id && !["draft", "received", "closed", "rejected"].includes(po.status))
+    .reduce((sum, po) => sum + po.qty, 0);
 
   const usedBy = bom
     .filter((b) => b.partId === p.id && b.isActive)
@@ -719,8 +727,9 @@ function PartCard({ code }: { code: string }) {
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", borderBottom: `1px solid ${BR.border}` }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: `1px solid ${BR.border}` }}>
           <NumberBlock label="在庫數量" value={p.stockOnHand.toString()} unit={p.unit} color={stockColor} bg={stockBg} large />
+          <NumberBlock label="採購在途" value={onOrderQty > 0 ? onOrderQty.toString() : "—"} unit={onOrderQty > 0 ? p.unit : undefined} color={onOrderQty > 0 ? "#7c3aed" : BR.inkFaint} bg={onOrderQty > 0 ? "#f5f3ff" : "#fff"} large />
           <NumberBlock label="安全庫存" value={p.safetyStock.toString()} unit={p.unit} color={BR.inkSoft} bg="#fff" />
           <NumberBlock label="倉位" value={location} color={BR.cyan} bg={BR.cyanSoft} mono />
         </div>
