@@ -153,27 +153,27 @@ export default function MasterDataPage() {
         {/* 三個上傳區塊 */}
         <UploadSection
           section="items"
-          onSave={async (rows) => {
+          onSave={async (rows, { fileName }) => {
             await saveItems(rows as ItemMaster[]);
-            await logUpload({ ts: Date.now(), type: "items", source: "csv", count: rows.length });
+            await logUpload({ ts: Date.now(), type: "items", source: "csv", count: rows.length, fileName });
             await refresh();
             showToast(`✓ 已儲存 ${rows.length} 筆料件主檔`);
           }}
         />
         <UploadSection
           section="bom"
-          onSave={async (rows) => {
+          onSave={async (rows, { fileName }) => {
             await saveBom(rows as BomEntry[]);
-            await logUpload({ ts: Date.now(), type: "bom", source: "csv", count: rows.length });
+            await logUpload({ ts: Date.now(), type: "bom", source: "csv", count: rows.length, fileName });
             await refresh();
             showToast(`✓ 已儲存 ${rows.length} 筆 BOM 結構`);
           }}
         />
         <UploadSection
           section="purchases"
-          onSave={async (rows) => {
+          onSave={async (rows, { fileName }) => {
             await savePurchases(rows as PurchaseRecord[]);
-            await logUpload({ ts: Date.now(), type: "purchases", source: "csv", count: rows.length });
+            await logUpload({ ts: Date.now(), type: "purchases", source: "csv", count: rows.length, fileName });
             await refresh();
             showToast(`✓ 已儲存 ${rows.length} 筆採購歷史`);
           }}
@@ -265,7 +265,7 @@ function RecentUploadsPanel({ logs, onRefresh }: { logs: UploadLog[]; onRefresh:
 
       {open && (
         <div className="mt-3 overflow-hidden rounded-[8px]" style={{ border: `1px solid ${BR.border}` }}>
-          <div className="grid grid-cols-[120px_80px_60px_80px_1fr_120px]" style={{
+          <div className="grid grid-cols-[120px_80px_70px_70px_1fr_110px]" style={{
             background: BR.greenInk, color: "#fff",
             padding: "6px 10px",
             fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
@@ -274,11 +274,11 @@ function RecentUploadsPanel({ logs, onRefresh }: { logs: UploadLog[]; onRefresh:
             <div>類型</div>
             <div className="text-right">筆數</div>
             <div>來源</div>
-            <div>詳細</div>
+            <div>詳細（檔名 / 父件 / 報表）</div>
             <div>絕對時間</div>
           </div>
           {logs.map((log) => (
-            <UploadLogRow key={log.id} log={log} />
+            <UploadLogRow key={log.id} log={log} isDuplicate={detectDuplicate(log, logs)} />
           ))}
         </div>
       )}
@@ -292,20 +292,26 @@ const TYPE_LABEL: Record<UploadLog["type"], { label: string; tone: string }> = {
   purchases: { label: "採購", tone: "#b8860b" },
 };
 
-function UploadLogRow({ log }: { log: UploadLog }) {
+function UploadLogRow({ log, isDuplicate }: { log: UploadLog; isDuplicate: boolean }) {
   const t = TYPE_LABEL[log.type];
-  const detail = [
+  const detailParts = [
     log.parentPartNo ? `父件 ${log.parentPartNo}` : null,
     log.fileName,
     log.removed ? `替換舊 ${log.removed} 筆` : null,
     log.detail,
-  ].filter(Boolean).join(" · ");
+  ].filter(Boolean) as string[];
+  const detail = detailParts.join(" · ");
   return (
-    <div className="grid grid-cols-[120px_80px_60px_80px_1fr_120px] items-center" style={{
-      padding: "6px 10px",
-      borderTop: `1px solid ${BR.border}`,
-      fontFamily: FONT_MONO, fontSize: 11.5, color: BR.ink,
-    }}>
+    <div
+      className="grid grid-cols-[120px_80px_70px_70px_1fr_110px] items-center"
+      title={isDuplicate ? "與最近一小時內的另一筆完全相同（同類型 + 同筆數 + 同檔名）— 可能重複上傳" : undefined}
+      style={{
+        padding: "6px 10px",
+        borderTop: `1px solid ${BR.border}`,
+        fontFamily: FONT_MONO, fontSize: 11.5, color: BR.ink,
+        background: isDuplicate ? "#fffaf0" : "transparent",
+      }}
+    >
       <div style={{ color: BR.greenDeep, fontWeight: 700 }}>{relativeTime(log.ts)}</div>
       <div>
         <span style={{
@@ -323,14 +329,43 @@ function UploadLogRow({ log }: { log: UploadLog }) {
       }}>
         {log.source === "ocr" ? "📄 OCR" : log.source === "csv" ? "📊 CSV" : log.source}
       </div>
-      <div style={{
+      <div className="flex items-center gap-2" style={{
         color: BR.inkSoft, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
       }}>
-        {detail || "—"}
+        {isDuplicate && (
+          <span style={{
+            fontSize: 10, fontWeight: 700, color: "#fff", background: BR.amber,
+            padding: "1px 6px", borderRadius: 3, flexShrink: 0,
+          }}>↻ 可能重複</span>
+        )}
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+          {detail || <span style={{ color: BR.inkFaint }}>—（早期版本上傳，未記檔名）</span>}
+        </span>
       </div>
       <div style={{ color: BR.inkFaint, fontSize: 10.5 }}>{fmtFullTs(log.ts)}</div>
     </div>
   );
+}
+
+// 判斷：最近 1 小時內存不存在同類型 + 同筆數 + 同檔名 + 同父件的另一筆
+// 完全相同 → 多半是使用者連點兩下、或網路慢按 N 次
+function detectDuplicate(log: UploadLog, all: UploadLog[]): boolean {
+  const ONE_HOUR = 60 * 60 * 1000;
+  const idx = all.findIndex((l) => l.id === log.id);
+  if (idx < 0) return false;
+  for (let i = idx + 1; i < all.length; i++) {
+    const earlier = all[i];
+    if (log.ts - earlier.ts > ONE_HOUR) break; // 已經超過 1 小時，不再往前找
+    if (
+      earlier.type === log.type &&
+      earlier.count === log.count &&
+      (earlier.fileName || "") === (log.fileName || "") &&
+      (earlier.parentPartNo || "") === (log.parentPartNo || "")
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function relativeTime(ts: number): string {
@@ -413,7 +448,7 @@ function UploadSection({
   onSave,
 }: {
   section: Section;
-  onSave: (rows: unknown[]) => Promise<void>;
+  onSave: (rows: unknown[], meta: { fileName: string }) => Promise<void>;
 }) {
   const info = SECTION_INFO[section];
   const [state, setState] = useState<StagedState>({ kind: "empty" });
@@ -540,7 +575,7 @@ function UploadSection({
           onRemap={remap}
           onCancel={() => setState({ kind: "empty" })}
           onConfirm={async () => {
-            await onSave(state.report.rows);
+            await onSave(state.report.rows, { fileName: state.fileName });
             setState({ kind: "empty" });
           }}
         />
