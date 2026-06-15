@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { parts } from "@/lib/erp/seed";
+import { parts, suppliers, bom, models } from "@/lib/erp/seed";
+import { initialSlips } from "@/lib/erp/warehouse";
+import { digitalPOs } from "@/lib/erp/supplier-portal";
+import { outsourceOrders } from "@/lib/erp/outsource";
 
-// ─── Brand colors (matching scan page) ───
 const BR = {
   green: "#76b900", greenDeep: "#4d7c0f", greenInk: "#0c1908",
   greenSoft: "#f0f7e4", greenLine: "#dcebc4",
@@ -17,210 +19,257 @@ const BR = {
 } as const;
 const FONT = "'Noto Sans TC', 'Sora', system-ui, sans-serif";
 
-// ─── localStorage keys ───
-const MAT_KEY = "chihua.material_master";
-const TX_KEY = "chihua.material_transactions";
-const HANDLER_KEY = "chihua.default_handler";
-
-// ─── Types ───
-type Material = {
-  code: string;
-  name: string;
-  spec: string;
-  location: string;
-  unit: string;
-  safetyStock: number;
-  machine: string;
-  initStock: number;
+const KIND_LABEL: Record<string, string> = {
+  purchase: "採購件", self: "自製件", dummy: "虛設品號",
+  feature: "Feature", outsource: "託外加工", option: "Option",
 };
 
-type Transaction = {
-  id: number;
-  code: string;
-  type: "in" | "out";
-  date: string;
-  summary: string;
-  quantity: number;
-  handler: string;
-  remark: string;
-  createdAt: string;
+const PO_STATUS_LABEL: Record<string, { text: string; color: string; bg: string }> = {
+  draft:         { text: "草稿",   color: "#9aa291", bg: "#f5f5f3" },
+  sent:          { text: "已發送", color: "#b8860b", bg: "#fffaf0" },
+  acked:         { text: "已確認", color: "#0891b2", bg: "#ecfeff" },
+  in_production: { text: "生產中", color: "#4d7c0f", bg: "#f0f7e4" },
+  shipped:       { text: "已出貨", color: "#7c3aed", bg: "#f5f3ff" },
+  received:      { text: "已收貨", color: "#059669", bg: "#ecfdf5" },
+  closed:        { text: "已結案", color: "#6b7280", bg: "#f9fafb" },
+  rejected:      { text: "已拒絕", color: "#d4351c", bg: "#fdecea" },
 };
 
-// ─── Helpers ───
-function loadMaterials(): Record<string, Material> {
-  try { return JSON.parse(localStorage.getItem(MAT_KEY) || "{}"); } catch { return {}; }
-}
-function saveMaterials(d: Record<string, Material>) { localStorage.setItem(MAT_KEY, JSON.stringify(d)); }
-function loadTransactions(): Transaction[] {
-  try { return JSON.parse(localStorage.getItem(TX_KEY) || "[]"); } catch { return []; }
-}
-function saveTransactions(d: Transaction[]) { localStorage.setItem(TX_KEY, JSON.stringify(d)); }
-
-function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-function fmtDate(s: string) {
-  if (!s) return "";
-  const d = new Date(s);
-  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+const LOCATION_MAP: Record<string, string> = {};
+for (const slip of initialSlips) {
+  for (const item of slip.items) {
+    if (item.location && item.partCode) {
+      LOCATION_MAP[item.partCode] = item.location;
+    }
+  }
 }
 
-function getItemStock(code: string, mats: Record<string, Material>, txs: Transaction[]) {
-  const mat = mats[code];
-  let stock = mat?.initStock ?? 0;
-  txs.filter(t => t.code === code).forEach(t => {
-    stock += t.type === "in" ? t.quantity : -t.quantity;
-  });
-  return stock;
+const WAREHOUSE_STAFF = [
+  { id: "242", name: "賴允正", role: "倉管員" },
+  { id: "233", name: "林郁展", role: "倉管員" },
+  { id: "243", name: "姜湘淇", role: "倉管員" },
+  { id: "235", name: "范成義", role: "倉管員" },
+];
+const STORAGE_KEY = "gascc.wh.login";
+
+type LoginState = { id: string; name: string; role: string; at: string };
+
+export default function MobileScanPage() {
+  const [user, setUser] = useState<LoginState | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try { setUser(JSON.parse(saved)); } catch { /* ignore */ }
+    }
+    setLoaded(true);
+  }, []);
+
+  function handleLogin(staff: typeof WAREHOUSE_STAFF[0]) {
+    const state: LoginState = { ...staff, at: new Date().toISOString() };
+    setUser(state);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function handleLogout() {
+    setUser(null);
+    localStorage.removeItem(STORAGE_KEY);
+  }
+
+  if (!loaded) return null;
+  if (!user) return <LoginScreen onLogin={handleLogin} />;
+  return <ScanScreen user={user} onLogout={handleLogout} />;
 }
 
-// ─── Tab type ───
-type TabId = "card" | "records" | "settings";
+// ============================================================
+// Login Screen
+// ============================================================
 
-// ─── Main page ───
-export default function MaterialCardPage() {
-  const [tab, setTab] = useState<TabId>("card");
-  const [toast, setToast] = useState("");
+function LoginScreen({ onLogin }: { onLogin: (s: typeof WAREHOUSE_STAFF[0]) => void }) {
+  const [empId, setEmpId] = useState("");
+  const [error, setError] = useState("");
 
-  function showToast(msg: string) {
-    setToast(msg);
-    setTimeout(() => setToast(""), 2500);
+  function submit() {
+    const q = empId.trim().toUpperCase();
+    const found = WAREHOUSE_STAFF.find((s) => s.id === q || s.name === empId.trim());
+    if (found) {
+      onLogin(found);
+    } else {
+      setError("找不到此工號或姓名，請確認後重試");
+    }
   }
 
   return (
-    <div style={{ minHeight: "100dvh", background: BR.page, fontFamily: FONT, color: BR.ink, display: "flex", flexDirection: "column" }}>
-      {/* Top bar */}
-      <div style={{ background: BR.greenInk, color: "#fff", padding: "10px 16px", position: "sticky", top: 0, zIndex: 50 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Link
-            href="/erp/mobile/scan"
-            style={{ background: "rgba(255,255,255,0.12)", border: "none", color: "#fff", padding: "8px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: "none" }}
-          >
-            ← 掃描
-          </Link>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, opacity: 0.7, letterSpacing: "0.1em", fontFamily: "'Sora', sans-serif" }}>CHI HUA · WAREHOUSE</div>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>物料進出卡</div>
+    <div style={{
+      minHeight: "100dvh", background: BR.greenInk, fontFamily: FONT,
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      padding: 24,
+    }}>
+      <div style={{
+        background: "#fff", borderRadius: 20, padding: "36px 28px", width: "100%",
+        maxWidth: 360, boxShadow: "0 8px 40px rgba(0,0,0,.25)",
+      }}>
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>📦</div>
+          <div style={{
+            fontFamily: "'Sora', sans-serif", fontSize: 11, fontWeight: 700,
+            letterSpacing: "0.15em", color: BR.green, marginBottom: 4,
+          }}>
+            CHI HUA · WAREHOUSE
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: BR.greenInk }}>
+            倉庫零件查詢系統
+          </div>
+          <div style={{ fontSize: 12, color: BR.inkFaint, marginTop: 4 }}>
+            請輸入工號或姓名登入
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: BR.inkSoft, display: "block", marginBottom: 6 }}>
+            工號 / 姓名
+          </label>
+          <input
+            type="text"
+            value={empId}
+            onChange={(e) => { setEmpId(e.target.value); setError(""); }}
+            onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+            placeholder="例：242 或 賴允正"
+            style={{
+              width: "100%", padding: "14px 16px", fontSize: 16, borderRadius: 12,
+              border: `1.5px solid ${error ? BR.red : BR.borderHi}`, background: "#fff",
+              outline: "none", fontFamily: FONT,
+            }}
+            autoFocus
+          />
+        </div>
+
+        {error && (
+          <div style={{
+            fontSize: 12, color: BR.red, background: BR.redSoft,
+            padding: "8px 12px", borderRadius: 8, marginBottom: 12,
+          }}>
+            {error}
+          </div>
+        )}
+
+        <button
+          onClick={submit}
+          disabled={!empId.trim()}
+          style={{
+            width: "100%", padding: "14px", fontSize: 16, fontWeight: 700,
+            color: "#fff", background: !empId.trim() ? BR.inkFaint : BR.greenInk,
+            border: "none", borderRadius: 12, cursor: !empId.trim() ? "not-allowed" : "pointer",
+            fontFamily: FONT,
+          }}
+        >
+          登入
+        </button>
+
+        <div style={{ marginTop: 20, borderTop: `1px solid ${BR.border}`, paddingTop: 16 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: BR.inkFaint, marginBottom: 8, letterSpacing: "0.06em" }}>
+            倉庫人員（點擊快速登入）
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {WAREHOUSE_STAFF.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => onLogin(s)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+                  background: BR.greenSoft, border: `1px solid ${BR.greenLine}`, borderRadius: 10,
+                  cursor: "pointer", fontFamily: FONT, textAlign: "left",
+                }}
+              >
+                <span style={{
+                  fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 700,
+                  color: BR.greenDeep, minWidth: 50,
+                }}>
+                  {s.id}
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: BR.greenInk }}>
+                  {s.name}
+                </span>
+                <span style={{ fontSize: 11, color: BR.inkFaint, flex: 1, textAlign: "right" }}>
+                  {s.role}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div style={{ display: "flex", borderBottom: `1.5px solid ${BR.border}`, background: "#fff" }}>
-        {([["card", "📋 進出登記"], ["records", "📊 歷史記錄"], ["settings", "⚙ 設定"]] as [TabId, string][]).map(([id, label]) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            style={{
-              flex: 1, padding: "10px 0", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer",
-              background: tab === id ? BR.greenSoft : "#fff",
-              color: tab === id ? BR.greenDeep : BR.inkFaint,
-              borderBottom: tab === id ? `2.5px solid ${BR.green}` : "2.5px solid transparent",
-              fontFamily: FONT,
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Content */}
-      <div style={{ flex: 1, overflow: "auto", padding: "12px 14px", paddingBottom: 80 }}>
-        {tab === "card" && <CardTab showToast={showToast} />}
-        {tab === "records" && <RecordsTab />}
-        {tab === "settings" && <SettingsTab showToast={showToast} />}
-      </div>
-
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: "fixed", top: 70, left: "50%", transform: "translateX(-50%)",
-          background: "#323232", color: "#fff", padding: "10px 24px", borderRadius: 8, fontSize: 14, zIndex: 300,
-          animation: "fadeIn 0.3s ease",
-        }}>
-          {toast}
-        </div>
-      )}
-
-      {/* Footer */}
-      <div style={{
-        padding: "6px 14px", fontSize: 10, color: BR.inkFaint, textAlign: "center",
-        borderTop: `1px solid ${BR.border}`, background: "#fff",
-        position: "sticky", bottom: 0,
-      }}>
-        祺驊股份有限公司 · 物料進出記錄（本機儲存）
+      <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 10, marginTop: 20, textAlign: "center" }}>
+        祺驊股份有限公司 · CHI HUA FITNESS CO., LTD.
+        <br />純讀取，不回寫鼎新 ERP
       </div>
     </div>
   );
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Card Tab - 物料進出登記
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ============================================================
+// Scan Screen（登入後的主畫面）
+// ============================================================
 
-function CardTab({ showToast }: { showToast: (m: string) => void }) {
-  const [materials, setMaterials] = useState<Record<string, Material>>({});
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [code, setCode] = useState("");
-  const [txType, setTxType] = useState<"in" | "out">("in");
-  const [date, setDate] = useState(todayStr());
-  const [summary, setSummary] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [handler, setHandler] = useState("");
-  const [remark, setRemark] = useState("");
+function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void }) {
+  const [query, setQuery] = useState("");
+  const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState("");
+  const [showMenu, setShowMenu] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const scannerRef = useRef<import("html5-qrcode").Html5Qrcode | null>(null);
   const mountedRef = useRef(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSearch, setShowSearch] = useState(false);
+
+  const filtered = useMemo(() => {
+    const raw = query.trim().toLowerCase();
+    if (!raw) return [];
+
+    // 整段直接比對（有命中就優先回傳）
+    const exact = parts.filter(
+      (p) =>
+        p.code.toLowerCase().includes(raw) ||
+        p.name.toLowerCase().includes(raw) ||
+        (p.spec ?? "").toLowerCase().includes(raw) ||
+        p.category.toLowerCase().includes(raw)
+    );
+    if (exact.length > 0) return exact.slice(0, 20);
+
+    // 整段比對不到 → 拆解關鍵字（空格分隔），每個 part 至少要命中一個關鍵字
+    const tokens = raw.split(/\s+/).filter((t) => t.length >= 2);
+    if (tokens.length === 0) return [];
+
+    const scored = parts
+      .map((p) => {
+        const haystack = `${p.code} ${p.name} ${p.spec ?? ""} ${p.category}`.toLowerCase();
+        const hits = tokens.filter((t) => haystack.includes(t)).length;
+        return { p, hits };
+      })
+      .filter((x) => x.hits > 0)
+      .sort((a, b) => b.hits - a.hits);
+
+    return scored.slice(0, 20).map((x) => x.p);
+  }, [query]);
+
+  const selected = selectedCode ? parts.find((p) => p.code === selectedCode) : null;
+
+  function handleSelect(code: string) {
+    setSelectedCode(code);
+    setQuery("");
+  }
 
   useEffect(() => {
     mountedRef.current = true;
-    setMaterials(loadMaterials());
-    setTransactions(loadTransactions());
-    setHandler(localStorage.getItem(HANDLER_KEY) || "");
     return () => { mountedRef.current = false; };
   }, []);
-
-  const mat = materials[code];
-  const stock = code ? getItemStock(code, materials, transactions) : 0;
-  const safetyStock = mat?.safetyStock ?? 0;
-  const isLow = safetyStock > 0 && stock < safetyStock;
-
-  const itemTxs = transactions.filter(t => t.code === code).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-  // Search ERP parts
-  const searchResults = searchQuery.trim()
-    ? parts.filter(p =>
-        p.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.name.toLowerCase().includes(searchQuery.toLowerCase())
-      ).slice(0, 10)
-    : [];
-
-  function selectFromERP(p: typeof parts[0]) {
-    setCode(p.code);
-    // Auto-fill material master if not exists
-    const mats = loadMaterials();
-    if (!mats[p.code]) {
-      mats[p.code] = {
-        code: p.code, name: p.name, spec: p.spec ?? "",
-        location: "", unit: p.unit, safetyStock: p.safetyStock,
-        machine: "", initStock: p.stockOnHand,
-      };
-      saveMaterials(mats);
-      setMaterials(mats);
-    }
-    setShowSearch(false);
-    setSearchQuery("");
-  }
 
   async function stopScanner() {
     if (scannerRef.current) {
       try {
-        const state = scannerRef.current.getState();
-        if (state === 2) await scannerRef.current.stop();
+        const s = scannerRef.current;
+        const state = s.getState();
+        if (state === 2) await s.stop();
       } catch { /* ignore */ }
       try { scannerRef.current.clear(); } catch { /* ignore */ }
       scannerRef.current = null;
@@ -236,630 +285,718 @@ function CardTab({ showToast }: { showToast: (m: string) => void }) {
         if (!mountedRef.current) return;
         const scanner = new Html5Qrcode(node.id);
         scannerRef.current = scanner;
+
         await scanner.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 220, height: 150 } },
+          {
+            fps: 10,
+            qrbox: { width: 220, height: 220 },
+            aspectRatio: 1,
+          },
           (decodedText) => {
-            const text = decodedText.trim();
-            setCode(text);
-            // try to find in ERP
-            const found = parts.find(p => p.code.toUpperCase() === text.toUpperCase());
-            if (found) selectFromERP(found);
+            const text = decodedText.trim().toUpperCase();
+            const found = parts.find(
+              (p) => p.code.toUpperCase() === text || text.includes(p.code.toUpperCase())
+            );
+            if (found) {
+              setSelectedCode(found.code);
+              setQuery("");
+            } else {
+              setQuery(decodedText.trim());
+              setSelectedCode(null);
+            }
             stopScanner();
-            showToast(`掃描成功: ${text}`);
           },
           () => {},
         );
       } catch (err) {
         if (!mountedRef.current) return;
         const msg = err instanceof Error ? err.message : String(err);
-        setScanError(msg.includes("NotAllowed") ? "相機權限被拒絕" : `無法啟動相機：${msg}`);
+        setScanError(
+          msg.includes("NotAllowed") || msg.includes("Permission")
+            ? "相機權限被拒絕，請在瀏覽器設定中允許相機存取"
+            : msg.includes("NotFound") || msg.includes("Requested device not found")
+            ? "找不到相機裝置"
+            : `無法啟動相機：${msg}`
+        );
         setScanning(false);
       }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function handleSave() {
-    if (!code.trim()) { showToast("請輸入品號"); return; }
-    const qty = parseInt(quantity);
-    if (!qty || qty <= 0) { showToast("請輸入有效數量"); return; }
-    if (!summary.trim()) { showToast("請輸入摘要/單號"); return; }
-
-    const mats = loadMaterials();
-    if (!mats[code]) {
-      mats[code] = { code, name: "", spec: "", location: "", unit: "PCS", safetyStock: 0, machine: "", initStock: 0 };
-      saveMaterials(mats);
-    }
-
-    const txs = loadTransactions();
-    txs.push({
-      id: Date.now(), code: code.trim(), type: txType, date,
-      summary: summary.trim(), quantity: qty,
-      handler: handler.trim(), remark: remark.trim(),
-      createdAt: new Date().toISOString(),
-    });
-    saveTransactions(txs);
-    setMaterials(loadMaterials());
-    setTransactions(txs);
-    setQuantity("");
-    setSummary("");
-    setRemark("");
-    showToast(txType === "in" ? "✓ 入庫記錄已儲存" : "✓ 出庫記錄已儲存");
-  }
-
-  async function exportExcel() {
-    if (!code) { showToast("請先選擇品號"); return; }
-    const XLSX = await import("xlsx");
-    const m = materials[code] || {} as Partial<Material>;
-    const sorted = [...transactions.filter(t => t.code === code)].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    const rows: (string | number)[][] = [];
-    rows.push(["物料進出記錄表　Material In / Out Record", "", "", "", "", "", ""]);
-    rows.push(["祺驊股份有限公司 CHI HUA FITNESS　｜　資材部", "", "", "", "", "", ""]);
-    rows.push(["品　號", code, "", "品　名", m.name || "", "", ""]);
-    rows.push(["規　格", m.spec || "", "", "倉　位", m.location || "", "", ""]);
-    rows.push(["庫存單位", m.unit || "PCS", "", "安全庫存量", safetyStock, "← 低於此值警示", ""]);
-    rows.push(["適用機種/製程", m.machine || "", "", "目前結存", stock, "狀　態", isLow ? "⚠ 低於安全庫存" : "● 正常"]);
-    rows.push([]);
-    rows.push(["日期", "摘要 / 單號", "入庫數量", "出庫數量", "結存", "經手人", "備註"]);
-
-    let runningStock = m.initStock || 0;
-    if (runningStock > 0) {
-      rows.push([sorted.length > 0 ? fmtDate(sorted[0].date) : fmtDate(todayStr()), "期初結存", "", "", runningStock, "—", ""]);
-    }
-    sorted.forEach(t => {
-      runningStock += t.type === "in" ? t.quantity : -t.quantity;
-      rows.push([fmtDate(t.date), t.summary, t.type === "in" ? t.quantity : "", t.type === "out" ? t.quantity : "", runningStock, t.handler, t.remark || ""]);
-    });
-
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws["!cols"] = [{ wch: 12 }, { wch: 24 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 14 }];
-    ws["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } },
-    ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "物料進出記錄表");
-    XLSX.writeFile(wb, `物料進出記錄_${code}_${todayStr()}.xlsx`);
-    showToast("Excel 已匯出");
+  function startScan() {
+    setScanError("");
+    setScanning(true);
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {/* 品號選擇區 */}
-      <div style={{ background: "#fff", borderRadius: 14, padding: 16, border: `1px solid ${BR.border}` }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 8 }}>選擇品號</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            type="text"
-            value={code}
-            onChange={e => setCode(e.target.value.toUpperCase())}
-            placeholder="品號 (如 P03NB001)"
+    <div style={{
+      minHeight: "100dvh", background: BR.page, fontFamily: FONT, color: BR.ink,
+    }}>
+      {/* Top Bar */}
+      <div style={{
+        background: BR.greenInk, color: "#fff", padding: "10px 16px",
+        position: "sticky", top: 0, zIndex: 50,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {selectedCode && (
+            <button
+              onClick={() => setSelectedCode(null)}
+              style={{
+                background: "rgba(255,255,255,0.12)", border: "none", color: "#fff",
+                padding: "8px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              ← 返回
+            </button>
+          )}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 10, opacity: 0.7, letterSpacing: "0.1em", fontFamily: "'Sora', sans-serif" }}>
+              CHI HUA · WAREHOUSE
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>倉庫零件查詢</div>
+          </div>
+
+          <Link
+            href="/erp/mobile/material-card"
             style={{
-              flex: 1, padding: "12px 14px", fontSize: 15, borderRadius: 10,
-              border: `1.5px solid ${BR.borderHi}`, background: "#fff", outline: "none", fontFamily: "'IBM Plex Mono', monospace",
-            }}
-          />
-          <button
-            onClick={() => { setScanError(""); setScanning(true); }}
-            style={{
-              padding: "12px 16px", borderRadius: 10, border: "none",
-              background: BR.greenInk, color: "#fff", fontSize: 20, cursor: "pointer", minWidth: 50,
+              background: BR.green, border: "none", color: "#fff",
+              padding: "8px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+              textDecoration: "none", fontFamily: "inherit", whiteSpace: "nowrap",
             }}
           >
-            📷
-          </button>
-          <button
-            onClick={() => setShowSearch(!showSearch)}
+            📋 進出卡
+          </Link>
+
+          <Link
+            href="/erp/mobile/count"
             style={{
-              padding: "12px 16px", borderRadius: 10, border: "none",
-              background: BR.cyan, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer",
-              fontFamily: FONT,
+              background: BR.cyan, border: "none", color: "#fff",
+              padding: "8px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+              textDecoration: "none", fontFamily: "inherit", whiteSpace: "nowrap",
             }}
           >
-            ERP
+            📊 盤點
+          </Link>
+
+          {/* 用戶頭像按鈕 */}
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              style={{
+                background: BR.green, border: "none", color: "#fff",
+                width: 36, height: 36, borderRadius: 99, fontSize: 14, fontWeight: 700,
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              {user.name.slice(0, 1)}
+            </button>
+            {showMenu && (
+              <>
+                <div
+                  onClick={() => setShowMenu(false)}
+                  style={{ position: "fixed", inset: 0, zIndex: 60 }}
+                />
+                <div style={{
+                  position: "absolute", right: 0, top: 42, zIndex: 70,
+                  background: "#fff", borderRadius: 12, padding: 12, minWidth: 180,
+                  boxShadow: "0 4px 20px rgba(0,0,0,.15)", color: BR.ink,
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{user.name}</div>
+                  <div style={{ fontSize: 11, color: BR.inkFaint, marginBottom: 2 }}>
+                    {user.id} · {user.role}
+                  </div>
+                  <div style={{ fontSize: 10, color: BR.inkFaint, marginBottom: 10 }}>
+                    登入於 {user.at.slice(11, 16)}
+                  </div>
+                  <button
+                    onClick={onLogout}
+                    style={{
+                      width: "100%", padding: "10px", fontSize: 13, fontWeight: 700,
+                      color: BR.red, background: BR.redSoft, border: `1px solid #f5c2c0`,
+                      borderRadius: 8, cursor: "pointer", fontFamily: FONT,
+                    }}
+                  >
+                    登出
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ padding: "12px 14px" }}>
+        {/* Search + Scan */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <div style={{ flex: 1, position: "relative" }}>
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setSelectedCode(null); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  if (filtered.length === 1) handleSelect(filtered[0].code);
+                  else if (filtered.length > 1) handleSelect(filtered[0].code);
+                  inputRef.current?.blur();
+                }
+              }}
+              placeholder="搜尋料號 / 品名 / 規格…"
+              style={{
+                width: "100%", padding: "12px 14px", fontSize: 15, borderRadius: 12,
+                border: `1.5px solid ${BR.borderHi}`, background: "#fff", outline: "none",
+                fontFamily: "inherit",
+              }}
+            />
+            {query && (
+              <button
+                onClick={() => { setQuery(""); setSelectedCode(null); inputRef.current?.focus(); }}
+                style={{
+                  position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                  background: "none", border: "none", fontSize: 18, color: BR.inkFaint,
+                  cursor: "pointer", lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
+            )}
+          </div>
+          <button
+            onClick={startScan}
+            disabled={scanning}
+            style={{
+              padding: "12px 16px", borderRadius: 12, border: "none",
+              background: scanning ? BR.inkFaint : BR.greenInk, color: "#fff",
+              fontSize: 22, cursor: scanning ? "not-allowed" : "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              minWidth: 52,
+            }}
+          >
+            {scanning ? "…" : "📷"}
           </button>
         </div>
 
-        {/* ERP search dropdown */}
-        {showSearch && (
-          <div style={{ marginTop: 8, border: `1px solid ${BR.border}`, borderRadius: 10, overflow: "hidden" }}>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="搜尋 ERP 料號/品名..."
-              autoFocus
-              style={{
-                width: "100%", padding: "10px 14px", fontSize: 14, border: "none",
-                borderBottom: `1px solid ${BR.border}`, outline: "none", fontFamily: FONT,
+        {/* 確認查詢按鈕 */}
+        {query && !selectedCode && (
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <button
+              onClick={() => {
+                if (filtered.length > 0) handleSelect(filtered[0].code);
+                inputRef.current?.blur();
               }}
-            />
-            <div style={{ maxHeight: 200, overflowY: "auto" }}>
-              {searchResults.map(p => (
-                <button
-                  key={p.code}
-                  onClick={() => selectFromERP(p)}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 10, width: "100%",
-                    padding: "8px 14px", fontSize: 12, textAlign: "left",
-                    background: "none", border: "none", cursor: "pointer",
-                    borderTop: `1px solid ${BR.border}`, fontFamily: FONT,
-                  }}
-                >
-                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontWeight: 700, color: BR.greenDeep, fontSize: 11, minWidth: 80 }}>{p.code}</span>
-                  <span style={{ flex: 1, color: BR.ink }}>{p.name}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: p.stockOnHand < p.safetyStock ? BR.red : BR.greenDeep }}>{p.stockOnHand} {p.unit}</span>
-                </button>
-              ))}
-              {searchQuery && searchResults.length === 0 && (
-                <div style={{ padding: "12px 14px", fontSize: 12, color: BR.inkFaint, textAlign: "center" }}>找不到符合的料件</div>
-              )}
+              disabled={filtered.length === 0}
+              style={{
+                flex: 1, padding: "12px", borderRadius: 10, border: "none",
+                background: filtered.length === 0 ? BR.inkFaint : BR.green,
+                color: "#fff", fontSize: 14, fontWeight: 700,
+                cursor: filtered.length === 0 ? "not-allowed" : "pointer",
+                fontFamily: "inherit",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              }}
+            >
+              {filtered.length === 0
+                ? "🔍 找不到符合的料件"
+                : `🔍 查詢「${filtered[0].code}」${filtered.length > 1 ? ` 等 ${filtered.length} 筆` : ""}`}
+            </button>
+            <button
+              onClick={() => { setQuery(""); setSelectedCode(null); inputRef.current?.focus(); }}
+              style={{
+                padding: "12px 16px", borderRadius: 10,
+                background: "#fff", border: `1.5px solid ${BR.borderHi}`,
+                color: BR.inkSoft, fontSize: 14, fontWeight: 700,
+                cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              清除
+            </button>
+          </div>
+        )}
+
+        {/* QR Scanner Overlay */}
+        {scanning && (
+          <div style={{
+            position: "fixed", inset: 0, zIndex: 100,
+            background: "#000", display: "flex", flexDirection: "column",
+          }}>
+            <div style={{
+              padding: "14px 16px", display: "flex", justifyContent: "space-between",
+              alignItems: "center", color: "#fff", background: "rgba(0,0,0,0.8)",
+              zIndex: 10,
+            }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>掃描 QR Code / 條碼</div>
+                <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>對準零件標籤即可辨識</div>
+              </div>
+              <button
+                onClick={stopScanner}
+                style={{
+                  background: "rgba(255,255,255,0.2)", border: "none", color: "#fff",
+                  padding: "10px 20px", borderRadius: 10, fontSize: 14, fontWeight: 700,
+                  cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                ✕ 關閉
+              </button>
+            </div>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+              <div ref={qrReaderRef} id="qr-reader-box" style={{ width: "100%", maxWidth: 400 }} />
+            </div>
+            <div style={{
+              padding: "16px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: 12,
+              background: "rgba(0,0,0,0.8)",
+            }}>
+              將 QR Code 或條碼對準框框內即可自動辨識
+            </div>
+          </div>
+        )}
+
+        {/* Scanner Error */}
+        {scanError && (
+          <div style={{
+            padding: "10px 14px", borderRadius: 10, marginBottom: 12,
+            background: BR.redSoft, border: `1px solid #f5c2c0`,
+            fontSize: 12, color: BR.red, display: "flex", alignItems: "center", gap: 8,
+          }}>
+            <span>⚠️</span>
+            <span style={{ flex: 1 }}>{scanError}</span>
+            <button
+              onClick={() => setScanError("")}
+              style={{ background: "none", border: "none", color: BR.red, fontSize: 16, cursor: "pointer" }}
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {/* Search Results */}
+        {query && !selectedCode && filtered.length > 0 && (
+          <div style={{
+            background: "#fff", borderRadius: 12, border: `1px solid ${BR.border}`,
+            marginBottom: 12, overflow: "hidden",
+          }}>
+            {filtered.map((p, i) => (
+              <button
+                key={p.code}
+                onClick={() => handleSelect(p.code)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10, width: "100%",
+                  padding: "10px 14px", fontSize: 13, textAlign: "left",
+                  background: "none", border: "none", cursor: "pointer",
+                  borderTop: i > 0 ? `1px solid ${BR.border}` : "none",
+                  fontFamily: "inherit", color: BR.ink,
+                }}
+              >
+                <span style={{
+                  fontFamily: "'IBM Plex Mono', monospace", fontWeight: 700,
+                  color: BR.greenDeep, fontSize: 12, minWidth: 80,
+                }}>
+                  {p.code}
+                </span>
+                <span style={{ flex: 1 }}>{p.name}</span>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, color: p.stockOnHand < p.safetyStock ? BR.red : BR.greenDeep,
+                }}>
+                  {p.stockOnHand}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {query && !selectedCode && filtered.length === 0 && (
+          <div style={{
+            textAlign: "center", padding: "24px 16px", color: BR.inkFaint, fontSize: 13,
+          }}>
+            找不到「{query}」— 試試料號或品名關鍵字
+          </div>
+        )}
+
+        {/* Parts Card — 零件卡 */}
+        {selected && (
+          <>
+            <PartCard code={selected.code} />
+            <button
+              onClick={() => setSelectedCode(null)}
+              style={{
+                width: "100%", marginTop: 12, padding: "14px",
+                background: "#fff", border: `1.5px solid ${BR.borderHi}`,
+                borderRadius: 12, fontSize: 14, fontWeight: 700, color: BR.greenInk,
+                cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              ← 返回搜尋其他料件
+            </button>
+          </>
+        )}
+
+        {/* Empty State */}
+        {!query && !selectedCode && (
+          <div style={{ textAlign: "center", padding: "40px 16px" }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>📦</div>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>掃 QR 或搜尋料號</div>
+            <div style={{ fontSize: 12, color: BR.inkFaint, lineHeight: 1.6 }}>
+              輸入料號 / 品名 / 規格，或按 📷 掃描
+              <br />即可看到零件卡（庫存 · 品名 · 倉位 · 規格）
+            </div>
+
+            {/* 常用料件快捷 */}
+            <div style={{ marginTop: 20, textAlign: "left" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: BR.inkFaint, marginBottom: 8, letterSpacing: "0.06em" }}>
+                常用料件（點擊查看零件卡）
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {parts.slice(0, 8).map((p) => (
+                  <button
+                    key={p.code}
+                    onClick={() => handleSelect(p.code)}
+                    style={{
+                      padding: "10px 12px", borderRadius: 10, textAlign: "left",
+                      background: "#fff", border: `1px solid ${BR.border}`,
+                      cursor: "pointer", fontFamily: "inherit",
+                    }}
+                  >
+                    <div style={{
+                      fontFamily: "'IBM Plex Mono', monospace", fontSize: 11,
+                      fontWeight: 700, color: BR.greenDeep,
+                    }}>
+                      {p.code}
+                    </div>
+                    <div style={{ fontSize: 12, color: BR.ink, marginTop: 2 }}>
+                      {p.name}
+                    </div>
+                    <div style={{
+                      fontSize: 11, fontWeight: 700, marginTop: 2,
+                      color: p.stockOnHand < p.safetyStock ? BR.red : BR.inkSoft,
+                    }}>
+                      庫存 {p.stockOnHand} {p.unit}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* QR Scanner Overlay */}
-      {scanning && (
+      {/* Footer */}
+      <div style={{
+        padding: "8px 14px", fontSize: 10, color: BR.inkFaint, textAlign: "center",
+        borderTop: `1px solid ${BR.border}`, marginTop: 16,
+      }}>
+        {user.name} ({user.id}) · 純讀取，不回寫鼎新 ERP
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// 零件卡
+// ============================================================
+
+function PartCard({ code }: { code: string }) {
+  const p = parts.find((x) => x.code === code);
+  if (!p) return <div style={{ padding: 20, textAlign: "center", color: "#999" }}>找不到 {code}</div>;
+
+  const sup = suppliers.find((s) => s.id === p.supplierId);
+  const low = p.stockOnHand < p.safetyStock;
+  const pct = p.safetyStock > 0 ? Math.round((p.stockOnHand / p.safetyStock) * 100) : 999;
+  const location = LOCATION_MAP[p.code] ?? "—";
+
+  const usedBy = bom
+    .filter((b) => b.partId === p.id && b.isActive)
+    .map((b) => models.find((m) => m.id === b.modelId))
+    .filter((x): x is NonNullable<typeof x> => !!x);
+  const uniqUsedBy = [...new Map(usedBy.map((m) => [m.id, m])).values()];
+
+  const stockColor = low ? BR.red : pct < 150 ? BR.amber : BR.greenDeep;
+  const stockBg = low ? BR.redSoft : pct < 150 ? BR.amberSoft : BR.greenSoft;
+  const stockBorder = low ? "#f5c2c0" : pct < 150 ? "#f3e1b8" : BR.greenLine;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {/* === 主卡 === */}
+      <div style={{
+        background: "#fff", borderRadius: 16, overflow: "hidden",
+        border: `1.5px solid ${stockBorder}`,
+        boxShadow: "0 2px 8px rgba(12,18,8,.06)",
+      }}>
         <div style={{
-          position: "fixed", inset: 0, zIndex: 100,
-          background: "#000", display: "flex", flexDirection: "column",
+          background: BR.greenInk, color: "#fff", padding: "14px 16px",
+          display: "flex", justifyContent: "space-between", alignItems: "flex-start",
         }}>
+          <div>
+            <div style={{
+              fontFamily: "'IBM Plex Mono', monospace", fontSize: 20, fontWeight: 800,
+              letterSpacing: "0.04em",
+            }}>
+              {p.code}
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 600, marginTop: 2 }}>{p.name}</div>
+            {p.spec && (
+              <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>📐 {p.spec}</div>
+            )}
+          </div>
           <div style={{
-            padding: "14px 16px", display: "flex", justifyContent: "space-between",
-            alignItems: "center", color: "#fff", background: "rgba(0,0,0,0.8)", zIndex: 10,
+            fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 99,
+            background: low ? BR.red : BR.green, whiteSpace: "nowrap",
           }}>
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 700 }}>掃描條碼 / QR Code</div>
-              <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>對準物料標籤即可辨識</div>
-            </div>
-            <button
-              onClick={stopScanner}
-              style={{
-                background: "rgba(255,255,255,0.2)", border: "none", color: "#fff",
-                padding: "10px 20px", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT,
-              }}
-            >
-              ✕ 關閉
-            </button>
+            {low ? "⚠ 低於安全庫存" : "✓ 庫存正常"}
           </div>
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-            <div ref={qrReaderRef} id="qr-material-reader" style={{ width: "100%", maxWidth: 400 }} />
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", borderBottom: `1px solid ${BR.border}` }}>
+          <NumberBlock label="在庫數量" value={p.stockOnHand.toString()} unit={p.unit} color={stockColor} bg={stockBg} large />
+          <NumberBlock label="安全庫存" value={p.safetyStock.toString()} unit={p.unit} color={BR.inkSoft} bg="#fff" />
+          <NumberBlock label="倉位" value={location} color={BR.cyan} bg={BR.cyanSoft} mono />
+        </div>
+
+        <div style={{ padding: "10px 16px", borderBottom: `1px solid ${BR.border}` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: BR.inkFaint, marginBottom: 4 }}>
+            <span>庫存水位</span>
+            <span style={{ color: stockColor, fontWeight: 700 }}>{pct}%</span>
+          </div>
+          <div style={{ height: 8, background: "#f0f0ec", borderRadius: 99, overflow: "hidden" }}>
+            <div style={{
+              height: "100%", borderRadius: 99, width: `${Math.min(pct, 100)}%`,
+              background: stockColor, transition: "width 0.5s ease",
+            }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: BR.inkFaint, marginTop: 3 }}>
+            <span>0</span>
+            <span style={{ color: BR.amber }}>安全線 {p.safetyStock}</span>
+            <span>{Math.max(p.stockOnHand, p.safetyStock * 2)}</span>
+          </div>
+        </div>
+
+        <div style={{ padding: "12px 16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <InfoRow label="分類" value={p.category} />
+            <InfoRow label="屬性" value={KIND_LABEL[p.kind ?? "purchase"] ?? p.kind ?? "採購件"} />
+            <InfoRow label="單價" value={`$${p.unitCost.toLocaleString()}`} />
+            <InfoRow label="交期" value={`${p.leadDays} 天`} />
+            <InfoRow label="單位" value={p.unit} />
+            <InfoRow label="庫存金額" value={`$${(p.stockOnHand * p.unitCost).toLocaleString()}`} />
+          </div>
+        </div>
+      </div>
+
+      {sup && (
+        <div style={{ background: "#fff", borderRadius: 14, padding: "14px 16px", border: `1px solid ${BR.border}` }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 6 }}>供應商</div>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>🏭 {sup.name}</div>
+          <div style={{ fontSize: 12, color: BR.inkSoft, marginTop: 2 }}>{sup.country} · {sup.city}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8 }}>
+            <InfoRow label="代號" value={sup.code} />
+            <InfoRow label="運輸天數" value={`${sup.transitDays} 天`} />
           </div>
         </div>
       )}
 
-      {scanError && (
-        <div style={{
-          padding: "10px 14px", borderRadius: 10, background: BR.redSoft, border: `1px solid #f5c2c0`,
-          fontSize: 12, color: BR.red, display: "flex", alignItems: "center", gap: 8,
-        }}>
-          <span>⚠️ {scanError}</span>
-          <button onClick={() => setScanError("")} style={{ background: "none", border: "none", color: BR.red, fontSize: 16, cursor: "pointer", marginLeft: "auto" }}>×</button>
-        </div>
-      )}
+      {/* 在途訂單 */}
+      <InTransitSection partId={p.id} partCode={p.code} />
 
-      {/* 物料資訊卡 */}
-      {code && mat && (
-        <div style={{ background: "#fff", borderRadius: 14, overflow: "hidden", border: `1.5px solid ${isLow ? "#f5c2c0" : BR.greenLine}` }}>
-          <div style={{ background: BR.greenInk, color: "#fff", padding: "12px 16px" }}>
-            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 18, fontWeight: 800 }}>{code}</div>
-            <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>{mat.name}</div>
-            {mat.spec && <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>📐 {mat.spec}</div>}
+      {uniqUsedBy.length > 0 && (
+        <div style={{ background: "#fff", borderRadius: 14, padding: "14px 16px", border: `1px solid ${BR.border}` }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 6 }}>
+            被以下成品使用（{uniqUsedBy.length}）
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", borderBottom: `1px solid ${BR.border}` }}>
-            <div style={{ padding: "10px 14px", textAlign: "center", background: isLow ? BR.redSoft : BR.greenSoft }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: BR.inkFaint }}>目前結存</div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: isLow ? BR.red : BR.greenDeep }}>{stock}</div>
-              <div style={{ fontSize: 10, color: BR.inkFaint }}>{mat.unit}</div>
+          {uniqUsedBy.slice(0, 6).map((m) => (
+            <div key={m.id} style={{
+              display: "flex", alignItems: "center", gap: 8, padding: "6px 0",
+              borderTop: `1px solid ${BR.border}`, fontSize: 12,
+            }}>
+              <span style={{
+                fontFamily: "'IBM Plex Mono', monospace", fontWeight: 700,
+                color: BR.greenDeep, fontSize: 11, minWidth: 100,
+              }}>
+                {m.code}
+              </span>
+              <span style={{ color: BR.inkSoft }}>{m.machineFamily}</span>
             </div>
-            <div style={{ padding: "10px 14px", textAlign: "center" }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: BR.inkFaint }}>安全庫存</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: BR.inkSoft }}>{safetyStock}</div>
-              <div style={{ fontSize: 10, color: BR.inkFaint }}>{mat.unit}</div>
-            </div>
-            <div style={{ padding: "10px 14px", textAlign: "center", background: BR.cyanSoft }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: BR.inkFaint }}>倉位</div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: BR.cyan, fontFamily: "'IBM Plex Mono', monospace" }}>{mat.location || "—"}</div>
-            </div>
-          </div>
-          {isLow && (
-            <div style={{ padding: "8px 16px", background: BR.redSoft, fontSize: 12, fontWeight: 700, color: BR.red, textAlign: "center" }}>
-              ⚠ 低於安全庫存（{safetyStock}），需補貨！
-            </div>
+          ))}
+          {uniqUsedBy.length > 6 && (
+            <div style={{ fontSize: 11, color: BR.inkFaint, marginTop: 4 }}>… 等 {uniqUsedBy.length} 個成品</div>
           )}
         </div>
       )}
-
-      {/* 進出登記表單 */}
-      <div style={{ background: "#fff", borderRadius: 14, padding: 16, border: `1px solid ${BR.border}` }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 10 }}>進出登記</div>
-
-        {/* 入庫/出庫切換 */}
-        <div style={{ display: "flex", gap: 0, borderRadius: 10, overflow: "hidden", border: `2px solid ${txType === "out" ? BR.red : BR.green}`, marginBottom: 12 }}>
-          <button
-            onClick={() => setTxType("in")}
-            style={{
-              flex: 1, padding: "10px", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT,
-              background: txType === "in" ? BR.green : "#fff",
-              color: txType === "in" ? "#fff" : BR.green,
-            }}
-          >
-            📥 入庫
-          </button>
-          <button
-            onClick={() => setTxType("out")}
-            style={{
-              flex: 1, padding: "10px", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT,
-              background: txType === "out" ? BR.red : "#fff",
-              color: txType === "out" ? "#fff" : BR.red,
-            }}
-          >
-            📤 出庫
-          </button>
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <InputField label="日期" type="date" value={date} onChange={setDate} />
-          <InputField label="摘要 / 單號" value={summary} onChange={setSummary} placeholder="如：進貨入庫 (PO-1180)" />
-          <InputField label={txType === "in" ? "入庫數量" : "出庫數量"} type="number" value={quantity} onChange={setQuantity} placeholder="0" />
-          <InputField label="經手人" value={handler} onChange={setHandler} placeholder="經手人姓名" />
-          <InputField label="備註" value={remark} onChange={setRemark} placeholder="選填" />
-        </div>
-
-        <button
-          onClick={handleSave}
-          style={{
-            width: "100%", marginTop: 14, padding: "14px", borderRadius: 10, border: "none",
-            background: txType === "out" ? BR.red : BR.greenInk,
-            color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: FONT,
-          }}
-        >
-          {txType === "in" ? "📥 儲存入庫記錄" : "📤 儲存出庫記錄"}
-        </button>
-      </div>
-
-      {/* 該品號交易明細 */}
-      {code && itemTxs.length > 0 && (
-        <div style={{ background: "#fff", borderRadius: 14, padding: 16, border: `1px solid ${BR.border}` }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 8 }}>
-            進出明細（{code}）
-          </div>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-              <thead>
-                <tr style={{ borderBottom: `1.5px solid ${BR.border}` }}>
-                  {["日期", "摘要", "入庫", "出庫", "結存", "經手人"].map(h => (
-                    <th key={h} style={{ padding: "6px 4px", textAlign: "left", fontSize: 10, fontWeight: 700, color: BR.inkFaint, whiteSpace: "nowrap" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {(() => {
-                  let running = mat?.initStock ?? 0;
-                  return itemTxs.map(t => {
-                    running += t.type === "in" ? t.quantity : -t.quantity;
-                    const lowRow = safetyStock > 0 && running < safetyStock;
-                    return (
-                      <tr key={t.id} style={{ borderBottom: `1px solid ${BR.border}` }}>
-                        <td style={{ padding: "6px 4px", whiteSpace: "nowrap", fontSize: 11 }}>{fmtDate(t.date)}</td>
-                        <td style={{ padding: "6px 4px", fontSize: 11 }}>{t.summary}</td>
-                        <td style={{ padding: "6px 4px", color: BR.greenDeep, fontWeight: 700 }}>{t.type === "in" ? t.quantity : ""}</td>
-                        <td style={{ padding: "6px 4px", color: BR.red, fontWeight: 700 }}>{t.type === "out" ? t.quantity : ""}</td>
-                        <td style={{ padding: "6px 4px", fontWeight: 700, color: lowRow ? BR.red : BR.ink }}>{running}</td>
-                        <td style={{ padding: "6px 4px", fontSize: 11, color: BR.inkSoft }}>{t.handler}</td>
-                      </tr>
-                    );
-                  });
-                })()}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* 匯出 Excel */}
-      {code && (
-        <button
-          onClick={exportExcel}
-          style={{
-            width: "100%", padding: "14px", borderRadius: 10,
-            background: "#fff", border: `1.5px solid ${BR.green}`,
-            color: BR.greenDeep, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT,
-          }}
-        >
-          📊 匯出 Excel（{code}）
-        </button>
-      )}
     </div>
   );
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Records Tab - 歷史記錄
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ============================================================
+// 在途訂單區塊
+// ============================================================
 
-function RecordsTab() {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [filterCode, setFilterCode] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "in" | "out">("all");
+function InTransitSection({ partId, partCode }: { partId: string; partCode: string }) {
+  const activePOs = digitalPOs.filter(
+    (po) => po.partId === partId && !["received", "closed", "rejected"].includes(po.status)
+  );
+  const activeOutsource = outsourceOrders.filter(
+    (o) => o.partCode === partCode && o.qtyReturned < o.qtyOut
+  );
+  const totalInTransit = activePOs.reduce((sum, po) => sum + po.qty, 0);
+  const totalOutsource = activeOutsource.reduce((sum, o) => sum + (o.qtyOut - o.qtyReturned), 0);
 
-  useEffect(() => {
-    setTransactions(loadTransactions());
-  }, []);
-
-  const filtered = transactions
-    .filter(t => !filterCode || t.code.toLowerCase().includes(filterCode.toLowerCase()))
-    .filter(t => filterType === "all" || t.type === filterType)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  if (activePOs.length === 0 && activeOutsource.length === 0) return null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ display: "flex", gap: 8 }}>
-        <input
-          type="text"
-          value={filterCode}
-          onChange={e => setFilterCode(e.target.value)}
-          placeholder="搜尋品號..."
-          style={{
-            flex: 1, padding: "10px 14px", fontSize: 14, borderRadius: 10,
-            border: `1.5px solid ${BR.borderHi}`, outline: "none", fontFamily: FONT,
-          }}
-        />
-        <select
-          value={filterType}
-          onChange={e => setFilterType(e.target.value as "all" | "in" | "out")}
-          style={{ padding: "10px 12px", borderRadius: 10, border: `1.5px solid ${BR.borderHi}`, fontSize: 14, fontFamily: FONT }}
-        >
-          <option value="all">全部</option>
-          <option value="in">入庫</option>
-          <option value="out">出庫</option>
-        </select>
-      </div>
-
-      {filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 32, color: BR.inkFaint, fontSize: 13 }}>尚無記錄</div>
-      ) : (
-        <div style={{ background: "#fff", borderRadius: 14, border: `1px solid ${BR.border}`, overflow: "hidden" }}>
-          {filtered.map((t, i) => (
-            <div key={t.id} style={{
-              padding: "10px 14px", borderTop: i > 0 ? `1px solid ${BR.border}` : "none",
-              display: "flex", alignItems: "center", gap: 10,
-            }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
-                background: t.type === "in" ? BR.greenSoft : BR.redSoft, fontSize: 16,
-              }}>
-                {t.type === "in" ? "📥" : "📤"}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 700, color: BR.greenDeep }}>{t.code}</span>
-                  <span style={{ fontSize: 11, color: BR.inkFaint }}>{fmtDate(t.date)}</span>
-                </div>
-                <div style={{ fontSize: 12, color: BR.inkSoft, marginTop: 2 }}>{t.summary}</div>
-              </div>
-              <div style={{
-                fontSize: 16, fontWeight: 800, minWidth: 50, textAlign: "right",
-                color: t.type === "in" ? BR.greenDeep : BR.red,
-              }}>
-                {t.type === "in" ? "+" : "−"}{t.quantity}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Settings Tab - 設定
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-function SettingsTab({ showToast }: { showToast: (m: string) => void }) {
-  const [materials, setMaterials] = useState<Record<string, Material>>({});
-  const [defaultHandler, setDefaultHandler] = useState("");
-  const [editCode, setEditCode] = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false);
-
-  // Edit form state
-  const [fCode, setFCode] = useState("");
-  const [fName, setFName] = useState("");
-  const [fSpec, setFSpec] = useState("");
-  const [fLocation, setFLocation] = useState("");
-  const [fUnit, setFUnit] = useState("PCS");
-  const [fSafety, setFSafety] = useState("");
-  const [fMachine, setFMachine] = useState("");
-  const [fInitStock, setFInitStock] = useState("");
-
-  useEffect(() => {
-    setMaterials(loadMaterials());
-    setDefaultHandler(localStorage.getItem(HANDLER_KEY) || "");
-  }, []);
-
-  function openModal(code: string | null) {
-    if (code) {
-      const m = loadMaterials()[code];
-      if (m) {
-        setFCode(m.code); setFName(m.name); setFSpec(m.spec); setFLocation(m.location);
-        setFUnit(m.unit); setFSafety(String(m.safetyStock || "")); setFMachine(m.machine);
-        setFInitStock(String(m.initStock || ""));
-      }
-    } else {
-      setFCode(""); setFName(""); setFSpec(""); setFLocation("");
-      setFUnit("PCS"); setFSafety(""); setFMachine(""); setFInitStock("");
-    }
-    setEditCode(code);
-    setShowModal(true);
-  }
-
-  function saveModal() {
-    if (!fCode.trim()) { showToast("品號不可為空"); return; }
-    const mats = loadMaterials();
-    mats[fCode.trim()] = {
-      code: fCode.trim(), name: fName, spec: fSpec, location: fLocation,
-      unit: fUnit || "PCS", safetyStock: parseInt(fSafety) || 0,
-      machine: fMachine, initStock: parseInt(fInitStock) || 0,
-    };
-    saveMaterials(mats);
-    setMaterials(mats);
-    setShowModal(false);
-    showToast(`已儲存 ${fCode.trim()}`);
-  }
-
-  function deleteMat(code: string) {
-    if (!confirm(`確定刪除 ${code}？`)) return;
-    const mats = loadMaterials();
-    delete mats[code];
-    saveMaterials(mats);
-    setMaterials(mats);
-    showToast(`已刪除 ${code}`);
-  }
-
-  function saveHandler() {
-    localStorage.setItem(HANDLER_KEY, defaultHandler);
-    showToast("預設經手人已儲存");
-  }
-
-  function exportBackup() {
-    const data = { materials: loadMaterials(), transactions: loadTransactions(), handler: localStorage.getItem(HANDLER_KEY) || "", exportedAt: new Date().toISOString() };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `物料備份_${todayStr()}.json`; a.click();
-    URL.revokeObjectURL(url);
-    showToast("備份已匯出");
-  }
-
-  function importBackup(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const data = JSON.parse(ev.target?.result as string);
-        if (data.materials) saveMaterials(data.materials);
-        if (data.transactions) saveTransactions(data.transactions);
-        if (data.handler) localStorage.setItem(HANDLER_KEY, data.handler);
-        setMaterials(loadMaterials());
-        showToast("備份匯入成功");
-      } catch { showToast("匯入失敗：格式錯誤"); }
-    };
-    reader.readAsText(file);
-    e.target.value = "";
-  }
-
-  const codes = Object.keys(materials);
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {/* 物料主檔 */}
-      <div style={{ background: "#fff", borderRadius: 14, padding: 16, border: `1px solid ${BR.border}` }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>物料主檔（{codes.length}）</div>
-          <button
-            onClick={() => openModal(null)}
-            style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: BR.greenInk, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}
-          >
-            + 新增
-          </button>
-        </div>
-        {codes.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 20, color: BR.inkFaint, fontSize: 12 }}>尚未建立物料主檔</div>
-        ) : (
-          codes.map(c => {
-            const m = materials[c];
-            return (
-              <div key={c} style={{ display: "flex", alignItems: "center", padding: "10px 0", borderTop: `1px solid ${BR.border}`, gap: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 700, color: BR.greenDeep }}>{c}</div>
-                  <div style={{ fontSize: 12, color: BR.inkSoft }}>{m.name}{m.spec ? ` / ${m.spec}` : ""}</div>
-                </div>
-                <button onClick={() => openModal(c)} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${BR.border}`, background: "#fff", fontSize: 11, cursor: "pointer", fontFamily: FONT }}>編輯</button>
-                <button onClick={() => deleteMat(c)} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: BR.redSoft, color: BR.red, fontSize: 11, cursor: "pointer", fontFamily: FONT }}>刪除</button>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {/* 預設經手人 */}
-      <div style={{ background: "#fff", borderRadius: 14, padding: 16, border: `1px solid ${BR.border}` }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 8 }}>預設經手人</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            type="text" value={defaultHandler} onChange={e => setDefaultHandler(e.target.value)}
-            placeholder="姓名"
-            style={{ flex: 1, padding: "10px 14px", fontSize: 14, borderRadius: 10, border: `1.5px solid ${BR.borderHi}`, outline: "none", fontFamily: FONT }}
-          />
-          <button onClick={saveHandler} style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: BR.greenInk, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>儲存</button>
-        </div>
-      </div>
-
-      {/* 資料管理 */}
-      <div style={{ background: "#fff", borderRadius: 14, padding: 16, border: `1px solid ${BR.border}` }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 10 }}>資料管理</div>
-        <button onClick={exportBackup} style={{ width: "100%", padding: "10px", borderRadius: 8, border: `1.5px solid ${BR.green}`, background: "#fff", color: BR.greenDeep, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
-          📦 匯出備份 (JSON)
-        </button>
-        <label style={{ display: "block", width: "100%", padding: "10px", borderRadius: 8, border: `1.5px solid ${BR.cyan}`, background: "#fff", color: BR.cyan, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT, textAlign: "center" }}>
-          📥 匯入備份 (JSON)
-          <input type="file" accept=".json" onChange={importBackup} style={{ display: "none" }} />
-        </label>
-      </div>
-
-      {/* Modal */}
-      {showModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 20, width: "100%", maxWidth: 400, maxHeight: "90vh", overflowY: "auto" }}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 14 }}>{editCode ? "編輯物料" : "新增物料"}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <InputField label="品號 *" value={fCode} onChange={setFCode} placeholder="如 P03NB001" disabled={!!editCode} />
-              <InputField label="品名" value={fName} onChange={setFName} />
-              <InputField label="規格" value={fSpec} onChange={setFSpec} />
-              <InputField label="倉位" value={fLocation} onChange={setFLocation} placeholder="如 A100" />
-              <InputField label="庫存單位" value={fUnit} onChange={setFUnit} />
-              <InputField label="安全庫存量" type="number" value={fSafety} onChange={setFSafety} />
-              <InputField label="適用機種/製程" value={fMachine} onChange={setFMachine} />
-              <InputField label="期初結存" type="number" value={fInitStock} onChange={setFInitStock} />
-            </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button onClick={() => setShowModal(false)} style={{ flex: 1, padding: "12px", borderRadius: 10, border: `1.5px solid ${BR.borderHi}`, background: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>取消</button>
-              <button onClick={saveModal} style={{ flex: 1, padding: "12px", borderRadius: 10, border: "none", background: BR.greenInk, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>儲存</button>
-            </div>
+    <div style={{ background: "#fff", borderRadius: 14, overflow: "hidden", border: `1.5px solid #c4b5fd` }}>
+      <div style={{
+        background: "#7c3aed", color: "#fff", padding: "10px 16px",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+      }}>
+        <div>
+          <div style={{ fontSize: 10, opacity: 0.8, letterSpacing: "0.08em" }}>採購在途訂單</div>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>
+            🚚 {activePOs.length + activeOutsource.length} 筆未結
           </div>
         </div>
-      )}
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 9, opacity: 0.7 }}>在途總量</div>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>{totalInTransit + totalOutsource}</div>
+        </div>
+      </div>
+
+      {activePOs.map((po) => {
+        const sup = suppliers.find((s) => s.id === po.supplierId);
+        const st = PO_STATUS_LABEL[po.status] ?? PO_STATUS_LABEL.draft;
+        const isOverdue = po.expectedArrival < new Date().toISOString().slice(0, 10) && po.status !== "received";
+        return (
+          <div key={po.id} style={{ padding: "10px 16px", borderTop: `1px solid ${BR.border}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 700, color: "#7c3aed" }}>
+                {po.poNo}
+              </span>
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 99,
+                color: st.color, background: st.bg,
+              }}>
+                {st.text}
+              </span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11 }}>
+              <div style={{ color: BR.inkFaint }}>供應商</div>
+              <div style={{ fontWeight: 600, textAlign: "right" }}>{sup?.name ?? "—"}</div>
+              <div style={{ color: BR.inkFaint }}>訂購數量</div>
+              <div style={{ fontWeight: 700, textAlign: "right", color: "#7c3aed" }}>{po.qty} {parts.find(p => p.id === po.partId)?.unit ?? "PCS"}</div>
+              <div style={{ color: BR.inkFaint }}>預計到貨</div>
+              <div style={{
+                fontWeight: 600, textAlign: "right",
+                color: isOverdue ? BR.red : BR.ink,
+              }}>
+                {po.expectedArrival}{isOverdue ? " ⚠ 逾期" : ""}
+              </div>
+              {po.asn && (
+                <>
+                  <div style={{ color: BR.inkFaint }}>物流單號</div>
+                  <div style={{ fontWeight: 600, textAlign: "right", fontSize: 10, fontFamily: "'IBM Plex Mono', monospace" }}>{po.asn.trackingNo}</div>
+                  <div style={{ color: BR.inkFaint }}>承運商</div>
+                  <div style={{ fontWeight: 600, textAlign: "right" }}>{po.asn.carrier}</div>
+                  {po.asn.remark && (
+                    <>
+                      <div style={{ color: BR.inkFaint }}>備註</div>
+                      <div style={{ fontWeight: 500, textAlign: "right", color: BR.amber, fontSize: 10 }}>{po.asn.remark}</div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+            {po.productionLog.length > 0 && (
+              <div style={{ marginTop: 6, display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {po.productionLog.map((log, i) => {
+                  const stageLabel: Record<string, string> = {
+                    pending: "待處理", material_ready: "備料完成", in_production: "生產中",
+                    packed: "已包裝", shipped: "已出貨", in_transit: "運輸中", arrived: "已到廠",
+                  };
+                  return (
+                    <span key={i} style={{
+                      fontSize: 9, padding: "2px 6px", borderRadius: 4,
+                      background: i === po.productionLog.length - 1 ? "#7c3aed" : "#e9ece3",
+                      color: i === po.productionLog.length - 1 ? "#fff" : BR.inkSoft,
+                      fontWeight: 600,
+                    }}>
+                      {stageLabel[log.stage] ?? log.stage}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {activeOutsource.map((o) => {
+        const remaining = o.qtyOut - o.qtyReturned;
+        const isOverdue = o.expectedReturn < new Date().toISOString().slice(0, 10) && remaining > 0;
+        return (
+          <div key={o.id} style={{ padding: "10px 16px", borderTop: `1px solid ${BR.border}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 700, color: BR.amber }}>
+                {o.orderNo}
+              </span>
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 99,
+                color: BR.amber, background: "#fffaf0",
+              }}>
+                託外加工
+              </span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11 }}>
+              <div style={{ color: BR.inkFaint }}>加工廠</div>
+              <div style={{ fontWeight: 600, textAlign: "right" }}>{o.vendor}</div>
+              <div style={{ color: BR.inkFaint }}>製程</div>
+              <div style={{ fontWeight: 600, textAlign: "right" }}>{o.process}</div>
+              <div style={{ color: BR.inkFaint }}>送出 / 已回</div>
+              <div style={{ fontWeight: 700, textAlign: "right" }}>{o.qtyOut} / {o.qtyReturned}</div>
+              <div style={{ color: BR.inkFaint }}>在外數量</div>
+              <div style={{ fontWeight: 700, textAlign: "right", color: BR.amber }}>{remaining}</div>
+              <div style={{ color: BR.inkFaint }}>預計回廠</div>
+              <div style={{
+                fontWeight: 600, textAlign: "right",
+                color: isOverdue ? BR.red : BR.ink,
+              }}>
+                {o.expectedReturn}{isOverdue ? " ⚠ 逾期" : ""}
+              </div>
+              {o.woRef && (
+                <>
+                  <div style={{ color: BR.inkFaint }}>關聯工單</div>
+                  <div style={{ fontWeight: 600, textAlign: "right", fontFamily: "'IBM Plex Mono', monospace", fontSize: 10 }}>{o.woRef}</div>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Shared components
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-function InputField({ label, value, onChange, placeholder, type, disabled }: {
-  label: string; value: string; onChange: (v: string) => void;
-  placeholder?: string; type?: string; disabled?: boolean;
+function NumberBlock({ label, value, unit, color, bg, large, mono }: {
+  label: string; value: string; unit?: string; color: string; bg: string;
+  large?: boolean; mono?: boolean;
 }) {
   return (
-    <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: BR.inkSoft, marginBottom: 4 }}>{label}</div>
-      <input
-        type={type || "text"}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        disabled={disabled}
-        style={{
-          width: "100%", padding: "10px 14px", fontSize: 14, borderRadius: 10,
-          border: `1.5px solid ${BR.borderHi}`, background: disabled ? "#f5f5f5" : "#fff",
-          outline: "none", fontFamily: FONT, color: BR.ink,
-        }}
-      />
+    <div style={{ padding: "12px 14px", background: bg, textAlign: "center", borderRight: `1px solid #e9ece3` }}>
+      <div style={{ fontSize: 9, fontWeight: 700, color: "#9aa291", letterSpacing: "0.06em", marginBottom: 4 }}>{label}</div>
+      <div style={{
+        fontSize: large ? 26 : 16, fontWeight: 800, color,
+        fontFamily: mono ? "'IBM Plex Mono', monospace" : "'Sora', sans-serif",
+        lineHeight: 1.1,
+      }}>
+        {value}
+      </div>
+      {unit && <div style={{ fontSize: 10, color: "#9aa291", marginTop: 2 }}>{unit}</div>}
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+      <span style={{ color: BR.inkFaint }}>{label}</span>
+      <span style={{ fontWeight: 600 }}>{value}</span>
     </div>
   );
 }
