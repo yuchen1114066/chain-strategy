@@ -1,0 +1,26 @@
+{
+  "name": "祺驊倉庫零件查詢",
+  "short_name": "倉庫查詢",
+  "description": "掃 QR 或搜尋料號，查看零件卡（庫存·品名·倉位·規格）",
+  "start_url": "/erp/mobile/scan",
+  "scope": "/erp/mobile/scan",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c1908",
+  "theme_color": "#0c1908",
+  "icons": [
+    {
+      "src": "/icons/warehouse-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/warehouse-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "utilities"]
+}

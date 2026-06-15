@@ -1,7 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 
+// Build-time fallback：未設定環境變數時用 placeholder 讓 createClient 通過驗證。
+// 戰情中心 / ERP 各頁完全不用 Supabase；只有 /quiz、/tracking 才會真的呼叫。
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key";
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="24" fill="#0c1908"/>
+  <!-- Warehouse roof -->
+  <polygon points="96,32 152,68 40,68" fill="#76b900"/>
+  <!-- Warehouse body -->
+  <rect x="48" y="68" width="96" height="72" fill="#76b900" opacity="0.85"/>
+  <!-- Door -->
+  <rect x="78" y="100" width="36" height="40" rx="2" fill="#0c1908"/>
+  <!-- Door handle -->
+  <circle cx="108" cy="122" r="3" fill="#76b900"/>
+  <!-- Box in front -->
+  <rect x="52" y="148" width="28" height="20" rx="2" fill="#76b900" stroke="#0c1908" stroke-width="1.5"/>
+  <line x1="52" y1="155" x2="80" y2="155" stroke="#0c1908" stroke-width="1"/>
+  <line x1="66" y1="148" x2="66" y2="168" stroke="#0c1908" stroke-width="1"/>
+</svg>
