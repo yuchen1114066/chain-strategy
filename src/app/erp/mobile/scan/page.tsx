@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { parts, suppliers, bom, models } from "@/lib/erp/seed";
+import { parts as seedParts, suppliers, bom, models } from "@/lib/erp/seed";
+import type { ItemMaster } from "@/lib/erp/master-data-store";
 import { initialSlips } from "@/lib/erp/warehouse";
 import { digitalPOs } from "@/lib/erp/supplier-portal";
 import { outsourceOrders } from "@/lib/erp/outsource";
@@ -42,6 +43,56 @@ for (const slip of initialSlips) {
       LOCATION_MAP[item.partCode] = item.location;
     }
   }
+}
+
+// ── IndexedDB 資料串接（master-data 匯入的真實資料） ──
+type MergedPart = typeof seedParts[0];
+
+function useMergedParts() {
+  const [parts, setParts] = useState<MergedPart[]>(seedParts);
+  const [dataSource, setDataSource] = useState<"seed" | "indexeddb">("seed");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { loadItems } = await import("@/lib/erp/master-data-store");
+        const items: ItemMaster[] = await loadItems();
+        if (items.length === 0) return;
+
+        const seedMap = new Map(seedParts.map((p) => [p.code, p]));
+        const merged: MergedPart[] = [];
+        const seen = new Set<string>();
+
+        for (const item of items) {
+          seen.add(item.partNo);
+          const seed = seedMap.get(item.partNo);
+          merged.push({
+            id: seed?.id ?? `idb-${item.partNo}`,
+            code: item.partNo,
+            name: item.name || seed?.name || item.partNo,
+            spec: item.spec ?? seed?.spec ?? "",
+            category: item.category ?? seed?.category ?? "未分類",
+            unit: item.unit ?? seed?.unit ?? "PCS",
+            unitCost: seed?.unitCost ?? 0,
+            supplierId: seed?.supplierId ?? "",
+            leadDays: seed?.leadDays ?? 0,
+            stockOnHand: seed?.stockOnHand ?? 0,
+            safetyStock: seed?.safetyStock ?? 0,
+            kind: seed?.kind,
+          } as MergedPart);
+        }
+
+        for (const sp of seedParts) {
+          if (!seen.has(sp.code)) merged.push(sp);
+        }
+
+        setParts(merged);
+        setDataSource("indexeddb");
+      } catch { /* IndexedDB unavailable, use seed */ }
+    })();
+  }, []);
+
+  return { parts, dataSource };
 }
 
 const WAREHOUSE_STAFF = [
@@ -186,6 +237,7 @@ function LoginScreen({ onLogin }: { onLogin: (s: typeof WAREHOUSE_STAFF[0]) => v
 // ============================================================
 
 function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void }) {
+  const { parts, dataSource } = useMergedParts();
   const [query, setQuery] = useState("");
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -329,6 +381,11 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
               CHI HUA · WAREHOUSE
             </div>
             <div style={{ fontSize: 16, fontWeight: 700 }}>倉庫零件查詢</div>
+            {dataSource === "indexeddb" && (
+              <div style={{ fontSize: 9, color: BR.green, fontWeight: 600, marginTop: 1 }}>
+                ● 已載入主檔資料（{parts.length} 筆）
+              </div>
+            )}
           </div>
 
           <Link
@@ -589,7 +646,7 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
         {/* Parts Card — 零件卡 */}
         {selected && (
           <>
-            <PartCard code={selected.code} />
+            <PartCard code={selected.code} parts={parts} />
             <button
               onClick={() => setSelectedCode(null)}
               style={{
@@ -672,7 +729,7 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
 // 零件卡
 // ============================================================
 
-function PartCard({ code }: { code: string }) {
+function PartCard({ code, parts }: { code: string; parts: MergedPart[] }) {
   const p = parts.find((x) => x.code === code);
   if (!p) return <div style={{ padding: 20, textAlign: "center", color: "#999" }}>找不到 {code}</div>;
 
@@ -745,7 +802,7 @@ function PartCard({ code }: { code: string }) {
       </div>
 
       {/* 在途訂單 */}
-      <InTransitSection partId={p.id} partCode={p.code} />
+      <InTransitSection partId={p.id} partCode={p.code} parts={parts} />
 
       {uniqUsedBy.length > 0 && (
         <div style={{ background: "#fff", borderRadius: 14, padding: "14px 16px", border: `1px solid ${BR.border}` }}>
@@ -779,7 +836,7 @@ function PartCard({ code }: { code: string }) {
 // 在途訂單區塊
 // ============================================================
 
-function InTransitSection({ partId, partCode }: { partId: string; partCode: string }) {
+function InTransitSection({ partId, partCode, parts }: { partId: string; partCode: string; parts: MergedPart[] }) {
   const activePOs = digitalPOs.filter(
     (po) => po.partId === partId && !["received", "closed", "rejected"].includes(po.status)
   );
