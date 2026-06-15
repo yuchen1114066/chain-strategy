@@ -10,8 +10,11 @@ import {
   upsertItems,
   replaceBomForParent,
   appendPurchases,
+  logUpload,
+  loadRecentLogs,
   clearAll,
   type MasterDataMeta,
+  type UploadLog,
 } from "@/lib/erp/master-data-store";
 import {
   readFile,
@@ -89,14 +92,15 @@ export default function MasterDataPage() {
     purchaseCount: 0,
   });
   const [toast, setToast] = useState<string>("");
+  const [logs, setLogs] = useState<UploadLog[]>([]);
 
-  const refreshMeta = useCallback(async () => {
-    setMeta(await loadMeta());
+  const refresh = useCallback(async () => {
+    const [m, l] = await Promise.all([loadMeta(), loadRecentLogs(20)]);
+    setMeta(m);
+    setLogs(l);
   }, []);
 
-  useEffect(() => {
-    refreshMeta();
-  }, [refreshMeta]);
+  useEffect(() => { refresh(); }, [refresh]);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -135,10 +139,13 @@ export default function MasterDataPage() {
         {/* 目前狀態 */}
         <StatusOverview meta={meta} />
 
+        {/* 上傳紀錄 — 一眼看出剛剛丟的有沒有進來 */}
+        <RecentUploadsPanel logs={logs} onRefresh={refresh} />
+
         {/* 鼎新報表 OCR — PR-4 */}
         <ReportOcrSection
           onSaved={async (msg) => {
-            await refreshMeta();
+            await refresh();
             showToast(msg);
           }}
         />
@@ -148,7 +155,8 @@ export default function MasterDataPage() {
           section="items"
           onSave={async (rows) => {
             await saveItems(rows as ItemMaster[]);
-            await refreshMeta();
+            await logUpload({ ts: Date.now(), type: "items", source: "csv", count: rows.length });
+            await refresh();
             showToast(`✓ 已儲存 ${rows.length} 筆料件主檔`);
           }}
         />
@@ -156,7 +164,8 @@ export default function MasterDataPage() {
           section="bom"
           onSave={async (rows) => {
             await saveBom(rows as BomEntry[]);
-            await refreshMeta();
+            await logUpload({ ts: Date.now(), type: "bom", source: "csv", count: rows.length });
+            await refresh();
             showToast(`✓ 已儲存 ${rows.length} 筆 BOM 結構`);
           }}
         />
@@ -164,7 +173,8 @@ export default function MasterDataPage() {
           section="purchases"
           onSave={async (rows) => {
             await savePurchases(rows as PurchaseRecord[]);
-            await refreshMeta();
+            await logUpload({ ts: Date.now(), type: "purchases", source: "csv", count: rows.length });
+            await refresh();
             showToast(`✓ 已儲存 ${rows.length} 筆採購歷史`);
           }}
         />
@@ -172,7 +182,7 @@ export default function MasterDataPage() {
         {/* 危險區：清空 */}
         <DangerZone onClear={async () => {
           await clearAll();
-          await refreshMeta();
+          await refresh();
           showToast("✓ 已清空所有主檔");
         }} />
 
@@ -201,6 +211,141 @@ export default function MasterDataPage() {
       )}
     </div>
   );
+}
+
+// ============================================================
+// 最近上傳紀錄 — 一眼看出「我剛剛丟的」有沒有真的進來
+//
+// 每次 CSV / OCR 寫入後都會 logUpload，這裡顯示最近 N 筆。
+// 沒有任何上傳時 → 改顯示 hint「還沒有任何上傳紀錄」。
+// ============================================================
+function RecentUploadsPanel({ logs, onRefresh }: { logs: UploadLog[]; onRefresh: () => void | Promise<void> }) {
+  const [open, setOpen] = useState(true);
+
+  if (logs.length === 0) {
+    return (
+      <div className="rounded-[10px] p-3 flex items-center gap-3 flex-wrap" style={{
+        background: "#fbfcfa", border: `1px dashed ${BR.border}`,
+        fontFamily: FONT_MONO, fontSize: 11.5, color: BR.inkFaint, lineHeight: 1.55,
+      }}>
+        <span style={{ fontFamily: FONT_HEAD, fontWeight: 700, color: BR.ink, fontSize: 13 }}>📜 上傳紀錄</span>
+        <span>還沒有任何上傳紀錄。上傳完成後這裡會顯示時間 / 類型 / 筆數 / 來源 / 父件，方便驗證是否已套用最新版。</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-[12px]" style={{
+      background: BR.card, border: `1px solid ${BR.border}`, padding: "14px 18px",
+    }}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-3 w-full text-left"
+        style={{ background: "transparent", border: "none", cursor: "pointer" }}
+      >
+        <span style={{ fontSize: 18 }}>{open ? "▾" : "▸"}</span>
+        <div className="flex-1 flex items-baseline gap-2 flex-wrap">
+          <span style={{ fontFamily: FONT_HEAD, fontSize: 15, fontWeight: 800, color: BR.ink }}>
+            📜 最近上傳紀錄
+          </span>
+          <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: BR.inkFaint }}>
+            最近 {logs.length} 筆 · 最新：{relativeTime(logs[0].ts)}
+          </span>
+        </div>
+        <span
+          role="button"
+          onClick={(e) => { e.stopPropagation(); onRefresh(); }}
+          style={{
+            fontFamily: FONT_MONO, fontSize: 11, color: BR.greenDeep,
+            border: `1px solid ${BR.greenLine}`, padding: "3px 8px", borderRadius: 4,
+            background: BR.greenSoft, cursor: "pointer",
+          }}
+        >↻ 重新整理</span>
+      </button>
+
+      {open && (
+        <div className="mt-3 overflow-hidden rounded-[8px]" style={{ border: `1px solid ${BR.border}` }}>
+          <div className="grid grid-cols-[120px_80px_60px_80px_1fr_120px]" style={{
+            background: BR.greenInk, color: "#fff",
+            padding: "6px 10px",
+            fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
+          }}>
+            <div>時間</div>
+            <div>類型</div>
+            <div className="text-right">筆數</div>
+            <div>來源</div>
+            <div>詳細</div>
+            <div>絕對時間</div>
+          </div>
+          {logs.map((log) => (
+            <UploadLogRow key={log.id} log={log} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const TYPE_LABEL: Record<UploadLog["type"], { label: string; tone: string }> = {
+  items: { label: "料件", tone: "#76b900" },
+  bom: { label: "BOM", tone: "#3a6ea5" },
+  purchases: { label: "採購", tone: "#b8860b" },
+};
+
+function UploadLogRow({ log }: { log: UploadLog }) {
+  const t = TYPE_LABEL[log.type];
+  const detail = [
+    log.parentPartNo ? `父件 ${log.parentPartNo}` : null,
+    log.fileName,
+    log.removed ? `替換舊 ${log.removed} 筆` : null,
+    log.detail,
+  ].filter(Boolean).join(" · ");
+  return (
+    <div className="grid grid-cols-[120px_80px_60px_80px_1fr_120px] items-center" style={{
+      padding: "6px 10px",
+      borderTop: `1px solid ${BR.border}`,
+      fontFamily: FONT_MONO, fontSize: 11.5, color: BR.ink,
+    }}>
+      <div style={{ color: BR.greenDeep, fontWeight: 700 }}>{relativeTime(log.ts)}</div>
+      <div>
+        <span style={{
+          fontSize: 10.5, fontWeight: 700,
+          color: "#fff", background: t.tone,
+          padding: "2px 8px", borderRadius: 3,
+        }}>{t.label}</span>
+      </div>
+      <div className="text-right" style={{ fontWeight: 700 }}>
+        +{log.count.toLocaleString()}
+      </div>
+      <div style={{
+        fontSize: 10.5, color: log.source === "ocr" ? BR.greenDeep : BR.inkSoft,
+        fontWeight: log.source === "ocr" ? 700 : 400,
+      }}>
+        {log.source === "ocr" ? "📄 OCR" : log.source === "csv" ? "📊 CSV" : log.source}
+      </div>
+      <div style={{
+        color: BR.inkSoft, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+      }}>
+        {detail || "—"}
+      </div>
+      <div style={{ color: BR.inkFaint, fontSize: 10.5 }}>{fmtFullTs(log.ts)}</div>
+    </div>
+  );
+}
+
+function relativeTime(ts: number): string {
+  const diff = Date.now() - ts;
+  if (diff < 60_000) return "剛剛";
+  if (diff < 60 * 60_000) return `${Math.floor(diff / 60_000)} 分鐘前`;
+  if (diff < 24 * 60 * 60_000) return `${Math.floor(diff / (60 * 60_000))} 小時前`;
+  if (diff < 7 * 24 * 60 * 60_000) return `${Math.floor(diff / (24 * 60 * 60_000))} 天前`;
+  return new Date(ts).toLocaleDateString("zh-TW");
+}
+
+function fmtFullTs(ts: number): string {
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getMonth() + 1}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 // ============================================================
@@ -677,6 +822,7 @@ function ReportOcrSection({ onSaved }: { onSaved: (msg: string) => void | Promis
     try {
       const r = state.result;
       let msg = "";
+      const fileName = state.kind === "ready" ? state.fileName : undefined;
       if (r.reportType === "bom") {
         const parent = r.parentPartNo;
         if (!parent) {
@@ -693,6 +839,12 @@ function ReportOcrSection({ onSaved }: { onSaved: (msg: string) => void | Promis
             level: row.level != null ? Number(row.level) : undefined,
           }));
         const result = await replaceBomForParent(parent, bomEntries);
+        await logUpload({
+          ts: Date.now(), type: "bom", source: "ocr",
+          count: result.inserted, removed: result.removed,
+          parentPartNo: parent, fileName,
+          detail: r.reportLabel ?? undefined,
+        });
         msg = `✓ ${parent}: 寫入 ${result.inserted} 筆 BOM 子料（替換舊有 ${result.removed} 筆）`;
       } else if (r.reportType === "items") {
         const items = r.rows
@@ -705,6 +857,11 @@ function ReportOcrSection({ onSaved }: { onSaved: (msg: string) => void | Promis
             unit: row.unit || undefined,
           }));
         const result = await upsertItems(items);
+        await logUpload({
+          ts: Date.now(), type: "items", source: "ocr",
+          count: result.inserted, fileName,
+          detail: r.reportLabel ?? undefined,
+        });
         msg = `✓ 新增/更新 ${result.inserted} 筆料件主檔（依料號 upsert）`;
       } else if (r.reportType === "purchases") {
         const purchases = r.rows
@@ -719,6 +876,11 @@ function ReportOcrSection({ onSaved }: { onSaved: (msg: string) => void | Promis
             date: normalizeDate(row.date || ""),
           }));
         const result = await appendPurchases(purchases);
+        await logUpload({
+          ts: Date.now(), type: "purchases", source: "ocr",
+          count: result.inserted, fileName,
+          detail: r.reportLabel ?? undefined,
+        });
         msg = `✓ 新增 ${result.inserted} 筆採購紀錄（不刪除既有資料）`;
       } else {
         setState({ kind: "error", message: "AI 無法辨識報表類型 — 請改用下方 CSV 上傳區" });

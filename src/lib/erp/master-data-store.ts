@@ -50,12 +50,26 @@ export type MasterDataMeta = {
   purchaseUpdatedAt?: string;
 };
 
+// 上傳紀錄 — 讓使用者一眼看出「我剛剛丟的那份有沒有真的進來」
+export type UploadLog = {
+  id?: number;
+  ts: number;                                  // Date.now()
+  type: "items" | "bom" | "purchases";
+  source: "csv" | "ocr" | "direct";
+  count: number;                               // 寫入的筆數
+  removed?: number;                            // 替換式才有（BOM 同父件替換時）
+  parentPartNo?: string;                       // BOM 才有
+  fileName?: string;
+  detail?: string;                             // 例如「FB61H003 多階正展」
+};
+
 const DB_NAME = "chain-strategy-erp-master";
-const DB_VERSION = 1;
+const DB_VERSION = 2;                          // ↑ v1→v2：新增 uploadLogs store
 const STORE_ITEMS = "items";
 const STORE_BOM = "bom";
 const STORE_PURCHASES = "purchases";
 const STORE_META = "meta";
+const STORE_LOGS = "uploadLogs";
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -86,6 +100,12 @@ function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_META)) {
         db.createObjectStore(STORE_META);
+      }
+      // v2 加入：上傳紀錄
+      if (!db.objectStoreNames.contains(STORE_LOGS)) {
+        const s = db.createObjectStore(STORE_LOGS, { keyPath: "id", autoIncrement: true });
+        s.createIndex("ts", "ts", { unique: false });
+        s.createIndex("type", "type", { unique: false });
       }
     };
   });
@@ -267,17 +287,58 @@ export async function findPurchasesByPart(partNo: string): Promise<PurchaseRecor
 }
 
 // ============================================================
+// 上傳紀錄（appendLog 不阻塞主流程，失敗就靜默）
+// ============================================================
+export async function logUpload(entry: Omit<UploadLog, "id">): Promise<void> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_LOGS, "readwrite");
+      tx.objectStore(STORE_LOGS).add(entry);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); resolve(); };
+    });
+  } catch {}
+}
+
+export async function loadRecentLogs(limit = 20): Promise<UploadLog[]> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_LOGS, "readonly");
+      const idx = tx.objectStore(STORE_LOGS).index("ts");
+      const req = idx.openCursor(null, "prev"); // 由新到舊
+      const out: UploadLog[] = [];
+      req.onsuccess = (e) => {
+        const c = (e.target as IDBRequest<IDBCursorWithValue | null>).result;
+        if (c && out.length < limit) {
+          out.push(c.value as UploadLog);
+          c.continue();
+        } else {
+          db.close();
+          resolve(out);
+        }
+      };
+      req.onerror = () => { db.close(); resolve([]); };
+    });
+  } catch {
+    return [];
+  }
+}
+
+// ============================================================
 // 清空（測試用）
 // ============================================================
 export async function clearAll(): Promise<void> {
   try {
     const db = await openDB();
     return new Promise((resolve) => {
-      const tx = db.transaction([STORE_ITEMS, STORE_BOM, STORE_PURCHASES, STORE_META], "readwrite");
+      const tx = db.transaction([STORE_ITEMS, STORE_BOM, STORE_PURCHASES, STORE_META, STORE_LOGS], "readwrite");
       tx.objectStore(STORE_ITEMS).clear();
       tx.objectStore(STORE_BOM).clear();
       tx.objectStore(STORE_PURCHASES).clear();
       tx.objectStore(STORE_META).clear();
+      tx.objectStore(STORE_LOGS).clear();
       tx.oncomplete = () => { db.close(); resolve(); };
       tx.onerror = () => { db.close(); resolve(); };
     });
