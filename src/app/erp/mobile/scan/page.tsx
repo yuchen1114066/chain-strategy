@@ -734,29 +734,11 @@ function PartCard({ code }: { code: string }) {
           <NumberBlock label="倉位" value={location} color={BR.cyan} bg={BR.cyanSoft} mono />
         </div>
 
-        <div style={{ padding: "10px 16px", borderBottom: `1px solid ${BR.border}` }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: BR.inkFaint, marginBottom: 4 }}>
-            <span>庫存水位</span>
-            <span style={{ color: stockColor, fontWeight: 700 }}>{pct}%</span>
-          </div>
-          <div style={{ height: 8, background: "#f0f0ec", borderRadius: 99, overflow: "hidden" }}>
-            <div style={{
-              height: "100%", borderRadius: 99, width: `${Math.min(pct, 100)}%`,
-              background: stockColor, transition: "width 0.5s ease",
-            }} />
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: BR.inkFaint, marginTop: 3 }}>
-            <span>0</span>
-            <span style={{ color: BR.amber }}>安全線 {p.safetyStock}</span>
-            <span>{Math.max(p.stockOnHand, p.safetyStock * 2)}</span>
-          </div>
-        </div>
-
         <div style={{ padding: "12px 16px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <InfoRow label="分類" value={p.category} />
             <InfoRow label="屬性" value={KIND_LABEL[p.kind ?? "purchase"] ?? p.kind ?? "採購件"} />
-            <InfoRow label="交期" value={`${p.leadDays} 天`} />
+            <InfoRow label="廠商交貨期" value={`${p.leadDays} 天`} />
             <InfoRow label="單位" value={p.unit} />
           </div>
         </div>
@@ -871,26 +853,26 @@ function InTransitSection({ partId, partCode }: { partId: string; partCode: stri
                 </>
               )}
             </div>
-            {po.productionLog.length > 0 && (
-              <div style={{ marginTop: 6, display: "flex", gap: 4, flexWrap: "wrap" }}>
-                {po.productionLog.map((log, i) => {
-                  const stageLabel: Record<string, string> = {
-                    pending: "待處理", material_ready: "備料完成", in_production: "生產中",
-                    packed: "已包裝", shipped: "已出貨", in_transit: "運輸中", arrived: "已到廠",
-                  };
-                  return (
-                    <span key={i} style={{
-                      fontSize: 9, padding: "2px 6px", borderRadius: 4,
-                      background: i === po.productionLog.length - 1 ? "#7c3aed" : "#e9ece3",
-                      color: i === po.productionLog.length - 1 ? "#fff" : BR.inkSoft,
-                      fontWeight: 600,
-                    }}>
-                      {stageLabel[log.stage] ?? log.stage}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
+            {po.productionLog.length > 0 && (() => {
+              const stageLabel: Record<string, string> = {
+                pending: "未交貨", material_ready: "未交貨", in_production: "未交貨",
+                packed: "未交貨", shipped: "已交貨", in_transit: "已交貨", arrived: "已交貨",
+              };
+              const lastStage = po.productionLog[po.productionLog.length - 1];
+              const currentLabel = stageLabel[lastStage.stage] ?? lastStage.stage;
+              const isDelivered = ["shipped", "in_transit", "arrived"].includes(lastStage.stage);
+              return (
+                <div style={{ marginTop: 6, display: "flex", gap: 4 }}>
+                  <span style={{
+                    fontSize: 10, padding: "3px 10px", borderRadius: 6, fontWeight: 700,
+                    background: isDelivered ? "#059669" : BR.amber,
+                    color: "#fff",
+                  }}>
+                    {currentLabel}
+                  </span>
+                </div>
+              );
+            })()}
           </div>
         );
       })}
