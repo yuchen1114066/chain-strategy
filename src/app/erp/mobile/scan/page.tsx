@@ -51,13 +51,16 @@ type MergedPart = typeof seedParts[0];
 function useMergedParts() {
   const [parts, setParts] = useState<MergedPart[]>(seedParts);
   const [dataSource, setDataSource] = useState<"seed" | "indexeddb">("seed");
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const { loadItems } = await import("@/lib/erp/master-data-store");
+        const { loadItems, loadMeta } = await import("@/lib/erp/master-data-store");
         const items: ItemMaster[] = await loadItems();
         if (items.length === 0) return;
+        const meta = await loadMeta();
+        if (meta.itemUpdatedAt) setUpdatedAt(meta.itemUpdatedAt);
 
         const seedMap = new Map(seedParts.map((p) => [p.code, p]));
         const merged: MergedPart[] = [];
@@ -92,7 +95,7 @@ function useMergedParts() {
     })();
   }, []);
 
-  return { parts, dataSource };
+  return { parts, dataSource, updatedAt };
 }
 
 const WAREHOUSE_STAFF = [
@@ -237,7 +240,7 @@ function LoginScreen({ onLogin }: { onLogin: (s: typeof WAREHOUSE_STAFF[0]) => v
 // ============================================================
 
 function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void }) {
-  const { parts, dataSource } = useMergedParts();
+  const { parts, dataSource, updatedAt } = useMergedParts();
   const [query, setQuery] = useState("");
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -670,6 +673,26 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
               輸入料號 / 品名 / 規格，或按 📷 掃描
               <br />即可看到零件卡（庫存 · 品名 · 倉位 · 規格）
             </div>
+            <div style={{
+              marginTop: 12, fontSize: 11, color: BR.inkFaint,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            }}>
+              <span style={{
+                display: "inline-block", width: 6, height: 6, borderRadius: 99,
+                background: dataSource === "indexeddb" ? BR.green : BR.amber,
+              }} />
+              {dataSource === "indexeddb"
+                ? `主檔資料已載入（${parts.length} 筆）`
+                : `Demo 資料（${parts.length} 筆）· 請至主檔管理匯入 ERP 報表`
+              }
+            </div>
+            {updatedAt && (
+              <div style={{ fontSize: 10, color: BR.inkFaint, marginTop: 4 }}>
+                資料更新日：{new Date(updatedAt).toLocaleDateString("zh-TW", { year: "numeric", month: "2-digit", day: "2-digit" })}
+                {" "}
+                {new Date(updatedAt).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}
+              </div>
+            )}
 
             {/* 常用料件快捷 */}
             <div style={{ marginTop: 20, textAlign: "left" }}>
