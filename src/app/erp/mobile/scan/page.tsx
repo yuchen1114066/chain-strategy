@@ -4,6 +4,8 @@ import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { parts, suppliers, bom, models } from "@/lib/erp/seed";
 import { initialSlips } from "@/lib/erp/warehouse";
+import { digitalPOs } from "@/lib/erp/supplier-portal";
+import { outsourceOrders } from "@/lib/erp/outsource";
 
 const BR = {
   green: "#76b900", greenDeep: "#4d7c0f", greenInk: "#0c1908",
@@ -22,6 +24,17 @@ const KIND_LABEL: Record<string, string> = {
   feature: "Feature", outsource: "託外加工", option: "Option",
 };
 
+const PO_STATUS_LABEL: Record<string, { text: string; color: string; bg: string }> = {
+  draft:         { text: "草稿",   color: "#9aa291", bg: "#f5f5f3" },
+  sent:          { text: "已發送", color: "#b8860b", bg: "#fffaf0" },
+  acked:         { text: "已確認", color: "#0891b2", bg: "#ecfeff" },
+  in_production: { text: "生產中", color: "#4d7c0f", bg: "#f0f7e4" },
+  shipped:       { text: "已出貨", color: "#7c3aed", bg: "#f5f3ff" },
+  received:      { text: "已收貨", color: "#059669", bg: "#ecfdf5" },
+  closed:        { text: "已結案", color: "#6b7280", bg: "#f9fafb" },
+  rejected:      { text: "已拒絕", color: "#d4351c", bg: "#fdecea" },
+};
+
 const LOCATION_MAP: Record<string, string> = {};
 for (const slip of initialSlips) {
   for (const item of slip.items) {
@@ -36,6 +49,7 @@ const WAREHOUSE_STAFF = [
   { id: "233", name: "林郁展", role: "倉管員" },
   { id: "243", name: "姜湘淇", role: "倉管員" },
   { id: "235", name: "范成義", role: "倉管員" },
+  { id: "320", name: "曾語梣", role: "系統管理者" },
 ];
 const STORAGE_KEY = "gascc.wh.login";
 
@@ -83,7 +97,7 @@ function LoginScreen({ onLogin }: { onLogin: (s: typeof WAREHOUSE_STAFF[0]) => v
     if (found) {
       onLogin(found);
     } else {
-      setError("找不到此工號或姓名，請確認後重試");
+      setError("無權限，請聯繫系統管理者");
     }
   }
 
@@ -109,20 +123,20 @@ function LoginScreen({ onLogin }: { onLogin: (s: typeof WAREHOUSE_STAFF[0]) => v
             倉庫零件查詢系統
           </div>
           <div style={{ fontSize: 12, color: BR.inkFaint, marginTop: 4 }}>
-            請輸入工號或姓名登入
+            請輸入工號登入
           </div>
         </div>
 
         <div style={{ marginBottom: 16 }}>
           <label style={{ fontSize: 11, fontWeight: 700, color: BR.inkSoft, display: "block", marginBottom: 6 }}>
-            工號 / 姓名
+            工號
           </label>
           <input
             type="text"
             value={empId}
             onChange={(e) => { setEmpId(e.target.value); setError(""); }}
             onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-            placeholder="例：242 或 賴允正"
+            placeholder="請輸入工號"
             style={{
               width: "100%", padding: "14px 16px", fontSize: 16, borderRadius: 12,
               border: `1.5px solid ${error ? BR.red : BR.borderHi}`, background: "#fff",
@@ -154,36 +168,8 @@ function LoginScreen({ onLogin }: { onLogin: (s: typeof WAREHOUSE_STAFF[0]) => v
           登入
         </button>
 
-        <div style={{ marginTop: 20, borderTop: `1px solid ${BR.border}`, paddingTop: 16 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: BR.inkFaint, marginBottom: 8, letterSpacing: "0.06em" }}>
-            倉庫人員（點擊快速登入）
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {WAREHOUSE_STAFF.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => onLogin(s)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
-                  background: BR.greenSoft, border: `1px solid ${BR.greenLine}`, borderRadius: 10,
-                  cursor: "pointer", fontFamily: FONT, textAlign: "left",
-                }}
-              >
-                <span style={{
-                  fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 700,
-                  color: BR.greenDeep, minWidth: 50,
-                }}>
-                  {s.id}
-                </span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: BR.greenInk }}>
-                  {s.name}
-                </span>
-                <span style={{ fontSize: 11, color: BR.inkFaint, flex: 1, textAlign: "right" }}>
-                  {s.role}
-                </span>
-              </button>
-            ))}
-          </div>
+        <div style={{ marginTop: 20, textAlign: "center", fontSize: 11, color: BR.inkFaint, lineHeight: 1.6 }}>
+          僅限授權人員登入<br />如需開通權限請聯繫分機 320
         </div>
       </div>
 
@@ -354,6 +340,17 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
             }}
           >
             📋 進出卡
+          </Link>
+
+          <Link
+            href="/erp/mobile/count"
+            style={{
+              background: BR.cyan, border: "none", color: "#fff",
+              padding: "8px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+              textDecoration: "none", fontFamily: "inherit", whiteSpace: "nowrap",
+            }}
+          >
+            📊 盤點
           </Link>
 
           {/* 用戶頭像按鈕 */}
@@ -770,6 +767,9 @@ function PartCard({ code }: { code: string }) {
         </div>
       )}
 
+      {/* 在途訂單 */}
+      <InTransitSection partId={p.id} partCode={p.code} />
+
       {uniqUsedBy.length > 0 && (
         <div style={{ background: "#fff", borderRadius: 14, padding: "14px 16px", border: `1px solid ${BR.border}` }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 6 }}>
@@ -794,6 +794,154 @@ function PartCard({ code }: { code: string }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// 在途訂單區塊
+// ============================================================
+
+function InTransitSection({ partId, partCode }: { partId: string; partCode: string }) {
+  const activePOs = digitalPOs.filter(
+    (po) => po.partId === partId && !["received", "closed", "rejected"].includes(po.status)
+  );
+  const activeOutsource = outsourceOrders.filter(
+    (o) => o.partCode === partCode && o.qtyReturned < o.qtyOut
+  );
+  const totalInTransit = activePOs.reduce((sum, po) => sum + po.qty, 0);
+  const totalOutsource = activeOutsource.reduce((sum, o) => sum + (o.qtyOut - o.qtyReturned), 0);
+
+  if (activePOs.length === 0 && activeOutsource.length === 0) return null;
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 14, overflow: "hidden", border: `1.5px solid #c4b5fd` }}>
+      <div style={{
+        background: "#7c3aed", color: "#fff", padding: "10px 16px",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+      }}>
+        <div>
+          <div style={{ fontSize: 10, opacity: 0.8, letterSpacing: "0.08em" }}>採購在途訂單</div>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>
+            🚚 {activePOs.length + activeOutsource.length} 筆未結
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 9, opacity: 0.7 }}>在途總量</div>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>{totalInTransit + totalOutsource}</div>
+        </div>
+      </div>
+
+      {activePOs.map((po) => {
+        const sup = suppliers.find((s) => s.id === po.supplierId);
+        const st = PO_STATUS_LABEL[po.status] ?? PO_STATUS_LABEL.draft;
+        const isOverdue = po.expectedArrival < new Date().toISOString().slice(0, 10) && po.status !== "received";
+        return (
+          <div key={po.id} style={{ padding: "10px 16px", borderTop: `1px solid ${BR.border}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 700, color: "#7c3aed" }}>
+                {po.poNo}
+              </span>
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 99,
+                color: st.color, background: st.bg,
+              }}>
+                {st.text}
+              </span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11 }}>
+              <div style={{ color: BR.inkFaint }}>供應商</div>
+              <div style={{ fontWeight: 600, textAlign: "right" }}>{sup?.name ?? "—"}</div>
+              <div style={{ color: BR.inkFaint }}>訂購數量</div>
+              <div style={{ fontWeight: 700, textAlign: "right", color: "#7c3aed" }}>{po.qty} {parts.find(p => p.id === po.partId)?.unit ?? "PCS"}</div>
+              <div style={{ color: BR.inkFaint }}>預計到貨</div>
+              <div style={{
+                fontWeight: 600, textAlign: "right",
+                color: isOverdue ? BR.red : BR.ink,
+              }}>
+                {po.expectedArrival}{isOverdue ? " ⚠ 逾期" : ""}
+              </div>
+              {po.asn && (
+                <>
+                  <div style={{ color: BR.inkFaint }}>物流單號</div>
+                  <div style={{ fontWeight: 600, textAlign: "right", fontSize: 10, fontFamily: "'IBM Plex Mono', monospace" }}>{po.asn.trackingNo}</div>
+                  <div style={{ color: BR.inkFaint }}>承運商</div>
+                  <div style={{ fontWeight: 600, textAlign: "right" }}>{po.asn.carrier}</div>
+                  {po.asn.remark && (
+                    <>
+                      <div style={{ color: BR.inkFaint }}>備註</div>
+                      <div style={{ fontWeight: 500, textAlign: "right", color: BR.amber, fontSize: 10 }}>{po.asn.remark}</div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+            {po.productionLog.length > 0 && (
+              <div style={{ marginTop: 6, display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {po.productionLog.map((log, i) => {
+                  const stageLabel: Record<string, string> = {
+                    pending: "待處理", material_ready: "備料完成", in_production: "生產中",
+                    packed: "已包裝", shipped: "已出貨", in_transit: "運輸中", arrived: "已到廠",
+                  };
+                  return (
+                    <span key={i} style={{
+                      fontSize: 9, padding: "2px 6px", borderRadius: 4,
+                      background: i === po.productionLog.length - 1 ? "#7c3aed" : "#e9ece3",
+                      color: i === po.productionLog.length - 1 ? "#fff" : BR.inkSoft,
+                      fontWeight: 600,
+                    }}>
+                      {stageLabel[log.stage] ?? log.stage}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {activeOutsource.map((o) => {
+        const remaining = o.qtyOut - o.qtyReturned;
+        const isOverdue = o.expectedReturn < new Date().toISOString().slice(0, 10) && remaining > 0;
+        return (
+          <div key={o.id} style={{ padding: "10px 16px", borderTop: `1px solid ${BR.border}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 700, color: BR.amber }}>
+                {o.orderNo}
+              </span>
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 99,
+                color: BR.amber, background: "#fffaf0",
+              }}>
+                託外加工
+              </span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11 }}>
+              <div style={{ color: BR.inkFaint }}>加工廠</div>
+              <div style={{ fontWeight: 600, textAlign: "right" }}>{o.vendor}</div>
+              <div style={{ color: BR.inkFaint }}>製程</div>
+              <div style={{ fontWeight: 600, textAlign: "right" }}>{o.process}</div>
+              <div style={{ color: BR.inkFaint }}>送出 / 已回</div>
+              <div style={{ fontWeight: 700, textAlign: "right" }}>{o.qtyOut} / {o.qtyReturned}</div>
+              <div style={{ color: BR.inkFaint }}>在外數量</div>
+              <div style={{ fontWeight: 700, textAlign: "right", color: BR.amber }}>{remaining}</div>
+              <div style={{ color: BR.inkFaint }}>預計回廠</div>
+              <div style={{
+                fontWeight: 600, textAlign: "right",
+                color: isOverdue ? BR.red : BR.ink,
+              }}>
+                {o.expectedReturn}{isOverdue ? " ⚠ 逾期" : ""}
+              </div>
+              {o.woRef && (
+                <>
+                  <div style={{ color: BR.inkFaint }}>關聯工單</div>
+                  <div style={{ fontWeight: 600, textAlign: "right", fontFamily: "'IBM Plex Mono', monospace", fontSize: 10 }}>{o.woRef}</div>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
