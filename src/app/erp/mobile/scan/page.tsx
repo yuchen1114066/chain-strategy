@@ -694,45 +694,96 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
               </div>
             )}
 
-            {/* 常用料件快捷 */}
-            <div style={{ marginTop: 20, textAlign: "left" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: BR.inkFaint, marginBottom: 8, letterSpacing: "0.06em" }}>
-                常用料件（點擊查看零件卡）
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                {parts.slice(0, 8).map((p) => (
-                  <button
-                    key={p.code}
-                    onClick={() => handleSelect(p.code)}
-                    style={{
-                      padding: "10px 12px", borderRadius: 10, textAlign: "left",
-                      background: "#fff", border: `1px solid ${BR.border}`,
-                      cursor: "pointer", fontFamily: "inherit",
-                    }}
-                  >
-                    <div style={{
-                      fontFamily: "'IBM Plex Mono', monospace", fontSize: 11,
-                      fontWeight: 700, color: BR.greenDeep,
-                    }}>
-                      {p.code}
-                    </div>
-                    <div style={{ fontSize: 12, color: BR.ink, marginTop: 2 }}>
-                      {p.name}
-                    </div>
-                    <div style={{
-                      fontSize: 11, fontWeight: 700, marginTop: 2,
-                      color: p.stockOnHand < p.safetyStock ? BR.red : BR.inkSoft,
-                    }}>
-                      庫存 {p.stockOnHand} {p.unit}
-                    </div>
-                    {(() => {
-                      const oq = digitalPOs.filter((po) => po.partId === p.id && !["draft", "received", "closed", "rejected"].includes(po.status)).reduce((s, po) => s + po.qty, 0);
-                      return oq > 0 ? <div style={{ fontSize: 10, fontWeight: 700, marginTop: 1, color: "#7c3aed" }}>在途 {oq} {p.unit}</div> : null;
-                    })()}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* 料件分類瀏覽 */}
+            {(() => {
+              const ERP_CATEGORY: Record<string, { label: string; color: string; bg: string }> = {
+                "1": { label: "1 原料類", color: "#b8860b", bg: "#fffaf0" },
+                "2": { label: "2 物料類", color: "#4d7c0f", bg: "#f0f7e4" },
+                "3": { label: "3 在製品", color: "#0891b2", bg: "#ecfeff" },
+                "4": { label: "4 製成品", color: "#7c3aed", bg: "#f5f3ff" },
+                "5": { label: "5 商品類", color: "#059669", bg: "#ecfdf5" },
+                "9": { label: "9 費用類", color: "#d4351c", bg: "#fdecea" },
+                "S": { label: "S 半成品", color: "#0369a1", bg: "#e0f2fe" },
+              };
+              const kindToErp: Record<string, string> = {
+                purchase: "2", self: "3", outsource: "3",
+                feature: "4", dummy: "9", option: "5",
+              };
+              const catToErp: Record<string, string> = {
+                半成品: "S", 原料: "1", 化工: "1", 鐵心: "1", 膠材: "1",
+                包材: "9", 包裝: "9",
+                鋼架: "2", 飛輪: "2", 阻力: "2", 控制板: "2", 顯示器: "2",
+                座墊: "2", 踏板: "2", 皮帶: "2", 電源: "2", 馬達: "2",
+                框架: "2", 扣件: "2", 軸件: "2", 軸承: "2", 磁件: "2",
+                索線: "2", 套件: "2", 彈簧: "2", 絕緣材: "2", 塑件: "2",
+                電線: "2", 傳動: "2", 電氣: "2", 其他: "2",
+              };
+              function getErpCat(p: MergedPart) {
+                if (p.category && catToErp[p.category]) return catToErp[p.category];
+                if (p.kind && kindToErp[p.kind]) return kindToErp[p.kind];
+                return "2";
+              }
+              const grouped = new Map<string, MergedPart[]>();
+              for (const p of parts) {
+                const cat = getErpCat(p);
+                if (!grouped.has(cat)) grouped.set(cat, []);
+                grouped.get(cat)!.push(p);
+              }
+              const sortedKeys = [...grouped.keys()].sort((a, b) => a.localeCompare(b));
+
+              return (
+                <div style={{ marginTop: 20, textAlign: "left" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: BR.inkFaint, marginBottom: 10, letterSpacing: "0.06em" }}>
+                    料件分類（點擊查看零件卡）
+                  </div>
+                  {sortedKeys.map((catKey) => {
+                    const cat = ERP_CATEGORY[catKey] ?? { label: catKey, color: BR.inkSoft, bg: "#f5f5f3" };
+                    const items = grouped.get(catKey)!;
+                    return (
+                      <div key={catKey} style={{ marginBottom: 14 }}>
+                        <div style={{
+                          fontSize: 11, fontWeight: 700, color: cat.color,
+                          padding: "4px 10px", background: cat.bg, borderRadius: 6,
+                          display: "inline-block", marginBottom: 6,
+                        }}>
+                          {cat.label}（{items.length}）
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                          {items.slice(0, 6).map((p) => (
+                            <button
+                              key={p.code}
+                              onClick={() => handleSelect(p.code)}
+                              style={{
+                                padding: "10px 12px", borderRadius: 10, textAlign: "left",
+                                background: "#fff", border: `1px solid ${BR.border}`,
+                                cursor: "pointer", fontFamily: "inherit",
+                              }}
+                            >
+                              <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, fontWeight: 700, color: BR.greenDeep }}>
+                                {p.code}
+                              </div>
+                              <div style={{ fontSize: 12, color: BR.ink, marginTop: 2 }}>{p.name}</div>
+                              <div style={{ fontSize: 11, fontWeight: 700, marginTop: 2, color: p.stockOnHand < p.safetyStock ? BR.red : BR.inkSoft }}>
+                                庫存 {p.stockOnHand} {p.unit}
+                              </div>
+                              {(() => {
+                                const oq = digitalPOs.filter((po) => po.partId === p.id && !["draft", "received", "closed", "rejected"].includes(po.status)).reduce((s, po) => s + po.qty, 0);
+                                return oq > 0 ? <div style={{ fontSize: 10, fontWeight: 700, marginTop: 1, color: "#7c3aed" }}>在途 {oq} {p.unit}</div> : null;
+                              })()}
+                            </button>
+                          ))}
+                        </div>
+                        {items.length > 6 && (
+                          <div style={{ fontSize: 10, color: BR.inkFaint, marginTop: 4, textAlign: "center" }}>
+                            還有 {items.length - 6} 筆，請搜尋料號查看
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
