@@ -7,7 +7,7 @@ import { Heart, AlertCircle } from "lucide-react";
 
 export default function Footer() {
   const pathname = usePathname();
-  if (pathname?.startsWith("/erp") || pathname?.startsWith("/os") || pathname?.startsWith("/roadmap") || pathname?.startsWith("/architecture")) return null;
+  if (pathname?.startsWith("/erp") || pathname?.startsWith("/os") || pathname?.startsWith("/roadmap") || pathname?.startsWith("/architecture") || pathname?.startsWith("/login")) return null;
   return (
     <footer className="mt-16" style={{background:"#3d2030", color:"#f0dde5"}}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
