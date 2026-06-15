@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { parts as allParts } from "@/lib/erp/seed";
+import { parts as seedParts } from "@/lib/erp/seed";
 import { initialSlips } from "@/lib/erp/warehouse";
+import type { ItemMaster } from "@/lib/erp/master-data-store";
 
 const BR = {
   green: "#76b900", greenDeep: "#4d7c0f", greenInk: "#0c1908",
@@ -17,6 +18,7 @@ const BR = {
 } as const;
 const FONT = "'Noto Sans TC', 'Sora', system-ui, sans-serif";
 
+type MergedPart = typeof seedParts[0];
 type Verdict = "" | "ok" | "diff";
 type CountState = { partCode: string; verdict: Verdict; actualQty: number | null; note: string };
 
@@ -29,19 +31,77 @@ function inferLocation(partCode: string): string {
   return "—";
 }
 
-const KNOWN_LOCATIONS = ["全廠", "A100", "A100-B2", "A100-B2-04", "A100-B3-12", "A100-B5", "IQC-A01"];
+function useMergedParts() {
+  const [parts, setParts] = useState<MergedPart[]>(seedParts);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { loadItems } = await import("@/lib/erp/master-data-store");
+        const items: ItemMaster[] = await loadItems();
+        if (items.length === 0) return;
+
+        const seedMap = new Map(seedParts.map((p) => [p.code, p]));
+        const merged: MergedPart[] = [];
+        const seen = new Set<string>();
+
+        for (const item of items) {
+          seen.add(item.partNo);
+          const seed = seedMap.get(item.partNo);
+          merged.push({
+            id: seed?.id ?? `idb-${item.partNo}`,
+            code: item.partNo,
+            name: item.name || seed?.name || item.partNo,
+            spec: item.spec ?? seed?.spec ?? "",
+            category: item.category ?? seed?.category ?? "未分類",
+            unit: item.unit ?? seed?.unit ?? "PCS",
+            unitCost: seed?.unitCost ?? 0,
+            supplierId: seed?.supplierId ?? "",
+            leadDays: seed?.leadDays ?? 0,
+            stockOnHand: seed?.stockOnHand ?? 0,
+            safetyStock: seed?.safetyStock ?? 0,
+            kind: seed?.kind,
+          } as MergedPart);
+        }
+
+        for (const sp of seedParts) {
+          if (!seen.has(sp.code)) merged.push(sp);
+        }
+
+        setParts(merged);
+      } catch { /* IndexedDB unavailable */ }
+    })();
+  }, []);
+
+  return parts;
+}
 
 export default function CycleCountPage() {
+  const allParts = useMergedParts();
   const [location, setLocation] = useState<string>("全廠");
   const [operator, setOperator] = useState<string>("");
   const [states, setStates] = useState<Map<string, CountState>>(new Map());
   const [filter, setFilter] = useState<"all" | "pending" | "ok" | "diff">("all");
 
+  const locations = useMemo(() => {
+    const locSet = new Set<string>();
+    for (const p of allParts) {
+      const loc = inferLocation(p.code);
+      if (loc && loc !== "—") {
+        locSet.add(loc);
+        const parts = loc.split("-");
+        for (let i = 1; i < parts.length; i++) {
+          locSet.add(parts.slice(0, i).join("-"));
+        }
+      }
+    }
+    return ["全廠", ...[...locSet].sort()];
+  }, [allParts]);
+
   const targetParts = useMemo(() => {
-    const purchaseOnly = allParts.filter((p) => !p.kind || p.kind === "purchase" || p.kind === "outsource");
-    if (location === "全廠") return purchaseOnly;
-    return purchaseOnly.filter((p) => inferLocation(p.code).startsWith(location));
-  }, [location]);
+    if (location === "全廠") return allParts;
+    return allParts.filter((p) => inferLocation(p.code).startsWith(location));
+  }, [location, allParts]);
 
   const filteredParts = useMemo(() => {
     if (filter === "all") return targetParts;
@@ -128,7 +188,7 @@ export default function CycleCountPage() {
                 onChange={(e) => setLocation(e.target.value)}
                 style={{ width: "100%", padding: "10px 12px", fontSize: 14, borderRadius: 10, border: `1.5px solid ${BR.borderHi}`, background: "#fff", fontFamily: FONT }}
               >
-                {KNOWN_LOCATIONS.map((l) => <option key={l} value={l}>{l}</option>)}
+                {locations.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
             <div style={{ flex: 1, minWidth: 120 }}>
