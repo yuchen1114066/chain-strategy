@@ -139,6 +139,9 @@ export default function MasterDataPage() {
         {/* 目前狀態 */}
         <StatusOverview meta={meta} />
 
+        {/* 資料的消費者頁面 — 讓使用者看見上傳 → 哪些頁面立刻變強，閉環關係 */}
+        <DataConsumersPanel meta={meta} />
+
         {/* 上傳紀錄 — 一眼看出剛剛丟的有沒有進來 */}
         <RecentUploadsPanel logs={logs} onRefresh={refresh} />
 
@@ -432,6 +435,114 @@ function fmtTs(iso: string): string {
   if (isNaN(d.getTime())) return iso;
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// ============================================================
+// 資料消費者 — 上傳→消費 是閉環，這頁不該只是「資料倉庫」
+// 讓使用者看見：上傳完，這些頁面立刻變強（而不是不知道資料跑去哪）
+//
+// 「needs」用來判斷某個消費者頁面在當前主檔狀態下能不能跑：
+//   - 全到位 → 綠色「就緒」
+//   - 缺料 → 黃色「需要 XXX」
+// ============================================================
+type Consumer = {
+  href: string;
+  icon: string;
+  title: string;
+  en: string;
+  desc: string;          // 一句話：這頁拿這份資料做什麼
+  needs: ("items" | "bom" | "purchases")[]; // 必要的主檔
+};
+
+const DATA_CONSUMERS: Consumer[] = [
+  {
+    href: "/erp/lead-time-validation",
+    icon: "💬",
+    title: "跨部門 AI Inbox",
+    en: "Cross-Dept AI Inbox",
+    desc: "業務 / 採購收到 email 問成本+交期 → AI 自動用這份資料答出真實數字 + 寫好 reply 草稿",
+    needs: ["items", "bom", "purchases"],
+  },
+  {
+    href: "/erp/quotation-analyzer",
+    icon: "✦",
+    title: "AI Quotation Analyzer",
+    en: "STEP 2-3 真實 BOM + 採購歷史",
+    desc: "供應商報價單 OCR 後，自動展開 BOM、抓近 12 月採購均價、推議價空間",
+    needs: ["items", "bom", "purchases"],
+  },
+];
+
+function DataConsumersPanel({ meta }: { meta: MasterDataMeta }) {
+  const has = {
+    items: meta.itemCount > 0,
+    bom: meta.bomCount > 0,
+    purchases: meta.purchaseCount > 0,
+  };
+  return (
+    <div className="rounded-[12px]" style={{
+      background: BR.card, border: `1px solid ${BR.border}`, padding: "14px 18px",
+    }}>
+      <div className="flex items-baseline gap-3 mb-3 flex-wrap">
+        <span style={{ fontFamily: FONT_HEAD, fontSize: 15, fontWeight: 800, color: BR.ink }}>
+          ✦ 這份主檔被誰用到
+        </span>
+        <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: BR.inkFaint }}>
+          上傳越完整、這些頁面答得越準
+        </span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {DATA_CONSUMERS.map((c) => {
+          const missing = c.needs.filter((n) => !has[n]);
+          const ready = missing.length === 0;
+          return (
+            <Link
+              key={c.href}
+              href={c.href}
+              className="block rounded-[10px] p-3 transition-shadow"
+              style={{
+                background: ready ? BR.greenSoft : "#fbfcfa",
+                border: `1.5px solid ${ready ? BR.green : BR.borderHi}`,
+                textDecoration: "none",
+              }}
+            >
+              <div className="flex items-baseline gap-2 mb-1 flex-wrap">
+                <span style={{ fontSize: 18 }}>{c.icon}</span>
+                <span style={{ fontFamily: FONT_HEAD, fontSize: 15, fontWeight: 800, color: BR.ink }}>
+                  {c.title}
+                </span>
+                <span style={{ fontFamily: FONT_MONO, fontSize: 10.5, color: BR.inkFaint }}>
+                  {c.en}
+                </span>
+                <span className="flex-1" />
+                {ready ? (
+                  <span style={{
+                    fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700,
+                    color: "#fff", background: BR.green,
+                    padding: "2px 8px", borderRadius: 3,
+                  }}>✓ 就緒</span>
+                ) : (
+                  <span style={{
+                    fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700,
+                    color: BR.amber, background: BR.amberSoft,
+                    padding: "2px 8px", borderRadius: 3, border: `1px solid ${BR.amber}`,
+                  }}>需要 {missing.map((m) => m === "items" ? "料件" : m === "bom" ? "BOM" : "採購").join(" · ")}</span>
+                )}
+              </div>
+              <p style={{ fontSize: 12, color: BR.inkSoft, lineHeight: 1.55, margin: 0 }}>
+                {c.desc}
+              </p>
+              <div className="mt-2" style={{
+                fontFamily: FONT_MONO, fontSize: 11, color: BR.greenDeep,
+              }}>
+                → 進入這頁
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 // ============================================================
