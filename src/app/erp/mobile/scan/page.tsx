@@ -747,25 +747,11 @@ function PartCard({ code }: { code: string }) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <InfoRow label="分類" value={p.category} />
             <InfoRow label="屬性" value={KIND_LABEL[p.kind ?? "purchase"] ?? p.kind ?? "採購件"} />
-            <InfoRow label="單價" value={`$${p.unitCost.toLocaleString()}`} />
             <InfoRow label="交期" value={`${p.leadDays} 天`} />
             <InfoRow label="單位" value={p.unit} />
-            <InfoRow label="庫存金額" value={`$${(p.stockOnHand * p.unitCost).toLocaleString()}`} />
           </div>
         </div>
       </div>
-
-      {sup && (
-        <div style={{ background: "#fff", borderRadius: 14, padding: "14px 16px", border: `1px solid ${BR.border}` }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 6 }}>供應商</div>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>🏭 {sup.name}</div>
-          <div style={{ fontSize: 12, color: BR.inkSoft, marginTop: 2 }}>{sup.country} · {sup.city}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8 }}>
-            <InfoRow label="代號" value={sup.code} />
-            <InfoRow label="運輸天數" value={`${sup.transitDays} 天`} />
-          </div>
-        </div>
-      )}
 
       {/* 在途訂單 */}
       <InTransitSection partId={p.id} partCode={p.code} />
@@ -973,3 +959,4 @@ function InfoRow({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
