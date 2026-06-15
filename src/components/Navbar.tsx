@@ -18,7 +18,7 @@ const navLinks = [
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
-  if (pathname?.startsWith("/erp") || pathname?.startsWith("/os") || pathname?.startsWith("/roadmap") || pathname?.startsWith("/architecture")) return null;
+  if (pathname?.startsWith("/erp") || pathname?.startsWith("/os") || pathname?.startsWith("/roadmap") || pathname?.startsWith("/architecture") || pathname?.startsWith("/login")) return null;
 
   return (
     <header className="sticky top-0 z-50 bg-[#fdf7f2]/95 backdrop-blur-sm border-b border-rose-100 shadow-sm">
