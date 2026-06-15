@@ -159,6 +159,20 @@ export default function Sidebar() {
           <span style={{ color: "#a0cfcf" }}>AI Confidence 92%</span>
         </div>
         <div style={{ color: TEXT_DIM }}>鼎新 iGP · 唯讀</div>
+        <a
+          href="/api/auth/logout"
+          onClick={(e) => {
+            // 用 fetch POST 而不是 GET navigation，登出後手動導回 /login
+            e.preventDefault();
+            fetch("/api/auth/logout", { method: "POST" }).finally(() => {
+              window.location.href = "/login";
+            });
+          }}
+          className="mt-2 inline-block"
+          style={{ color: "#a0cfcf", textDecoration: "underline" }}
+        >
+          🔒 登出
+        </a>
       </div>
     </aside>
   );
