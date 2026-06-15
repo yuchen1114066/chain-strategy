@@ -22,6 +22,44 @@ type MergedPart = typeof seedParts[0];
 type Verdict = "" | "ok" | "diff";
 type CountState = { partCode: string; verdict: Verdict; actualQty: number | null; note: string };
 
+const ERP_CATEGORY: Record<string, { label: string; color: string; bg: string }> = {
+  "1": { label: "1 原料類", color: "#b8860b", bg: "#fffaf0" },
+  "2": { label: "2 物料類", color: "#4d7c0f", bg: "#f0f7e4" },
+  "3": { label: "3 在製品", color: "#0891b2", bg: "#ecfeff" },
+  "4": { label: "4 製成品", color: "#7c3aed", bg: "#f5f3ff" },
+  "5": { label: "5 商品類", color: "#059669", bg: "#ecfdf5" },
+  "9": { label: "9 費用類", color: "#d4351c", bg: "#fdecea" },
+  "S": { label: "S 半成品", color: "#0369a1", bg: "#e0f2fe" },
+};
+const ERP_CODES = new Set(["1", "2", "3", "4", "5", "9", "S"]);
+
+function getErpCat(p: MergedPart): string {
+  const cat = (p.category ?? "").trim();
+  if (ERP_CODES.has(cat)) return cat;
+  if (cat.startsWith("1") || /原料/.test(cat)) return "1";
+  if (cat.startsWith("2") || /物料/.test(cat)) return "2";
+  if (cat.startsWith("3") || /在製/.test(cat)) return "3";
+  if (cat.startsWith("4") || /製成|成品/.test(cat)) return "4";
+  if (cat.startsWith("5") || /商品/.test(cat)) return "5";
+  if (cat.startsWith("9") || /費用/.test(cat)) return "9";
+  if (cat.toUpperCase() === "S" || /半成品/.test(cat)) return "S";
+
+  const name = (p.name ?? "").trim();
+  const code = (p.code ?? "").trim().toUpperCase();
+  if (/半成品/.test(name)) return "S";
+  if (/包裝|包材|外箱|紙箱|棧板/.test(name)) return "9";
+  if (/治具|治工具|模具|夾具/.test(name)) return "9";
+  if (code.startsWith("SP") || code.startsWith("SPM")) return "9";
+
+  const kind = p.kind ?? "";
+  if (kind === "self" || kind === "outsource") return "3";
+  if (kind === "feature") return "4";
+  if (kind === "dummy") return "9";
+  if (kind === "option") return "5";
+
+  return "2";
+}
+
 function inferLocation(partCode: string): string {
   for (const s of initialSlips) {
     for (const it of s.items) {
@@ -78,30 +116,22 @@ function useMergedParts() {
 
 export default function CycleCountPage() {
   const allParts = useMergedParts();
-  const [location, setLocation] = useState<string>("全廠");
+  const [category, setCategory] = useState<string>("全部");
   const [operator, setOperator] = useState<string>("");
   const [states, setStates] = useState<Map<string, CountState>>(new Map());
   const [filter, setFilter] = useState<"all" | "pending" | "ok" | "diff">("all");
 
-  const locations = useMemo(() => {
-    const locSet = new Set<string>();
-    for (const p of allParts) {
-      const loc = inferLocation(p.code);
-      if (loc && loc !== "—") {
-        locSet.add(loc);
-        const parts = loc.split("-");
-        for (let i = 1; i < parts.length; i++) {
-          locSet.add(parts.slice(0, i).join("-"));
-        }
-      }
-    }
-    return ["全廠", ...[...locSet].sort()];
+  const categories = useMemo(() => {
+    const catSet = new Set<string>();
+    for (const p of allParts) catSet.add(getErpCat(p));
+    const sorted = [...catSet].sort((a, b) => a.localeCompare(b));
+    return ["全部", ...sorted];
   }, [allParts]);
 
   const targetParts = useMemo(() => {
-    if (location === "全廠") return allParts;
-    return allParts.filter((p) => inferLocation(p.code).startsWith(location));
-  }, [location, allParts]);
+    if (category === "全部") return allParts;
+    return allParts.filter((p) => getErpCat(p) === category);
+  }, [category, allParts]);
 
   const filteredParts = useMemo(() => {
     if (filter === "all") return targetParts;
@@ -148,7 +178,8 @@ export default function CycleCountPage() {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `盤點對帳-${location}-${new Date().toISOString().slice(0, 10)}.csv`;
+    const catLabel = category === "全部" ? "全部" : (ERP_CATEGORY[category]?.label ?? category);
+    a.href = url; a.download = `盤點對帳-${catLabel}-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click(); URL.revokeObjectURL(url);
   }
 
@@ -184,11 +215,15 @@ export default function CycleCountPage() {
             <div style={{ flex: 1, minWidth: 120 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: BR.inkFaint, marginBottom: 4 }}>盤點範圍</div>
               <select
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
                 style={{ width: "100%", padding: "10px 12px", fontSize: 14, borderRadius: 10, border: `1.5px solid ${BR.borderHi}`, background: "#fff", fontFamily: FONT }}
               >
-                {locations.map((l) => <option key={l} value={l}>{l}</option>)}
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c === "全部" ? "全部分類" : (ERP_CATEGORY[c]?.label ?? c)}
+                  </option>
+                ))}
               </select>
             </div>
             <div style={{ flex: 1, minWidth: 120 }}>
@@ -254,6 +289,8 @@ export default function CycleCountPage() {
             const diff = actual != null ? actual - p.stockOnHand : null;
             const loc = inferLocation(p.code);
 
+            const erpCat = getErpCat(p);
+            const erpInfo = ERP_CATEGORY[erpCat] ?? { label: erpCat, color: BR.inkSoft, bg: "#f5f5f3" };
             const cardBorder = verdict === "ok" ? "#a7f3d0" : verdict === "diff" ? "#fca5a5" : BR.border;
             const cardBg = verdict === "ok" ? "#f0fdf4" : verdict === "diff" ? "#fef2f2" : "#fff";
 
@@ -266,7 +303,12 @@ export default function CycleCountPage() {
                     <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace", color: BR.cyan }}>{p.code}</div>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</div>
                     {p.spec && <div style={{ fontSize: 11, color: BR.inkSoft }}>{p.spec}</div>}
-                    <div style={{ fontSize: 10, color: BR.inkFaint, marginTop: 2 }}>倉位：{loc}</div>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 3 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: erpInfo.color, background: erpInfo.bg, padding: "1px 6px", borderRadius: 4 }}>
+                        {erpInfo.label}
+                      </span>
+                      {loc !== "—" && <span style={{ fontSize: 10, color: BR.inkFaint }}>倉位：{loc}</span>}
+                    </div>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: 10, color: BR.inkFaint }}>ERP 庫存</div>
