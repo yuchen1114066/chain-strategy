@@ -63,13 +63,50 @@ export type UploadLog = {
   detail?: string;                             // 例如「FB61H003 多階正展」
 };
 
+// IQC 進料檢驗紀錄（每批進貨檢驗結果）
+// 來源：/erp/wms/receiving 收料完成後的 IQC 步驟
+// 用途：① 供應商品質追蹤（PPM）② 觸發 RMA ③ 年度供應商考核資料
+export type IqcRecord = {
+  id?: number;
+  inspectedAt: number;                         // Date.now()
+  poNo: string;                                // 採購單號
+  partNo: string;
+  supplier: string;
+  qtyDelivered: number;                        // 來料數量
+  qtyInspected: number;                        // 抽檢數量
+  qtyDefect: number;                           // 不良數
+  result: "OK" | "NG" | "CONDITIONAL";         // 判定（CONDITIONAL = 允收 / 特採）
+  defectReason?: string;                       // 不良原因（NG / 特採才有）
+  inspector?: string;                          // 檢驗員
+  remark?: string;
+};
+
+// RMA 退料紀錄
+// 來源：IQC NG → 建立退料單；或客訴回流；或盤點報廢
+// 用途：① 退料追蹤 ② 供應商考核扣分 ③ 應付帳款扣除
+export type RmaRecord = {
+  id?: number;
+  createdAt: number;
+  rmaNo: string;                               // RMA 單號（自動產 RMA-YYYYMMDD-N）
+  poNo: string;                                // 原採購單
+  partNo: string;
+  supplier: string;
+  qty: number;                                 // 退貨數量
+  reason: string;                              // 退料原因
+  status: "OPEN" | "SHIPPED_BACK" | "REPLACED" | "CLOSED";
+  iqcRecordId?: number;                        // 如果是 IQC NG 觸發，鏈回 IQC 紀錄
+  remark?: string;
+};
+
 const DB_NAME = "chain-strategy-erp-master";
-const DB_VERSION = 2;                          // ↑ v1→v2：新增 uploadLogs store
+const DB_VERSION = 3;                          // ↑ v2→v3：新增 iqcRecords + rmaRecords
 const STORE_ITEMS = "items";
 const STORE_BOM = "bom";
 const STORE_PURCHASES = "purchases";
 const STORE_META = "meta";
 const STORE_LOGS = "uploadLogs";
+const STORE_IQC = "iqcRecords";
+const STORE_RMA = "rmaRecords";
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -106,6 +143,20 @@ function openDB(): Promise<IDBDatabase> {
         const s = db.createObjectStore(STORE_LOGS, { keyPath: "id", autoIncrement: true });
         s.createIndex("ts", "ts", { unique: false });
         s.createIndex("type", "type", { unique: false });
+      }
+      // v3 加入：IQC + RMA
+      if (!db.objectStoreNames.contains(STORE_IQC)) {
+        const s = db.createObjectStore(STORE_IQC, { keyPath: "id", autoIncrement: true });
+        s.createIndex("supplier", "supplier", { unique: false });
+        s.createIndex("partNo", "partNo", { unique: false });
+        s.createIndex("inspectedAt", "inspectedAt", { unique: false });
+      }
+      if (!db.objectStoreNames.contains(STORE_RMA)) {
+        const s = db.createObjectStore(STORE_RMA, { keyPath: "id", autoIncrement: true });
+        s.createIndex("supplier", "supplier", { unique: false });
+        s.createIndex("partNo", "partNo", { unique: false });
+        s.createIndex("createdAt", "createdAt", { unique: false });
+        s.createIndex("status", "status", { unique: false });
       }
     };
   });
@@ -327,18 +378,109 @@ export async function loadRecentLogs(limit = 20): Promise<UploadLog[]> {
 }
 
 // ============================================================
+// IQC 進料檢驗 / RMA 退料
+// ============================================================
+export async function saveIqcRecord(record: Omit<IqcRecord, "id">): Promise<number> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_IQC, "readwrite");
+    const req = tx.objectStore(STORE_IQC).add(record);
+    req.onsuccess = () => { db.close(); resolve(req.result as number); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+export async function loadIqcRecords(limit = 100): Promise<IqcRecord[]> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_IQC, "readonly");
+      const idx = tx.objectStore(STORE_IQC).index("inspectedAt");
+      const req = idx.openCursor(null, "prev");
+      const out: IqcRecord[] = [];
+      req.onsuccess = (e) => {
+        const c = (e.target as IDBRequest<IDBCursorWithValue | null>).result;
+        if (c && out.length < limit) {
+          out.push(c.value as IqcRecord);
+          c.continue();
+        } else { db.close(); resolve(out); }
+      };
+      req.onerror = () => { db.close(); resolve([]); };
+    });
+  } catch { return []; }
+}
+
+export async function findIqcBySupplier(supplier: string): Promise<IqcRecord[]> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_IQC, "readonly");
+      const idx = tx.objectStore(STORE_IQC).index("supplier");
+      const req = idx.getAll(supplier);
+      req.onsuccess = () => { db.close(); resolve((req.result as IqcRecord[]) ?? []); };
+      req.onerror = () => { db.close(); resolve([]); };
+    });
+  } catch { return []; }
+}
+
+export async function saveRmaRecord(record: Omit<RmaRecord, "id">): Promise<number> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_RMA, "readwrite");
+    const req = tx.objectStore(STORE_RMA).add(record);
+    req.onsuccess = () => { db.close(); resolve(req.result as number); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+export async function loadRmaRecords(limit = 100): Promise<RmaRecord[]> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_RMA, "readonly");
+      const idx = tx.objectStore(STORE_RMA).index("createdAt");
+      const req = idx.openCursor(null, "prev");
+      const out: RmaRecord[] = [];
+      req.onsuccess = (e) => {
+        const c = (e.target as IDBRequest<IDBCursorWithValue | null>).result;
+        if (c && out.length < limit) {
+          out.push(c.value as RmaRecord);
+          c.continue();
+        } else { db.close(); resolve(out); }
+      };
+      req.onerror = () => { db.close(); resolve([]); };
+    });
+  } catch { return []; }
+}
+
+export async function findRmaBySupplier(supplier: string): Promise<RmaRecord[]> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_RMA, "readonly");
+      const idx = tx.objectStore(STORE_RMA).index("supplier");
+      const req = idx.getAll(supplier);
+      req.onsuccess = () => { db.close(); resolve((req.result as RmaRecord[]) ?? []); };
+      req.onerror = () => { db.close(); resolve([]); };
+    });
+  } catch { return []; }
+}
+
+// ============================================================
 // 清空（測試用）
 // ============================================================
 export async function clearAll(): Promise<void> {
   try {
     const db = await openDB();
     return new Promise((resolve) => {
-      const tx = db.transaction([STORE_ITEMS, STORE_BOM, STORE_PURCHASES, STORE_META, STORE_LOGS], "readwrite");
+      const tx = db.transaction([STORE_ITEMS, STORE_BOM, STORE_PURCHASES, STORE_META, STORE_LOGS, STORE_IQC, STORE_RMA], "readwrite");
       tx.objectStore(STORE_ITEMS).clear();
       tx.objectStore(STORE_BOM).clear();
       tx.objectStore(STORE_PURCHASES).clear();
       tx.objectStore(STORE_META).clear();
       tx.objectStore(STORE_LOGS).clear();
+      tx.objectStore(STORE_IQC).clear();
+      tx.objectStore(STORE_RMA).clear();
       tx.oncomplete = () => { db.close(); resolve(); };
       tx.onerror = () => { db.close(); resolve(); };
     });
