@@ -22,6 +22,7 @@ import {
   parseItems,
   parseBom,
   parsePurchases,
+  matchReportProfile,
   type ParsedFile,
   type ColumnMapping,
   type ParseReport,
@@ -591,7 +592,7 @@ function UploadSection({
         setState({ kind: "error", message: "檔案沒有任何資料列（第一頁工作表是空的？）" });
         return;
       }
-      const mapping = detectColumns(parsed.headers);
+      const mapping = detectColumns(parsed.headers, file.name);
       const report = parseRows(section, parsed, mapping);
       setState({ kind: "ready", fileName: file.name, parsed, mapping, report });
     } catch (err) {
@@ -794,10 +795,11 @@ function PreviewPanel({
   const missingRequired = fields.some(f => f.required && !mapping[f.key as keyof ColumnMapping]);
   const preview = report.rows.slice(0, 5) as Record<string, unknown>[];
   const previewKeys = preview.length > 0 ? Object.keys(preview[0]) : [];
+  const detectedProfile = matchReportProfile(fileName);
 
   return (
     <div className="space-y-3">
-      {/* 檔案列 */}
+      {/* 檔案列 + 自動偵測的報表代碼 */}
       <div className="flex items-center gap-3 flex-wrap" style={{
         fontFamily: FONT_MONO, fontSize: 11, color: BR.inkSoft,
       }}>
@@ -805,8 +807,42 @@ function PreviewPanel({
           background: BR.greenInk, color: "#fff",
           padding: "3px 8px", borderRadius: 4, fontWeight: 700,
         }}>📎 {fileName}</span>
+        {detectedProfile && (
+          <span style={{
+            background: BR.green, color: "#fff",
+            padding: "3px 8px", borderRadius: 4, fontWeight: 700,
+          }}>
+            ✓ 偵測為 {detectedProfile.code} · {detectedProfile.description}
+          </span>
+        )}
         <span>共 {parsed.rows.length.toLocaleString()} 列 → 解析出 <b style={{ color: BR.greenDeep }}>{report.rows.length.toLocaleString()}</b> 筆有效資料</span>
       </div>
+
+      {/* 自動偵測說明（成功 / 失敗）*/}
+      {report.rows.length === 0 && (
+        <div className="rounded-[8px] p-3" style={{
+          background: BR.amberSoft, border: `1px solid ${BR.amber}`,
+          fontSize: 12.5, color: BR.amber, lineHeight: 1.6,
+        }}>
+          ⚠ <b>自動對應失敗</b> — 系統認不出這份檔的欄位名。
+          {detectedProfile
+            ? <>已套用 {detectedProfile.code} 報表的預設 hints，但欄位名跟標準版差異太大。</>
+            : <>檔名不是已知的鼎新報表代碼（INVI03 / BOMR05 / PURR06 ...），無法套用預設 mapping。</>
+          }
+          <br />
+          <b>請看下方欄位對應</b>，從下拉選單手動指定 — 你的檔案有這些欄位：
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {parsed.headers.slice(0, 12).map((h) => (
+              <span key={h} style={{
+                fontFamily: FONT_MONO, fontSize: 10.5,
+                background: "#fff", color: BR.ink, padding: "2px 6px",
+                borderRadius: 3, border: `1px solid ${BR.amber}`,
+              }}>{h}</span>
+            ))}
+            {parsed.headers.length > 12 && <span style={{ fontSize: 10.5, color: BR.amber }}>… 還有 {parsed.headers.length - 12} 個</span>}
+          </div>
+        </div>
+      )}
 
       {/* 欄位 mapping */}
       <div className="rounded-[10px] p-3" style={{ background: "#fbfcfa", border: `1px solid ${BR.border}` }}>
