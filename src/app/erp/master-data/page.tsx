@@ -58,6 +58,8 @@ const SECTION_INFO: Record<Section, {
   desc: string;
   hint: string;
   requiredFields: string[];
+  // 鼎新 Workflow / iGP 標準報表代碼（給使用者明確知道要從哪一支出 Excel）
+  reportCodes: { code: string; name: string; preferred?: boolean }[];
 }> = {
   items: {
     icon: "📦",
@@ -66,6 +68,11 @@ const SECTION_INFO: Record<Section, {
     desc: "料號 + 品名 + 商品分類 — 報價單上傳後系統用此表查到完整品名與分類",
     hint: "鼎新匯出路徑：庫存管理 → 料件基本資料 → 匯出 Excel（建議勾選：品號 / 品名 / 規格 / 大類碼 / 庫存單位）",
     requiredFields: ["料號（partNo）", "品名（name）"],
+    reportCodes: [
+      { code: "INVI03", name: "料件基本資料維護（進階查詢 → 匯出）", preferred: true },
+      { code: "INVR101", name: "料件主檔清單" },
+      { code: "INV101", name: "品號查詢報表" },
+    ],
   },
   bom: {
     icon: "🔗",
@@ -74,6 +81,11 @@ const SECTION_INFO: Record<Section, {
     desc: "成品 → 子料的用量結構 — Should-Cost 推導用此表加權每個成本成分",
     hint: "鼎新匯出路徑：BOM 管理 → 單階 BOM 表 → 匯出 Excel（建議勾選：母件品號 / 用料品號 / 用量）",
     requiredFields: ["父料號（parentPartNo）", "子料號（childPartNo）", "用量（qty）"],
+    reportCodes: [
+      { code: "BOMR05", name: "BOM 多階正展列表（推薦）", preferred: true },
+      { code: "BOMI01", name: "用料清單維護（單階）" },
+      { code: "BOM210", name: "BOM 多階正展列表（紙本掃描可走 OCR）" },
+    ],
   },
   purchases: {
     icon: "💰",
@@ -82,6 +94,11 @@ const SECTION_INFO: Record<Section, {
     desc: "過去 3-6 年實際採購單價 — 用來畫歷年漲價曲線、找替代供應商、判斷是否被供應商獅子大開口",
     hint: "鼎新匯出路徑：採購管理 → 採購單明細查詢 → 設日期範圍 → 匯出 Excel（建議勾選：單號 / 品號 / 廠商 / 單價 / 數量 / 日期）",
     requiredFields: ["料號（partNo）", "供應商（supplier）", "單價（unitPrice）", "日期（date）"],
+    reportCodes: [
+      { code: "PURR06", name: "採購單身查詢（推薦 · 含廠商 + 單價）", preferred: true },
+      { code: "PURR05", name: "採購單明細列印" },
+      { code: "PURR01", name: "採購單明細查詢" },
+    ],
   },
 };
 
@@ -623,6 +640,30 @@ function UploadSection({
           <p style={{ fontSize: 12.5, color: BR.inkSoft, lineHeight: 1.55, marginTop: 4 }}>
             {info.desc}
           </p>
+
+          {/* 鼎新報表代碼 — 一眼看出要從哪支出 Excel */}
+          <div className="mt-2 p-2 rounded-[6px]" style={{
+            background: "#fbfcfa", border: `1px solid ${BR.borderHi}`,
+          }}>
+            <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.06em", marginBottom: 5 }}>
+              📑 接受的鼎新報表代碼
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {info.reportCodes.map((rc) => (
+                <div key={rc.code} className="flex items-center gap-1.5">
+                  <span style={{
+                    fontFamily: FONT_MONO, fontSize: 11.5, fontWeight: 800,
+                    color: "#fff", background: rc.preferred ? BR.green : BR.inkSoft,
+                    padding: "2px 8px", borderRadius: 4, letterSpacing: "0.04em",
+                  }}>{rc.code}</span>
+                  <span style={{ fontSize: 11, color: BR.inkSoft }}>
+                    {rc.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="mt-2 p-2 rounded-[6px]" style={{
             background: BR.greenSoft, border: `1px solid ${BR.greenLine}`,
             fontFamily: FONT_MONO, fontSize: 11, color: BR.greenInk, lineHeight: 1.5,
@@ -1065,11 +1106,39 @@ function ReportOcrSection({ onSaved }: { onSaved: (msg: string) => void | Promis
             把鼎新印出來的報表丟進來（PDF 掃描、Word 截圖、手機翻拍都行）。
             AI 會自動判斷是 BOM / 料件主檔 / 採購歷史，抽出結構化資料、預覽、確認後寫進對應的 IndexedDB。
           </p>
+          {/* OCR 認得的鼎新報表代碼 */}
+          <div className="mt-2 p-2 rounded-[6px]" style={{
+            background: "#fbfcfa", border: `1px solid ${BR.borderHi}`,
+          }}>
+            <div style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.06em", marginBottom: 5 }}>
+              📑 AI 認得的鼎新報表代碼（自動辨識類型 → 寫進對應 store）
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {([
+                { code: "BOM210 / BOMR05", desc: "BOM 多階正展 → 寫入 BOM 結構", tone: BR.blue },
+                { code: "INVI03 / INVR101", desc: "料件主檔 → 寫入料件主檔", tone: BR.green },
+                { code: "PURR05 / PURR06", desc: "採購單明細 → 寫入採購歷史", tone: BR.amber },
+                { code: "BOR213", desc: "製程操作畫面（規劃中）", tone: BR.inkFaint },
+              ]).map((rc) => (
+                <div key={rc.code} className="flex items-center gap-1.5">
+                  <span style={{
+                    fontFamily: FONT_MONO, fontSize: 11, fontWeight: 800,
+                    color: "#fff", background: rc.tone,
+                    padding: "2px 8px", borderRadius: 4, letterSpacing: "0.04em",
+                  }}>{rc.code}</span>
+                  <span style={{ fontSize: 11, color: BR.inkSoft }}>
+                    {rc.desc}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="mt-2 p-2 rounded-[6px]" style={{
             background: BR.greenSoft, border: `1px solid ${BR.greenLine}`,
             fontFamily: FONT_MONO, fontSize: 11, color: BR.greenInk, lineHeight: 1.5,
           }}>
-            💡 適合的場景：① BOM 多階正展 BOM210（影印機掃描）② 鼎新畫面截圖 ③ 採購單 PDF ④ 採購員手機拍鼎新畫面
+            💡 適合的場景：① BOM 多階正展（影印機掃描）② 鼎新畫面截圖 ③ 採購單 PDF ④ 採購員手機拍鼎新畫面
           </div>
         </div>
       </div>
