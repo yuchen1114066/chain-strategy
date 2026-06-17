@@ -34,6 +34,14 @@ const MAT_KEY = "chihua.material_master";
 const TX_KEY = "chihua.material_transactions";
 const HANDLER_KEY = "chihua.default_handler";
 
+const WAREHOUSE_STAFF = [
+  { id: "242", name: "賴允正" },
+  { id: "233", name: "林郁展" },
+  { id: "243", name: "姜湘淇" },
+  { id: "235", name: "范成義" },
+  { id: "320", name: "曾語梣" },
+];
+
 // ─── Types ───
 type Material = {
   code: string;
@@ -700,17 +708,21 @@ function CardTab({ showToast }: { showToast: (m: string) => void }) {
           boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
         }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: DS.onSurfaceVariant, marginBottom: 8 }}>經辦人員</div>
-          <input
-            type="text"
+          <select
             value={handler}
             onChange={e => setHandler(e.target.value)}
-            placeholder="經手人姓名"
             style={{
               width: "100%", padding: "12px 10px", fontSize: 14, borderRadius: 12,
               border: `1.5px solid ${DS.border}`, background: DS.bg, outline: "none",
               fontFamily: FONT_BODY, color: DS.onSurface, boxSizing: "border-box",
+              appearance: "auto",
             }}
-          />
+          >
+            <option value="">請選擇人員</option>
+            {WAREHOUSE_STAFF.map(s => (
+              <option key={s.id} value={`${s.id} ${s.name}`}>{s.id} {s.name}</option>
+            ))}
+          </select>
         </div>
       </div>
 
