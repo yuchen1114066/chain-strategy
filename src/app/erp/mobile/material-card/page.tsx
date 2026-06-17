@@ -175,9 +175,31 @@ function MinusIcon() {
 }
 
 // ─── Main page ───
+function useDataMeta() {
+  const [itemCount, setItemCount] = useState<number | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { loadItems, loadMeta } = await import("@/lib/erp/master-data-store");
+        const items = await loadItems();
+        if (items.length > 0) {
+          setItemCount(items.length);
+          const meta = await loadMeta();
+          if (meta.itemUpdatedAt) setUpdatedAt(meta.itemUpdatedAt);
+        }
+      } catch { /* IndexedDB unavailable */ }
+    })();
+  }, []);
+
+  return { itemCount, updatedAt };
+}
+
 export default function MaterialCardPage() {
   const [tab, setTab] = useState<TabId>("card");
   const [toast, setToast] = useState("");
+  const { itemCount, updatedAt } = useDataMeta();
 
   function showToast(msg: string) {
     setToast(msg);
@@ -227,6 +249,28 @@ export default function MaterialCardPage() {
         </div>
       </div>
 
+      {/* Data status bar */}
+      <div style={{
+        padding: "8px 14px", display: "flex", alignItems: "center", gap: 8,
+        background: DS.surface, borderBottom: `1px solid ${DS.border}`,
+      }}>
+        <div style={{
+          width: 7, height: 7, borderRadius: "50%",
+          background: itemCount ? "#10B981" : "#F59E0B",
+          boxShadow: itemCount ? "0 0 6px #10B981" : "none",
+        }} />
+        <span style={{ fontSize: 12, color: DS.onSurfaceVariant }}>
+          {itemCount
+            ? `主檔已載入（${itemCount.toLocaleString()} 筆）`
+            : "尚未匯入主檔資料"}
+        </span>
+        {updatedAt && (
+          <span style={{ fontSize: 11, color: DS.outline, marginLeft: "auto" }}>
+            更新：{new Date(updatedAt).toLocaleDateString("zh-TW")}
+          </span>
+        )}
+      </div>
+
       {/* Content */}
       <div style={{ flex: 1, overflow: "auto", padding: "12px 14px", paddingBottom: 90 }}>
         {tab === "card" && <CardTab showToast={showToast} />}
@@ -264,7 +308,7 @@ export default function MaterialCardPage() {
         </Link>
         <Link href="/erp/mobile/count" style={{ textDecoration: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
           <CountIcon />
-          <span style={{ fontSize: 11, fontWeight: 500, color: DS.onSurfaceVariant, fontFamily: FONT_BODY }}>盤點</span>
+          <span style={{ fontSize: 11, fontWeight: 500, color: DS.onSurfaceVariant, fontFamily: FONT_BODY }}>平日抽盤</span>
         </Link>
       </div>
 
