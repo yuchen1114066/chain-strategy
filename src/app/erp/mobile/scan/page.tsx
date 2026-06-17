@@ -65,6 +65,16 @@ const ERP_CATEGORY: Record<string, { label: string; short: string; color: string
 };
 const ERP_CODES = new Set(["1", "2", "3", "4", "5", "9", "S"]);
 
+const ERP_CAT_META: Record<string, { label: string; color: string; bg: string }> = {
+  "1": { label: "1 原料類", color: DS.cat1, bg: "#FFFBEB" },
+  "2": { label: "2 物料類", color: DS.cat2, bg: "#ECFDF5" },
+  "3": { label: "3 在製品", color: DS.cat3, bg: "#ECFEFF" },
+  "4": { label: "4 製成品", color: DS.cat4, bg: "#F5F3FF" },
+  "5": { label: "5 商品類", color: DS.cat5, bg: "#ECFDF5" },
+  "9": { label: "9 費用類", color: DS.cat9, bg: "#FEF2F2" },
+  "S": { label: "S 半成品", color: DS.catS, bg: "#EFF6FF" },
+};
+
 const LOCATION_MAP: Record<string, string> = {};
 for (const slip of initialSlips) {
   for (const item of slip.items) {
@@ -359,6 +369,7 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState("");
   const [showMenu, setShowMenu] = useState(false);
+  const [showVerify, setShowVerify] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const scannerRef = useRef<import("html5-qrcode").Html5Qrcode | null>(null);
   const mountedRef = useRef(true);
@@ -739,19 +750,82 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
         {/* ── Home / Empty State (categories) ── */}
         {!query && !selectedCode && (
           <div>
-            {/* Data source indicator */}
+            {/* Data source indicator + verification */}
             <div style={{
-              display: "flex", alignItems: "center", gap: 6,
-              marginBottom: 16, fontSize: 12, color: DS.outline,
+              background: DS.surface, borderRadius: 12, border: `1px solid ${DS.border}`,
+              padding: "12px 14px", marginBottom: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
             }}>
-              <span style={{
-                display: "inline-block", width: 7, height: 7, borderRadius: 99,
-                background: dataSource === "indexeddb" ? DS.cat2 : DS.cat1,
-              }} />
-              {dataSource === "indexeddb"
-                ? `主檔資料已載入（${parts.length} 筆）`
-                : `Demo 資料（${parts.length} 筆）`
-              }
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{
+                    width: 8, height: 8, borderRadius: "50%",
+                    background: dataSource === "indexeddb" ? DS.cat2 : DS.cat1,
+                    boxShadow: dataSource === "indexeddb" ? `0 0 6px ${DS.cat2}` : "none",
+                  }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: DS.onSurface }}>
+                    {dataSource === "indexeddb"
+                      ? `已載入主檔資料（${parts.length.toLocaleString()} 筆）`
+                      : "Demo 展示資料"}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowVerify(!showVerify)}
+                  style={{
+                    background: "none", border: `1px solid ${DS.border}`, borderRadius: 8,
+                    padding: "4px 10px", fontSize: 11, fontWeight: 600, color: DS.secondary,
+                    cursor: "pointer", fontFamily: FONT_BODY,
+                  }}
+                >
+                  {showVerify ? "收合" : "驗證明細"}
+                </button>
+              </div>
+              {updatedAt && (
+                <div style={{ fontSize: 11, color: DS.outline, marginTop: 4, marginLeft: 16 }}>
+                  資料更新：{new Date(updatedAt).toLocaleDateString("zh-TW", { year: "numeric", month: "2-digit", day: "2-digit" })}
+                  {" "}
+                  {new Date(updatedAt).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}
+                </div>
+              )}
+              {!updatedAt && dataSource === "seed" && (
+                <div style={{ fontSize: 11, color: DS.cat1, marginTop: 4, marginLeft: 16 }}>
+                  請至 /erp/master-data 匯入 ERP 主檔報表
+                </div>
+              )}
+
+              {showVerify && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${DS.border}` }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: DS.outline, marginBottom: 8, letterSpacing: "0.05em" }}>
+                    ERP 分類筆數摘要（可與鼎新系統核對）
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                    {sortedCatKeys.map((catKey) => {
+                      const info = ERP_CAT_META[catKey] ?? { label: catKey, color: DS.outline, bg: DS.bg };
+                      const count = categoryGroups.get(catKey)?.length ?? 0;
+                      return (
+                        <div key={catKey} style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "6px 10px", borderRadius: 8, background: info.bg,
+                        }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: info.color }}>{info.label}</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, fontFamily: FONT_MONO, color: info.color }}>
+                            {count.toLocaleString()}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "8px 10px", marginTop: 6, borderRadius: 8,
+                    background: DS.primaryContainer, color: DS.onPrimary,
+                  }}>
+                    <span style={{ fontSize: 12, fontWeight: 700 }}>合計</span>
+                    <span style={{ fontSize: 14, fontWeight: 800, fontFamily: FONT_MONO }}>
+                      {parts.length.toLocaleString()} 筆
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Categories header */}
@@ -849,7 +923,7 @@ function ScanScreen({ user, onLogout }: { user: LoginState; onLogout: () => void
       }}>
         <NavTab href="/erp/mobile/scan" label="掃描" icon={<IconScan />} active />
         <NavTab href="/erp/mobile/material-card" label="物料卡" icon={<IconCard />} />
-        <NavTab href="/erp/mobile/count" label="盤點" icon={<IconClipboard />} />
+        <NavTab href="/erp/mobile/count" label="平日抽盤" icon={<IconClipboard />} />
       </div>
 
       {/* Footer info */}
