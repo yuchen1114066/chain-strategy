@@ -4,18 +4,30 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { parts } from "@/lib/erp/seed";
 
-// ─── Brand colors (matching scan page) ───
-const BR = {
-  green: "#76b900", greenDeep: "#4d7c0f", greenInk: "#0c1908",
-  greenSoft: "#f0f7e4", greenLine: "#dcebc4",
-  ink: "#0c1208", inkSoft: "#5b6356", inkFaint: "#9aa291",
-  page: "#fbfcfa", card: "#ffffff",
-  border: "#e9ece3", borderHi: "#dadfd0",
-  red: "#d4351c", redSoft: "#fdecea",
-  amber: "#b8860b", amberSoft: "#fffaf0",
-  cyan: "#0891b2", cyanSoft: "#ecfeff",
+// ─── Design System colors ───
+const DS = {
+  primary: "#091426",
+  primaryContainer: "#1E293B",
+  secondary: "#0058BE",
+  secondaryContainer: "#2170E4",
+  surface: "#FFFFFF",
+  bg: "#F8FAFC",
+  surfaceContainer: "#F0EDEF",
+  surfaceContainerLow: "#F5F3F4",
+  border: "#E2E8F0",
+  borderHi: "#CBD5E1",
+  outline: "#75777D",
+  outlineVariant: "#C5C6CD",
+  onSurface: "#1B1B1D",
+  onSurfaceVariant: "#45474C",
+  onPrimary: "#FFFFFF",
+  error: "#BA1A1A",
+  catSBlue: "#2563EB",
 } as const;
-const FONT = "'Noto Sans TC', 'Sora', system-ui, sans-serif";
+
+const FONT_BODY = "'Noto Sans TC', system-ui, sans-serif";
+const FONT_HEADLINE = "'Sora', 'Noto Sans TC', system-ui, sans-serif";
+const FONT_MONO = "'IBM Plex Mono', monospace";
 
 // ─── localStorage keys ───
 const MAT_KEY = "chihua.material_master";
@@ -78,6 +90,90 @@ function getItemStock(code: string, mats: Record<string, Material>, txs: Transac
 // ─── Tab type ───
 type TabId = "card" | "records" | "settings";
 
+// ─── SVG Icons ───
+function HamburgerIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  );
+}
+
+function AccountIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-4 4-7 8-7s8 3 8 7" />
+    </svg>
+  );
+}
+
+function ScanIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={DS.onSurfaceVariant} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 7V5a2 2 0 012-2h2" />
+      <path d="M17 3h2a2 2 0 012 2v2" />
+      <path d="M21 17v2a2 2 0 01-2 2h-2" />
+      <path d="M7 21H5a2 2 0 01-2-2v-2" />
+      <line x1="7" y1="12" x2="17" y2="12" />
+    </svg>
+  );
+}
+
+function MaterialIcon({ active }: { active?: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? DS.secondary : DS.onSurfaceVariant} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <line x1="3" y1="9" x2="21" y2="9" />
+      <line x1="9" y1="3" x2="9" y2="21" />
+    </svg>
+  );
+}
+
+function CountIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={DS.onSurfaceVariant} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+      <rect x="9" y="3" width="6" height="4" rx="1" />
+      <path d="M9 14l2 2 4-4" />
+    </svg>
+  );
+}
+
+function QrScanIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 7V5a2 2 0 012-2h2" />
+      <path d="M17 3h2a2 2 0 012 2v2" />
+      <path d="M21 17v2a2 2 0 01-2 2h-2" />
+      <path d="M7 21H5a2 2 0 01-2-2v-2" />
+      <rect x="7" y="7" width="4" height="4" />
+      <rect x="13" y="7" width="4" height="4" />
+      <rect x="7" y="13" width="4" height="4" />
+      <path d="M13 13h4v4h-4z" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+function MinusIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
 // ─── Main page ───
 export default function MaterialCardPage() {
   const [tab, setTab] = useState<TabId>("card");
@@ -88,51 +184,51 @@ export default function MaterialCardPage() {
     setTimeout(() => setToast(""), 2500);
   }
 
+  const tabs: [TabId, string][] = [["card", "進出登記"], ["records", "歷史記錄"], ["settings", "設定"]];
+
   return (
-    <div style={{ minHeight: "100dvh", background: BR.page, fontFamily: FONT, color: BR.ink, display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100dvh", background: DS.bg, fontFamily: FONT_BODY, color: DS.onSurface, display: "flex", flexDirection: "column" }}>
       {/* Top bar */}
-      <div style={{ background: BR.greenInk, color: "#fff", padding: "10px 16px", position: "sticky", top: 0, zIndex: 50 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Link
-            href="/erp/mobile/scan"
-            style={{ background: "rgba(255,255,255,0.12)", border: "none", color: "#fff", padding: "8px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: "none" }}
-          >
-            ← 掃描
-          </Link>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, opacity: 0.7, letterSpacing: "0.1em", fontFamily: "'Sora', sans-serif" }}>CHI HUA · WAREHOUSE</div>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>物料進出卡</div>
-          </div>
-          <Link
-            href="/erp/mobile/count"
-            style={{ background: "rgba(255,255,255,0.12)", border: "none", color: "#fff", padding: "8px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}
-          >
-            📊 盤點
-          </Link>
+      <div style={{
+        background: DS.primary, color: DS.onPrimary, height: 48, padding: "0 16px",
+        position: "fixed", top: 0, left: 0, right: 0, zIndex: 50,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <HamburgerIcon />
+          <span style={{ fontFamily: FONT_HEADLINE, fontWeight: 700, fontSize: 16, color: DS.onPrimary }}>
+            祺驊倉庫管理
+          </span>
+        </div>
+        <AccountIcon />
+      </div>
+
+      {/* Tab navigation */}
+      <div style={{ marginTop: 48, padding: "6px", background: DS.surfaceContainerLow }}>
+        <div style={{
+          display: "flex", gap: 4, padding: 4,
+          background: DS.surfaceContainerLow, borderRadius: 16,
+        }}>
+          {tabs.map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              style={{
+                flex: 1, padding: "8px 0", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
+                borderRadius: 12, fontFamily: FONT_BODY, transition: "all 0.2s",
+                background: tab === id ? DS.surface : "transparent",
+                color: tab === id ? DS.secondary : DS.onSurfaceVariant,
+                boxShadow: tab === id ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div style={{ display: "flex", borderBottom: `1.5px solid ${BR.border}`, background: "#fff" }}>
-        {([["card", "📋 進出登記"], ["records", "📊 歷史記錄"], ["settings", "⚙ 設定"]] as [TabId, string][]).map(([id, label]) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            style={{
-              flex: 1, padding: "10px 0", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer",
-              background: tab === id ? BR.greenSoft : "#fff",
-              color: tab === id ? BR.greenDeep : BR.inkFaint,
-              borderBottom: tab === id ? `2.5px solid ${BR.green}` : "2.5px solid transparent",
-              fontFamily: FONT,
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
       {/* Content */}
-      <div style={{ flex: 1, overflow: "auto", padding: "12px 14px", paddingBottom: 80 }}>
+      <div style={{ flex: 1, overflow: "auto", padding: "12px 14px", paddingBottom: 90 }}>
         {tab === "card" && <CardTab showToast={showToast} />}
         {tab === "records" && <RecordsTab />}
         {tab === "settings" && <SettingsTab showToast={showToast} />}
@@ -142,18 +238,41 @@ export default function MaterialCardPage() {
       {toast && (
         <div style={{
           position: "fixed", top: 70, left: "50%", transform: "translateX(-50%)",
-          background: "#323232", color: "#fff", padding: "10px 24px", borderRadius: 8, fontSize: 14, zIndex: 300,
+          background: DS.primaryContainer, color: DS.onPrimary, padding: "10px 24px",
+          borderRadius: 12, fontSize: 14, zIndex: 300, fontFamily: FONT_BODY,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
           animation: "fadeIn 0.3s ease",
         }}>
           {toast}
         </div>
       )}
 
-      {/* Footer */}
+      {/* Bottom navigation */}
       <div style={{
-        padding: "6px 14px", fontSize: 10, color: BR.inkFaint, textAlign: "center",
-        borderTop: `1px solid ${BR.border}`, background: "#fff",
-        position: "sticky", bottom: 0,
+        position: "fixed", bottom: 0, left: 0, right: 0, height: 72,
+        background: DS.surface, borderTop: `1px solid ${DS.border}`,
+        display: "flex", alignItems: "center", justifyContent: "space-around",
+        zIndex: 50, paddingBottom: "env(safe-area-inset-bottom, 0px)",
+      }}>
+        <Link href="/erp/mobile/scan" style={{ textDecoration: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+          <ScanIcon />
+          <span style={{ fontSize: 11, fontWeight: 500, color: DS.onSurfaceVariant, fontFamily: FONT_BODY }}>掃描</span>
+        </Link>
+        <Link href="/erp/mobile/material-card" style={{ textDecoration: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+          <MaterialIcon active />
+          <span style={{ fontSize: 11, fontWeight: 600, color: DS.secondary, fontFamily: FONT_BODY }}>物料卡</span>
+        </Link>
+        <Link href="/erp/mobile/count" style={{ textDecoration: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+          <CountIcon />
+          <span style={{ fontSize: 11, fontWeight: 500, color: DS.onSurfaceVariant, fontFamily: FONT_BODY }}>盤點</span>
+        </Link>
+      </div>
+
+      {/* Footer text above bottom nav */}
+      <div style={{
+        position: "fixed", bottom: 72, left: 0, right: 0,
+        padding: "6px 14px", fontSize: 10, color: DS.outline, textAlign: "center",
+        background: DS.bg, borderTop: `1px solid ${DS.border}`,
       }}>
         祺驊股份有限公司 · 物料進出記錄（本機儲存）
       </div>
@@ -207,7 +326,6 @@ function CardTab({ showToast }: { showToast: (m: string) => void }) {
 
   function selectFromERP(p: typeof parts[0]) {
     setCode(p.code);
-    // Auto-fill material master if not exists
     const mats = loadMaterials();
     if (!mats[p.code]) {
       mats[p.code] = {
@@ -248,7 +366,6 @@ function CardTab({ showToast }: { showToast: (m: string) => void }) {
           (decodedText) => {
             const text = decodedText.trim();
             setCode(text);
-            // try to find in ERP
             const found = parts.find(p => p.code.toUpperCase() === text.toUpperCase());
             if (found) selectFromERP(found);
             stopScanner();
@@ -291,7 +408,7 @@ function CardTab({ showToast }: { showToast: (m: string) => void }) {
     setQuantity("");
     setSummary("");
     setRemark("");
-    showToast(txType === "in" ? "✓ 入庫記錄已儲存" : "✓ 出庫記錄已儲存");
+    showToast(txType === "in" ? "入庫記錄已儲存" : "出庫記錄已儲存");
   }
 
   async function exportExcel() {
@@ -331,11 +448,38 @@ function CardTab({ showToast }: { showToast: (m: string) => void }) {
     showToast("Excel 已匯出");
   }
 
+  const qtyNum = parseInt(quantity) || 0;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {/* 品號選擇區 */}
-      <div style={{ background: "#fff", borderRadius: 14, padding: 16, border: `1px solid ${BR.border}` }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 8 }}>選擇品號</div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Header card */}
+      <div style={{
+        background: DS.surface, borderRadius: 16, padding: "20px 20px 16px", border: `1px solid ${DS.border}`,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+          <span style={{
+            background: DS.secondary, color: DS.onPrimary, fontSize: 10, fontWeight: 700,
+            padding: "3px 10px", borderRadius: 20, fontFamily: FONT_HEADLINE, letterSpacing: "0.05em",
+          }}>
+            ERP SYSTEM
+          </span>
+          <span style={{ fontSize: 12, color: DS.outline, fontFamily: FONT_MONO }}>V2.4.0</span>
+        </div>
+        <div style={{ fontFamily: FONT_HEADLINE, fontSize: 24, fontWeight: 700, color: DS.primary, marginBottom: 4 }}>
+          物料進出登記
+        </div>
+        <div style={{ fontSize: 13, color: DS.onSurfaceVariant }}>
+          請填寫詳細物料異動資訊
+        </div>
+      </div>
+
+      {/* 物料編號 with QR scan */}
+      <div style={{
+        background: DS.surface, borderRadius: 16, padding: 16, border: `1px solid ${DS.border}`,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: DS.onSurfaceVariant, marginBottom: 8 }}>物料編號</div>
         <div style={{ display: "flex", gap: 8 }}>
           <input
             type="text"
@@ -343,25 +487,27 @@ function CardTab({ showToast }: { showToast: (m: string) => void }) {
             onChange={e => setCode(e.target.value.toUpperCase())}
             placeholder="品號 (如 P03NB001)"
             style={{
-              flex: 1, padding: "12px 14px", fontSize: 15, borderRadius: 10,
-              border: `1.5px solid ${BR.borderHi}`, background: "#fff", outline: "none", fontFamily: "'IBM Plex Mono', monospace",
+              flex: 1, padding: "12px 14px", fontSize: 15, borderRadius: 12,
+              border: `1.5px solid ${DS.border}`, background: DS.bg, outline: "none",
+              fontFamily: FONT_MONO, color: DS.onSurface,
             }}
           />
           <button
             onClick={() => { setScanError(""); setScanning(true); }}
             style={{
-              padding: "12px 16px", borderRadius: 10, border: "none",
-              background: BR.greenInk, color: "#fff", fontSize: 20, cursor: "pointer", minWidth: 50,
+              width: 48, height: 48, borderRadius: 12, border: `1.5px solid ${DS.border}`,
+              background: DS.bg, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              color: DS.onSurfaceVariant,
             }}
           >
-            📷
+            <QrScanIcon />
           </button>
           <button
             onClick={() => setShowSearch(!showSearch)}
             style={{
-              padding: "12px 16px", borderRadius: 10, border: "none",
-              background: BR.cyan, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer",
-              fontFamily: FONT,
+              padding: "0 16px", borderRadius: 12, border: "none",
+              background: DS.secondary, color: DS.onPrimary, fontSize: 12, fontWeight: 700,
+              cursor: "pointer", fontFamily: FONT_BODY, height: 48,
             }}
           >
             ERP
@@ -370,7 +516,7 @@ function CardTab({ showToast }: { showToast: (m: string) => void }) {
 
         {/* ERP search dropdown */}
         {showSearch && (
-          <div style={{ marginTop: 8, border: `1px solid ${BR.border}`, borderRadius: 10, overflow: "hidden" }}>
+          <div style={{ marginTop: 10, border: `1px solid ${DS.border}`, borderRadius: 12, overflow: "hidden" }}>
             <input
               type="text"
               value={searchQuery}
@@ -379,7 +525,8 @@ function CardTab({ showToast }: { showToast: (m: string) => void }) {
               autoFocus
               style={{
                 width: "100%", padding: "10px 14px", fontSize: 14, border: "none",
-                borderBottom: `1px solid ${BR.border}`, outline: "none", fontFamily: FONT,
+                borderBottom: `1px solid ${DS.border}`, outline: "none", fontFamily: FONT_BODY,
+                background: DS.bg,
               }}
             />
             <div style={{ maxHeight: 200, overflowY: "auto" }}>
@@ -391,16 +538,16 @@ function CardTab({ showToast }: { showToast: (m: string) => void }) {
                     display: "flex", alignItems: "center", gap: 10, width: "100%",
                     padding: "8px 14px", fontSize: 12, textAlign: "left",
                     background: "none", border: "none", cursor: "pointer",
-                    borderTop: `1px solid ${BR.border}`, fontFamily: FONT,
+                    borderTop: `1px solid ${DS.border}`, fontFamily: FONT_BODY,
                   }}
                 >
-                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontWeight: 700, color: BR.greenDeep, fontSize: 11, minWidth: 80 }}>{p.code}</span>
-                  <span style={{ flex: 1, color: BR.ink }}>{p.name}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: p.stockOnHand < p.safetyStock ? BR.red : BR.greenDeep }}>{p.stockOnHand} {p.unit}</span>
+                  <span style={{ fontFamily: FONT_MONO, fontWeight: 700, color: DS.secondary, fontSize: 11, minWidth: 80 }}>{p.code}</span>
+                  <span style={{ flex: 1, color: DS.onSurface }}>{p.name}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: p.stockOnHand < p.safetyStock ? DS.error : DS.secondary }}>{p.stockOnHand} {p.unit}</span>
                 </button>
               ))}
               {searchQuery && searchResults.length === 0 && (
-                <div style={{ padding: "12px 14px", fontSize: 12, color: BR.inkFaint, textAlign: "center" }}>找不到符合的料件</div>
+                <div style={{ padding: "12px 14px", fontSize: 12, color: DS.outline, textAlign: "center" }}>找不到符合的料件</div>
               )}
             </div>
           </div>
@@ -418,17 +565,18 @@ function CardTab({ showToast }: { showToast: (m: string) => void }) {
             alignItems: "center", color: "#fff", background: "rgba(0,0,0,0.8)", zIndex: 10,
           }}>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 700 }}>掃描條碼 / QR Code</div>
+              <div style={{ fontSize: 15, fontWeight: 700, fontFamily: FONT_HEADLINE }}>掃描條碼 / QR Code</div>
               <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>對準物料標籤即可辨識</div>
             </div>
             <button
               onClick={stopScanner}
               style={{
                 background: "rgba(255,255,255,0.2)", border: "none", color: "#fff",
-                padding: "10px 20px", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT,
+                padding: "10px 20px", borderRadius: 10, fontSize: 14, fontWeight: 700,
+                cursor: "pointer", fontFamily: FONT_BODY,
               }}
             >
-              ✕ 關閉
+              關閉
             </button>
           </div>
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
@@ -439,106 +587,221 @@ function CardTab({ showToast }: { showToast: (m: string) => void }) {
 
       {scanError && (
         <div style={{
-          padding: "10px 14px", borderRadius: 10, background: BR.redSoft, border: `1px solid #f5c2c0`,
-          fontSize: 12, color: BR.red, display: "flex", alignItems: "center", gap: 8,
+          padding: "10px 14px", borderRadius: 12, background: "#FEE2E2", border: `1px solid #FECACA`,
+          fontSize: 12, color: DS.error, display: "flex", alignItems: "center", gap: 8,
         }}>
-          <span>⚠️ {scanError}</span>
-          <button onClick={() => setScanError("")} style={{ background: "none", border: "none", color: BR.red, fontSize: 16, cursor: "pointer", marginLeft: "auto" }}>×</button>
+          <span>{scanError}</span>
+          <button onClick={() => setScanError("")} style={{ background: "none", border: "none", color: DS.error, fontSize: 16, cursor: "pointer", marginLeft: "auto" }}>x</button>
         </div>
       )}
 
       {/* 物料資訊卡 */}
       {code && mat && (
-        <div style={{ background: "#fff", borderRadius: 14, overflow: "hidden", border: `1.5px solid ${isLow ? "#f5c2c0" : BR.greenLine}` }}>
-          <div style={{ background: BR.greenInk, color: "#fff", padding: "12px 16px" }}>
-            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 18, fontWeight: 800 }}>{code}</div>
+        <div style={{
+          background: DS.surface, borderRadius: 16, overflow: "hidden",
+          border: `1.5px solid ${isLow ? "#FECACA" : DS.border}`,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+        }}>
+          <div style={{ background: DS.primary, color: DS.onPrimary, padding: "12px 16px" }}>
+            <div style={{ fontFamily: FONT_MONO, fontSize: 18, fontWeight: 800 }}>{code}</div>
             <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>{mat.name}</div>
-            {mat.spec && <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>📐 {mat.spec}</div>}
+            {mat.spec && <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>{mat.spec}</div>}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", borderBottom: `1px solid ${BR.border}` }}>
-            <div style={{ padding: "10px 14px", textAlign: "center", background: isLow ? BR.redSoft : BR.greenSoft }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: BR.inkFaint }}>目前結存</div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: isLow ? BR.red : BR.greenDeep }}>{stock}</div>
-              <div style={{ fontSize: 10, color: BR.inkFaint }}>{mat.unit}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", borderBottom: `1px solid ${DS.border}` }}>
+            <div style={{ padding: "10px 14px", textAlign: "center", background: isLow ? "#FEE2E2" : "#EFF6FF" }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: DS.outline }}>目前結存</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: isLow ? DS.error : DS.secondary, fontFamily: FONT_MONO }}>{stock}</div>
+              <div style={{ fontSize: 10, color: DS.outline }}>{mat.unit}</div>
             </div>
             <div style={{ padding: "10px 14px", textAlign: "center" }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: BR.inkFaint }}>安全庫存</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: BR.inkSoft }}>{safetyStock}</div>
-              <div style={{ fontSize: 10, color: BR.inkFaint }}>{mat.unit}</div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: DS.outline }}>安全庫存</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: DS.onSurfaceVariant, fontFamily: FONT_MONO }}>{safetyStock}</div>
+              <div style={{ fontSize: 10, color: DS.outline }}>{mat.unit}</div>
             </div>
-            <div style={{ padding: "10px 14px", textAlign: "center", background: BR.cyanSoft }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: BR.inkFaint }}>倉位</div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: BR.cyan, fontFamily: "'IBM Plex Mono', monospace" }}>{mat.location || "—"}</div>
+            <div style={{ padding: "10px 14px", textAlign: "center", background: "#EFF6FF" }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: DS.outline }}>倉位</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: DS.secondary, fontFamily: FONT_MONO }}>{mat.location || "—"}</div>
             </div>
           </div>
           {isLow && (
-            <div style={{ padding: "8px 16px", background: BR.redSoft, fontSize: 12, fontWeight: 700, color: BR.red, textAlign: "center" }}>
-              ⚠ 低於安全庫存（{safetyStock}），需補貨！
+            <div style={{ padding: "8px 16px", background: "#FEE2E2", fontSize: 12, fontWeight: 700, color: DS.error, textAlign: "center" }}>
+              低於安全庫存（{safetyStock}），需補貨！
             </div>
           )}
         </div>
       )}
 
-      {/* 進出登記表單 */}
-      <div style={{ background: "#fff", borderRadius: 14, padding: 16, border: `1px solid ${BR.border}` }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 10 }}>進出登記</div>
-
-        {/* 入庫/出庫切換 */}
-        <div style={{ display: "flex", gap: 0, borderRadius: 10, overflow: "hidden", border: `2px solid ${txType === "out" ? BR.red : BR.green}`, marginBottom: 12 }}>
-          <button
-            onClick={() => setTxType("in")}
+      {/* Grid: 作業類型 | 經辦人員 */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div style={{
+          background: DS.surface, borderRadius: 16, padding: 16, border: `1px solid ${DS.border}`,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: DS.onSurfaceVariant, marginBottom: 8 }}>作業類型</div>
+          <select
+            value={txType}
+            onChange={e => setTxType(e.target.value as "in" | "out")}
             style={{
-              flex: 1, padding: "10px", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT,
-              background: txType === "in" ? BR.green : "#fff",
-              color: txType === "in" ? "#fff" : BR.green,
+              width: "100%", padding: "12px 10px", fontSize: 14, borderRadius: 12,
+              border: `1.5px solid ${DS.border}`, background: DS.bg, outline: "none",
+              fontFamily: FONT_BODY, color: DS.onSurface, appearance: "auto",
             }}
           >
-            📥 入庫
-          </button>
-          <button
-            onClick={() => setTxType("out")}
+            <option value="in">入庫</option>
+            <option value="out">出庫</option>
+          </select>
+        </div>
+        <div style={{
+          background: DS.surface, borderRadius: 16, padding: 16, border: `1px solid ${DS.border}`,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: DS.onSurfaceVariant, marginBottom: 8 }}>經辦人員</div>
+          <input
+            type="text"
+            value={handler}
+            onChange={e => setHandler(e.target.value)}
+            placeholder="經手人姓名"
             style={{
-              flex: 1, padding: "10px", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT,
-              background: txType === "out" ? BR.red : "#fff",
-              color: txType === "out" ? "#fff" : BR.red,
+              width: "100%", padding: "12px 10px", fontSize: 14, borderRadius: 12,
+              border: `1.5px solid ${DS.border}`, background: DS.bg, outline: "none",
+              fontFamily: FONT_BODY, color: DS.onSurface, boxSizing: "border-box",
+            }}
+          />
+        </div>
+      </div>
+
+      {/* 異動日期 + 異動原因 */}
+      <div style={{
+        background: DS.surface, borderRadius: 16, padding: 16, border: `1px solid ${DS.border}`,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+        display: "flex", flexDirection: "column", gap: 12,
+      }}>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: DS.onSurfaceVariant, marginBottom: 8 }}>異動日期</div>
+          <input
+            type="date"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            style={{
+              width: "100%", padding: "12px 14px", fontSize: 14, borderRadius: 12,
+              border: `1.5px solid ${DS.border}`, background: DS.bg, outline: "none",
+              fontFamily: FONT_BODY, color: DS.onSurface, boxSizing: "border-box",
+            }}
+          />
+        </div>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: DS.onSurfaceVariant, marginBottom: 8 }}>異動原因</div>
+          <textarea
+            value={summary}
+            onChange={e => setSummary(e.target.value)}
+            placeholder="如：進貨入庫 (PO-1180)"
+            rows={2}
+            style={{
+              width: "100%", padding: "12px 14px", fontSize: 14, borderRadius: 12,
+              border: `1.5px solid ${DS.border}`, background: DS.bg, outline: "none",
+              fontFamily: FONT_BODY, color: DS.onSurface, resize: "vertical",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: DS.onSurfaceVariant, marginBottom: 8 }}>備註</div>
+          <input
+            type="text"
+            value={remark}
+            onChange={e => setRemark(e.target.value)}
+            placeholder="選填"
+            style={{
+              width: "100%", padding: "12px 14px", fontSize: 14, borderRadius: 12,
+              border: `1.5px solid ${DS.border}`, background: DS.bg, outline: "none",
+              fontFamily: FONT_BODY, color: DS.onSurface, boxSizing: "border-box",
+            }}
+          />
+        </div>
+      </div>
+
+      {/* QUANTITY card */}
+      <div style={{
+        background: DS.surface, borderRadius: 16, padding: 24, border: `2px solid ${DS.secondary}`,
+        boxShadow: "0 2px 8px rgba(0,88,190,0.08)",
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 16,
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: DS.secondary, letterSpacing: "0.1em", fontFamily: FONT_HEADLINE }}>
+          QUANTITY
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          <button
+            onClick={() => setQuantity(String(Math.max(0, qtyNum - 1)))}
+            style={{
+              width: 48, height: 48, borderRadius: 12, border: `1.5px solid ${DS.border}`,
+              background: DS.bg, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              color: DS.onSurfaceVariant,
             }}
           >
-            📤 出庫
+            <MinusIcon />
+          </button>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={quantity}
+            onChange={e => {
+              const v = e.target.value.replace(/[^0-9]/g, "");
+              setQuantity(v);
+            }}
+            placeholder="0"
+            style={{
+              width: 120, textAlign: "center", fontSize: 40, fontWeight: 800,
+              fontFamily: FONT_MONO, border: "none", outline: "none",
+              background: "transparent", color: DS.primary,
+            }}
+          />
+          <button
+            onClick={() => setQuantity(String(qtyNum + 1))}
+            style={{
+              width: 48, height: 48, borderRadius: 12, border: `1.5px solid ${DS.secondary}`,
+              background: "#EFF6FF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              color: DS.secondary,
+            }}
+          >
+            <PlusIcon />
           </button>
         </div>
+        <div style={{ fontSize: 11, color: DS.outline }}>{mat?.unit || "PCS"}</div>
+      </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <InputField label="日期" type="date" value={date} onChange={setDate} />
-          <InputField label="摘要 / 單號" value={summary} onChange={setSummary} placeholder="如：進貨入庫 (PO-1180)" />
-          <InputField label={txType === "in" ? "入庫數量" : "出庫數量"} type="number" value={quantity} onChange={setQuantity} placeholder="0" />
-          <InputField label="經手人" value={handler} onChange={setHandler} placeholder="經手人姓名" />
-          <InputField label="備註" value={remark} onChange={setRemark} placeholder="選填" />
-        </div>
+      {/* Submit button */}
+      <button
+        onClick={handleSave}
+        style={{
+          width: "100%", height: 64, borderRadius: 16, border: "none",
+          background: DS.primary, color: DS.onPrimary, fontSize: 17, fontWeight: 700,
+          cursor: "pointer", fontFamily: FONT_HEADLINE, letterSpacing: "0.02em",
+          boxShadow: "0 2px 8px rgba(9,20,38,0.2)",
+        }}
+      >
+        確認登記
+      </button>
 
-        <button
-          onClick={handleSave}
-          style={{
-            width: "100%", marginTop: 14, padding: "14px", borderRadius: 10, border: "none",
-            background: txType === "out" ? BR.red : BR.greenInk,
-            color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: FONT,
-          }}
-        >
-          {txType === "in" ? "📥 儲存入庫記錄" : "📤 儲存出庫記錄"}
-        </button>
+      {/* Info text */}
+      <div style={{ textAlign: "center", fontSize: 11, color: DS.outline, padding: "0 8px" }}>
+        資料將即時同步至雲端伺服器
       </div>
 
       {/* 該品號交易明細 */}
       {code && itemTxs.length > 0 && (
-        <div style={{ background: "#fff", borderRadius: 14, padding: 16, border: `1px solid ${BR.border}` }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 8 }}>
+        <div style={{
+          background: DS.surface, borderRadius: 16, padding: 16, border: `1px solid ${DS.border}`,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: DS.outline, letterSpacing: "0.08em", marginBottom: 8 }}>
             進出明細（{code}）
           </div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead>
-                <tr style={{ borderBottom: `1.5px solid ${BR.border}` }}>
+                <tr style={{ borderBottom: `1.5px solid ${DS.border}` }}>
                   {["日期", "摘要", "入庫", "出庫", "結存", "經手人"].map(h => (
-                    <th key={h} style={{ padding: "6px 4px", textAlign: "left", fontSize: 10, fontWeight: 700, color: BR.inkFaint, whiteSpace: "nowrap" }}>{h}</th>
+                    <th key={h} style={{ padding: "6px 4px", textAlign: "left", fontSize: 10, fontWeight: 700, color: DS.outline, whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -549,13 +812,13 @@ function CardTab({ showToast }: { showToast: (m: string) => void }) {
                     running += t.type === "in" ? t.quantity : -t.quantity;
                     const lowRow = safetyStock > 0 && running < safetyStock;
                     return (
-                      <tr key={t.id} style={{ borderBottom: `1px solid ${BR.border}` }}>
+                      <tr key={t.id} style={{ borderBottom: `1px solid ${DS.border}` }}>
                         <td style={{ padding: "6px 4px", whiteSpace: "nowrap", fontSize: 11 }}>{fmtDate(t.date)}</td>
                         <td style={{ padding: "6px 4px", fontSize: 11 }}>{t.summary}</td>
-                        <td style={{ padding: "6px 4px", color: BR.greenDeep, fontWeight: 700 }}>{t.type === "in" ? t.quantity : ""}</td>
-                        <td style={{ padding: "6px 4px", color: BR.red, fontWeight: 700 }}>{t.type === "out" ? t.quantity : ""}</td>
-                        <td style={{ padding: "6px 4px", fontWeight: 700, color: lowRow ? BR.red : BR.ink }}>{running}</td>
-                        <td style={{ padding: "6px 4px", fontSize: 11, color: BR.inkSoft }}>{t.handler}</td>
+                        <td style={{ padding: "6px 4px", color: DS.secondary, fontWeight: 700 }}>{t.type === "in" ? t.quantity : ""}</td>
+                        <td style={{ padding: "6px 4px", color: DS.error, fontWeight: 700 }}>{t.type === "out" ? t.quantity : ""}</td>
+                        <td style={{ padding: "6px 4px", fontWeight: 700, color: lowRow ? DS.error : DS.onSurface }}>{running}</td>
+                        <td style={{ padding: "6px 4px", fontSize: 11, color: DS.onSurfaceVariant }}>{t.handler}</td>
                       </tr>
                     );
                   });
@@ -571,12 +834,12 @@ function CardTab({ showToast }: { showToast: (m: string) => void }) {
         <button
           onClick={exportExcel}
           style={{
-            width: "100%", padding: "14px", borderRadius: 10,
-            background: "#fff", border: `1.5px solid ${BR.green}`,
-            color: BR.greenDeep, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT,
+            width: "100%", padding: "14px", borderRadius: 12,
+            background: DS.surface, border: `1.5px solid ${DS.secondary}`,
+            color: DS.secondary, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT_BODY,
           }}
         >
-          📊 匯出 Excel（{code}）
+          匯出 Excel（{code}）
         </button>
       )}
     </div>
@@ -610,14 +873,18 @@ function RecordsTab() {
           onChange={e => setFilterCode(e.target.value)}
           placeholder="搜尋品號..."
           style={{
-            flex: 1, padding: "10px 14px", fontSize: 14, borderRadius: 10,
-            border: `1.5px solid ${BR.borderHi}`, outline: "none", fontFamily: FONT,
+            flex: 1, padding: "10px 14px", fontSize: 14, borderRadius: 12,
+            border: `1.5px solid ${DS.border}`, outline: "none", fontFamily: FONT_BODY,
+            background: DS.surface,
           }}
         />
         <select
           value={filterType}
           onChange={e => setFilterType(e.target.value as "all" | "in" | "out")}
-          style={{ padding: "10px 12px", borderRadius: 10, border: `1.5px solid ${BR.borderHi}`, fontSize: 14, fontFamily: FONT }}
+          style={{
+            padding: "10px 12px", borderRadius: 12, border: `1.5px solid ${DS.border}`,
+            fontSize: 14, fontFamily: FONT_BODY, background: DS.surface,
+          }}
         >
           <option value="all">全部</option>
           <option value="in">入庫</option>
@@ -626,32 +893,37 @@ function RecordsTab() {
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 32, color: BR.inkFaint, fontSize: 13 }}>尚無記錄</div>
+        <div style={{ textAlign: "center", padding: 32, color: DS.outline, fontSize: 13 }}>尚無記錄</div>
       ) : (
-        <div style={{ background: "#fff", borderRadius: 14, border: `1px solid ${BR.border}`, overflow: "hidden" }}>
+        <div style={{
+          background: DS.surface, borderRadius: 16, border: `1px solid ${DS.border}`, overflow: "hidden",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+        }}>
           {filtered.map((t, i) => (
             <div key={t.id} style={{
-              padding: "10px 14px", borderTop: i > 0 ? `1px solid ${BR.border}` : "none",
+              padding: "12px 14px", borderTop: i > 0 ? `1px solid ${DS.border}` : "none",
               display: "flex", alignItems: "center", gap: 10,
             }}>
               <div style={{
-                width: 36, height: 36, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
-                background: t.type === "in" ? BR.greenSoft : BR.redSoft, fontSize: 16,
+                width: 36, height: 36, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center",
+                background: t.type === "in" ? "#EFF6FF" : "#FEE2E2", fontSize: 14, fontWeight: 700,
+                color: t.type === "in" ? DS.secondary : DS.error,
               }}>
-                {t.type === "in" ? "📥" : "📤"}
+                {t.type === "in" ? "IN" : "OUT"}
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 700, color: BR.greenDeep }}>{t.code}</span>
-                  <span style={{ fontSize: 11, color: BR.inkFaint }}>{fmtDate(t.date)}</span>
+                  <span style={{ fontFamily: FONT_MONO, fontSize: 12, fontWeight: 700, color: DS.secondary }}>{t.code}</span>
+                  <span style={{ fontSize: 11, color: DS.outline }}>{fmtDate(t.date)}</span>
                 </div>
-                <div style={{ fontSize: 12, color: BR.inkSoft, marginTop: 2 }}>{t.summary}</div>
+                <div style={{ fontSize: 12, color: DS.onSurfaceVariant, marginTop: 2 }}>{t.summary}</div>
               </div>
               <div style={{
                 fontSize: 16, fontWeight: 800, minWidth: 50, textAlign: "right",
-                color: t.type === "in" ? BR.greenDeep : BR.red,
+                fontFamily: FONT_MONO,
+                color: t.type === "in" ? DS.secondary : DS.error,
               }}>
-                {t.type === "in" ? "+" : "−"}{t.quantity}
+                {t.type === "in" ? "+" : "-"}{t.quantity}
               </div>
             </div>
           ))}
@@ -763,29 +1035,42 @@ function SettingsTab({ showToast }: { showToast: (m: string) => void }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {/* 物料主檔 */}
-      <div style={{ background: "#fff", borderRadius: 14, padding: 16, border: `1px solid ${BR.border}` }}>
+      <div style={{
+        background: DS.surface, borderRadius: 16, padding: 16, border: `1px solid ${DS.border}`,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+      }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em" }}>物料主檔（{codes.length}）</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: DS.outline, letterSpacing: "0.08em" }}>物料主檔（{codes.length}）</div>
           <button
             onClick={() => openModal(null)}
-            style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: BR.greenInk, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}
+            style={{
+              padding: "6px 14px", borderRadius: 10, border: "none",
+              background: DS.primary, color: DS.onPrimary, fontSize: 12, fontWeight: 700,
+              cursor: "pointer", fontFamily: FONT_BODY,
+            }}
           >
             + 新增
           </button>
         </div>
         {codes.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 20, color: BR.inkFaint, fontSize: 12 }}>尚未建立物料主檔</div>
+          <div style={{ textAlign: "center", padding: 20, color: DS.outline, fontSize: 12 }}>尚未建立物料主檔</div>
         ) : (
           codes.map(c => {
             const m = materials[c];
             return (
-              <div key={c} style={{ display: "flex", alignItems: "center", padding: "10px 0", borderTop: `1px solid ${BR.border}`, gap: 10 }}>
+              <div key={c} style={{ display: "flex", alignItems: "center", padding: "10px 0", borderTop: `1px solid ${DS.border}`, gap: 10 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 700, color: BR.greenDeep }}>{c}</div>
-                  <div style={{ fontSize: 12, color: BR.inkSoft }}>{m.name}{m.spec ? ` / ${m.spec}` : ""}</div>
+                  <div style={{ fontFamily: FONT_MONO, fontSize: 12, fontWeight: 700, color: DS.secondary }}>{c}</div>
+                  <div style={{ fontSize: 12, color: DS.onSurfaceVariant }}>{m.name}{m.spec ? ` / ${m.spec}` : ""}</div>
                 </div>
-                <button onClick={() => openModal(c)} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${BR.border}`, background: "#fff", fontSize: 11, cursor: "pointer", fontFamily: FONT }}>編輯</button>
-                <button onClick={() => deleteMat(c)} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: BR.redSoft, color: BR.red, fontSize: 11, cursor: "pointer", fontFamily: FONT }}>刪除</button>
+                <button onClick={() => openModal(c)} style={{
+                  padding: "4px 10px", borderRadius: 8, border: `1px solid ${DS.border}`,
+                  background: DS.surface, fontSize: 11, cursor: "pointer", fontFamily: FONT_BODY,
+                }}>編輯</button>
+                <button onClick={() => deleteMat(c)} style={{
+                  padding: "4px 10px", borderRadius: 8, border: "none",
+                  background: "#FEE2E2", color: DS.error, fontSize: 11, cursor: "pointer", fontFamily: FONT_BODY,
+                }}>刪除</button>
               </div>
             );
           })
@@ -793,48 +1078,88 @@ function SettingsTab({ showToast }: { showToast: (m: string) => void }) {
       </div>
 
       {/* 預設經手人 */}
-      <div style={{ background: "#fff", borderRadius: 14, padding: 16, border: `1px solid ${BR.border}` }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 8 }}>預設經手人</div>
+      <div style={{
+        background: DS.surface, borderRadius: 16, padding: 16, border: `1px solid ${DS.border}`,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: DS.outline, letterSpacing: "0.08em", marginBottom: 8 }}>預設經手人</div>
         <div style={{ display: "flex", gap: 8 }}>
           <input
             type="text" value={defaultHandler} onChange={e => setDefaultHandler(e.target.value)}
             placeholder="姓名"
-            style={{ flex: 1, padding: "10px 14px", fontSize: 14, borderRadius: 10, border: `1.5px solid ${BR.borderHi}`, outline: "none", fontFamily: FONT }}
+            style={{
+              flex: 1, padding: "10px 14px", fontSize: 14, borderRadius: 12,
+              border: `1.5px solid ${DS.border}`, outline: "none", fontFamily: FONT_BODY,
+              background: DS.bg,
+            }}
           />
-          <button onClick={saveHandler} style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: BR.greenInk, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>儲存</button>
+          <button onClick={saveHandler} style={{
+            padding: "10px 20px", borderRadius: 12, border: "none",
+            background: DS.primary, color: DS.onPrimary, fontSize: 13, fontWeight: 700,
+            cursor: "pointer", fontFamily: FONT_BODY,
+          }}>儲存</button>
         </div>
       </div>
 
       {/* 資料管理 */}
-      <div style={{ background: "#fff", borderRadius: 14, padding: 16, border: `1px solid ${BR.border}` }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: BR.inkFaint, letterSpacing: "0.08em", marginBottom: 10 }}>資料管理</div>
-        <button onClick={exportBackup} style={{ width: "100%", padding: "10px", borderRadius: 8, border: `1.5px solid ${BR.green}`, background: "#fff", color: BR.greenDeep, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
-          📦 匯出備份 (JSON)
+      <div style={{
+        background: DS.surface, borderRadius: 16, padding: 16, border: `1px solid ${DS.border}`,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: DS.outline, letterSpacing: "0.08em", marginBottom: 10 }}>資料管理</div>
+        <button onClick={exportBackup} style={{
+          width: "100%", padding: "12px", borderRadius: 12, border: `1.5px solid ${DS.secondary}`,
+          background: DS.surface, color: DS.secondary, fontSize: 13, fontWeight: 700,
+          cursor: "pointer", fontFamily: FONT_BODY, marginBottom: 8,
+        }}>
+          匯出備份 (JSON)
         </button>
-        <label style={{ display: "block", width: "100%", padding: "10px", borderRadius: 8, border: `1.5px solid ${BR.cyan}`, background: "#fff", color: BR.cyan, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT, textAlign: "center" }}>
-          📥 匯入備份 (JSON)
+        <label style={{
+          display: "block", width: "100%", padding: "12px", borderRadius: 12,
+          border: `1.5px solid ${DS.outline}`, background: DS.surface, color: DS.onSurfaceVariant,
+          fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT_BODY, textAlign: "center",
+          boxSizing: "border-box",
+        }}>
+          匯入備份 (JSON)
           <input type="file" accept=".json" onChange={importBackup} style={{ display: "none" }} />
         </label>
       </div>
 
       {/* Modal */}
       {showModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 20, width: "100%", maxWidth: 400, maxHeight: "90vh", overflowY: "auto" }}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 14 }}>{editCode ? "編輯物料" : "新增物料"}</div>
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex",
+          alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16,
+        }}>
+          <div style={{
+            background: DS.surface, borderRadius: 20, padding: 20, width: "100%",
+            maxWidth: 400, maxHeight: "90vh", overflowY: "auto",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+          }}>
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 14, fontFamily: FONT_HEADLINE, color: DS.primary }}>
+              {editCode ? "編輯物料" : "新增物料"}
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <InputField label="品號 *" value={fCode} onChange={setFCode} placeholder="如 P03NB001" disabled={!!editCode} />
-              <InputField label="品名" value={fName} onChange={setFName} />
-              <InputField label="規格" value={fSpec} onChange={setFSpec} />
-              <InputField label="倉位" value={fLocation} onChange={setFLocation} placeholder="如 A100" />
-              <InputField label="庫存單位" value={fUnit} onChange={setFUnit} />
-              <InputField label="安全庫存量" type="number" value={fSafety} onChange={setFSafety} />
-              <InputField label="適用機種/製程" value={fMachine} onChange={setFMachine} />
-              <InputField label="期初結存" type="number" value={fInitStock} onChange={setFInitStock} />
+              <FieldInput label="品號 *" value={fCode} onChange={setFCode} placeholder="如 P03NB001" disabled={!!editCode} mono />
+              <FieldInput label="品名" value={fName} onChange={setFName} />
+              <FieldInput label="規格" value={fSpec} onChange={setFSpec} />
+              <FieldInput label="倉位" value={fLocation} onChange={setFLocation} placeholder="如 A100" />
+              <FieldInput label="庫存單位" value={fUnit} onChange={setFUnit} />
+              <FieldInput label="安全庫存量" type="number" value={fSafety} onChange={setFSafety} />
+              <FieldInput label="適用機種/製程" value={fMachine} onChange={setFMachine} />
+              <FieldInput label="期初結存" type="number" value={fInitStock} onChange={setFInitStock} />
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button onClick={() => setShowModal(false)} style={{ flex: 1, padding: "12px", borderRadius: 10, border: `1.5px solid ${BR.borderHi}`, background: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>取消</button>
-              <button onClick={saveModal} style={{ flex: 1, padding: "12px", borderRadius: 10, border: "none", background: BR.greenInk, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>儲存</button>
+              <button onClick={() => setShowModal(false)} style={{
+                flex: 1, padding: "12px", borderRadius: 12, border: `1.5px solid ${DS.border}`,
+                background: DS.surface, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT_BODY,
+                color: DS.onSurfaceVariant,
+              }}>取消</button>
+              <button onClick={saveModal} style={{
+                flex: 1, padding: "12px", borderRadius: 12, border: "none",
+                background: DS.primary, color: DS.onPrimary, fontSize: 14, fontWeight: 700,
+                cursor: "pointer", fontFamily: FONT_BODY,
+              }}>儲存</button>
             </div>
           </div>
         </div>
@@ -847,13 +1172,13 @@ function SettingsTab({ showToast }: { showToast: (m: string) => void }) {
 // Shared components
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function InputField({ label, value, onChange, placeholder, type, disabled }: {
+function FieldInput({ label, value, onChange, placeholder, type, disabled, mono }: {
   label: string; value: string; onChange: (v: string) => void;
-  placeholder?: string; type?: string; disabled?: boolean;
+  placeholder?: string; type?: string; disabled?: boolean; mono?: boolean;
 }) {
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: BR.inkSoft, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: DS.onSurfaceVariant, marginBottom: 4 }}>{label}</div>
       <input
         type={type || "text"}
         value={value}
@@ -861,9 +1186,10 @@ function InputField({ label, value, onChange, placeholder, type, disabled }: {
         placeholder={placeholder}
         disabled={disabled}
         style={{
-          width: "100%", padding: "10px 14px", fontSize: 14, borderRadius: 10,
-          border: `1.5px solid ${BR.borderHi}`, background: disabled ? "#f5f5f5" : "#fff",
-          outline: "none", fontFamily: FONT, color: BR.ink,
+          width: "100%", padding: "10px 14px", fontSize: 14, borderRadius: 12,
+          border: `1.5px solid ${DS.border}`, background: disabled ? DS.surfaceContainer : DS.bg,
+          outline: "none", fontFamily: mono ? FONT_MONO : FONT_BODY, color: DS.onSurface,
+          boxSizing: "border-box",
         }}
       />
     </div>
