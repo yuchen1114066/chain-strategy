@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>祺驊倉庫零件查詢系統 QR Code</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    @page {
+      margin: 0;
+      size: A4;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif;
+      background: #ffffff;
+      color: #000000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .container {
+      text-align: center;
+      padding: 40px;
+    }
+
+    .title {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      font-weight: 400;
+      letter-spacing: 6px;
+      color: #555555;
+      margin-bottom: 48px;
+    }
+
+    .qr-code {
+      display: inline-block;
+      padding: 16px;
+      margin-bottom: 40px;
+    }
+
+    .qr-code img {
+      width: 300px;
+      height: 300px;
+      display: block;
+    }
+
+    .instruction {
+      font-size: 18px;
+      font-weight: 400;
+      color: #333333;
+      margin-bottom: 12px;
+    }
+
+    .url {
+      font-size: 13px;
+      font-weight: 300;
+      color: #888888;
+      letter-spacing: 1px;
+      word-break: break-all;
+    }
+
+    @media print {
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      .container {
+        padding: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="title">祺驊倉庫零件查詢系統</h1>
+    <p class="subtitle">CHI HUA &middot; WAREHOUSE</p>
+    <div class="qr-code">
+      <img src="warehouse-qr.png" alt="QR Code" />
+    </div>
+    <p class="instruction">用手機掃描 QR Code 即可開啟</p>
+    <p class="url">chain-strategy-437l.vercel.app/erp/mobile/scan</p>
+  </div>
+</body>
+</html>

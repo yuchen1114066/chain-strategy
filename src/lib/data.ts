@@ -1131,6 +1131,19 @@ export const products: Product[] = [
     imageColor: "from-green-100 to-emerald-200",
     badge: "訂閱熱門",
   },
+  {
+    id: "12",
+    name: "線上中醫師諮詢（30分鐘）",
+    category: "專業服務",
+    price: 800,
+    description: "資深中醫師一對一線上視訊諮詢，為您進行體質分析、提供個人化養生建議和藥膳食療方案。",
+    features: ["資深中醫師", "線上視訊", "個人化方案", "書面報告"],
+    inStock: true,
+    rating: 4.9,
+    reviews: 445,
+    imageColor: "from-purple-100 to-violet-200",
+    badge: "專業推薦",
+  },
 ];
 
 export const seasonalTips = [

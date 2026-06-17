@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import MobileBottomNav from "@/components/MobileBottomNav";
+import ScrollToTop from "@/components/erp/ScrollToTop";
 
 export const metadata: Metadata = {
-  title: "養生道 YangSheng Dao | 傳統中醫養生平台",
-  description: "結合傳統中醫智慧與現代生活方式，提供體質測評、食療食譜、藥膳湯品、中西藥交互查詢等全方位養生服務。",
+  title: "祺驊 CHI HUA — AI Supply Chain Flow",
+  description: "Enterprise Supply Chain Control Tower → AI Decision Platform → Predictive Network → Autonomous OS",
 };
 
 export default function RootLayout({
@@ -18,9 +18,9 @@ export default function RootLayout({
     <html lang="zh-TW" className="h-full">
       <body className="min-h-full flex flex-col bg-[#fdfaf5] text-[#2c1810]">
         <Navbar />
-        <main className="flex-1 pb-16 md:pb-0">{children}</main>
-        <div className="hidden md:block"><Footer /></div>
-        <MobileBottomNav />
+        <main className="flex-1">{children}</main>
+        <Footer />
+        <ScrollToTop />
       </body>
     </html>
   );

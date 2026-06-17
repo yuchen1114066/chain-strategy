@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fdf7f2;
+  --foreground: #4a2a38;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Noto Sans TC", "IBM Plex Sans", "Inter", system-ui, sans-serif;
+  margin: 0;
+  line-height: 1.7;
+}
